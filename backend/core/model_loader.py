@@ -176,8 +176,7 @@ class ModelLoader:
             or None if the model is not found or an error occurs.
         """
         repo_id = f"{author}/{model_name}"
-        try:
-            # Fetch model info, including metadata about its files (siblings)
+        try: # Fetch model info, including metadata about its files (siblings)
             model_info = self.client.model_info(repo_id, files_metadata=True)
             if not model_info: # Should be caught by RepositoryNotFoundError, but good practice
                 logger.info(f"Model {repo_id} info returned None from API.")
