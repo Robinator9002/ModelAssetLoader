@@ -1,0 +1,258 @@
+/* frontend/src/style/global.css */
+
+:root {
+	/* Schriftarten */
+	--font-primary: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+		Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+	--font-monospace: "Fira Code", "Courier New", Courier, monospace;
+
+	/* Basisgrößen */
+	--font-size-base: 16px;
+	--spacing-unit: 8px;
+
+	/* Übergänge */
+	--transition-speed-fast: 0.15s;
+	--transition-speed-normal: 0.25s;
+	--transition-speed-slow: 0.4s;
+
+	/* Standard Theme: Dark */
+	--color-background: #121212;
+	--color-surface: #1e1e1e;
+	--color-surface-alt: #2c2c2c;
+	--color-surface-hover: #333333;
+	--color-border: #383838;
+	--color-text-primary: #e0e0e0;
+	--color-text-secondary: #b0b0b0;
+	--color-text-placeholder: #757575;
+	--color-primary: #6200ea;
+	--color-primary-variant: #3700b3;
+	--color-primary-hover: #7c4dff;
+	--color-primary-active: #5d10c8;
+	--color-accent: #03dac6;
+	--color-accent-hover: #66fff9;
+	--color-error: #cf6679;
+	--color-success: var(
+		--color-accent
+	); /* Using accent for success by default */
+	--color-error-rgb: 207, 102, 121; /* RGB for error color */
+	--color-accent-rgb: 3, 218, 198; /* RGB for accent color */
+
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.26);
+	--shadow-md: 0 3px 6px rgba(0, 0, 0, 0.36), 0 3px 6px rgba(0, 0, 0, 0.28);
+	--shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.39), 0 6px 6px rgba(0, 0, 0, 0.23);
+	--shadow-interactive-focus: 0 0 0 3px
+		rgba(
+			var(--color-primary-rgb, 98),
+			var(--color-primary-rgb, 0),
+			var(--color-primary-rgb, 234),
+			0.4
+		);
+
+	--border-radius-sm: 4px;
+	--border-radius-md: 8px;
+	--border-radius-lg: 16px;
+
+	--color-primary-rgb: 98, 0, 234;
+	/* --color-accent-rgb: 3, 218, 198; Already defined above */
+}
+
+.light-theme {
+	--color-background: #ffffff;
+	--color-surface: #f5f5f5;
+	--color-surface-alt: #eeeeee;
+	--color-surface-hover: #e0e0e0;
+	--color-border: #d1d1d1;
+	--color-text-primary: #212121;
+	--color-text-secondary: #616161;
+	--color-text-placeholder: #9e9e9e;
+	--color-primary: #6200ea;
+	--color-primary-variant: #3700b3;
+	--color-primary-hover: #7c4dff;
+	--color-primary-active: #5d10c8;
+	--color-accent: #00bfa5;
+	--color-accent-hover: #1de9b6;
+	--color-error: #b00020;
+	--color-error-rgb: 176, 0, 32; /* RGB for light theme error */
+	--color-accent-rgb: 0, 191, 165; /* RGB for light theme accent */
+
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.08);
+	--shadow-md: 0 3px 6px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.1);
+	--shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 6px 6px rgba(0, 0, 0, 0.08);
+	--shadow-interactive-focus: 0 0 0 3px
+		rgba(
+			var(--color-primary-rgb, 98),
+			var(--color-primary-rgb, 0),
+			var(--color-primary-rgb, 234),
+			0.3
+		);
+
+	/* --color-primary-rgb: 98, 0, 234; Already defined above */
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	font-size: var(--font-size-base);
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	font-family: var(--font-primary);
+	background-color: var(--color-background);
+	color: var(--color-text-primary);
+	transition: background-color var(--transition-speed-normal) ease,
+		color var(--transition-speed-normal) ease;
+	min-height: 100vh;
+	overflow: hidden; /* Verhindert Scrollbalken am Body, wenn ein Modal offen ist */
+	display: flex;
+	flex-direction: column;
+}
+/* Spezifische Klasse für Body, wenn ein Modal offen ist, um Scrollen zu verhindern */
+body.modal-open {
+	overflow: hidden;
+}
+
+#root {
+	flex-grow: 1;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden; /* Verhindert Scrollen des Hauptinhalts, wenn nicht nötig */
+}
+
+input,
+button,
+select,
+textarea {
+	font-family: inherit;
+	font-size: 1rem;
+	border-radius: var(--border-radius-md);
+	border: 1px solid var(--color-border);
+	background-color: var(--color-surface);
+	color: var(--color-text-primary);
+	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 1.5);
+	transition: border-color var(--transition-speed-fast) ease,
+		background-color var(--transition-speed-fast) ease,
+		box-shadow var(--transition-speed-fast) ease,
+		transform var(--transition-speed-fast) ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+	outline: none;
+	border-color: var(--color-primary);
+	box-shadow: var(--shadow-interactive-focus);
+}
+
+input::placeholder {
+	color: var(--color-text-placeholder);
+	opacity: 1;
+}
+
+button {
+	cursor: pointer;
+	background-color: var(--color-primary);
+	color: #ffffff;
+	border: none;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	box-shadow: var(--shadow-sm);
+}
+
+button:hover:not(:disabled) {
+	/* :not(:disabled) hinzugefügt */
+	background-color: var(--color-primary-hover);
+	box-shadow: var(--shadow-md);
+	transform: translateY(-1px);
+}
+button:active:not(:disabled) {
+	/* :not(:disabled) hinzugefügt */
+	background-color: var(--color-primary-active);
+	box-shadow: none;
+	transform: translateY(0px);
+}
+button:disabled {
+	background-color: var(
+		--color-border
+	) !important; /* Wichtig, um spezifischere Styles zu überschreiben */
+	color: var(--color-text-placeholder) !important;
+	cursor: not-allowed;
+	box-shadow: none;
+	transform: none;
+}
+
+::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+::-webkit-scrollbar-track {
+	background: var(--color-surface-alt);
+	border-radius: var(
+		--border-radius-lg
+	); /* Gilt nur, wenn der Track selbst abgerundet ist */
+}
+::-webkit-scrollbar-thumb {
+	background: var(--color-border);
+	border-radius: var(--border-radius-lg);
+	border: 3px solid var(--color-surface-alt); /* Erzeugt einen "Padding"-Effekt */
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--color-primary-hover);
+}
+::-webkit-scrollbar-thumb:active {
+	/* :active statt :hover:active */
+	background: var(--color-primary);
+}
+
+.container {
+	width: 90%;
+	max-width: 1400px;
+	margin-left: auto;
+	margin-right: auto;
+	padding-left: calc(var(--spacing-unit) * 2);
+	padding-right: calc(var(--spacing-unit) * 2);
+}
+
+/* Generischer Modal Overlay Style */
+.modal-overlay {
+	position: fixed; /* Bleibt beim Scrollen an Ort und Stelle */
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 0.65); /* Halbtransparenter Hintergrund */
+	display: none; /* Standardmäßig ausgeblendet */
+	align-items: center; /* Zentriert den Inhalt vertikal */
+	justify-content: center; /* Zentriert den Inhalt horizontal */
+	z-index: 1000; /* Stellt sicher, dass es über anderen Inhalten liegt */
+	padding: var(
+		--spacing-unit
+	); /* Kleiner Abstand zum Rand bei sehr kleinen Bildschirmen */
+	/* overflow-y: auto; /* Erlaubt Scrollen des Overlays, falls Inhalt doch größer als Viewport - besser am modal-content */
+}
+
+.modal-overlay.active {
+	display: flex; /* Zeigt das Overlay an, wenn aktiv */
+}
+
+/* Generischer Stil für den Modal-Inhaltscontainer */
+/* Spezifische Größen und Scrolling werden in den jeweiligen Modal-CSS-Dateien gehandhabt */
+.modal-content {
+	background-color: var(--color-surface);
+	border-radius: var(--border-radius-lg);
+	box-shadow: var(--shadow-lg);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden; /* Verhindert, dass der Content-Block selbst scrollt; Scrolling im Body */
+	width: 95%; /* Default responsive width */
+	/* max-width, min-height, max-height sollten spezifisch pro Modal gesetzt werden */
+}

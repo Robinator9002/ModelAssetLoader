@@ -1,0 +1,52 @@
+/* frontend/src/App.css */
+@import url("./style/global.css");
+@import url("./style/Theme/ThemeSwitcher.css");
+@import url("./style/ModelLoader/ModelSearchPage.css");
+@import url("./style/ModelLoader/ModelDetailsPage.css");
+@import url("./style/Layout/Navbar.css");
+@import url("./style/Layout/ConfirmModal.css");
+@import url("./style/Layout/FolderSelector.css");
+@import url("./style/Files/ConfigurationsPage.css");
+@import url("./style/Files/DownloadModal.css");
+
+.app-wrapper {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	overflow: hidden;
+	background-color: var(--color-background);
+}
+
+.app-header-placeholder {
+	flex-shrink: 0;
+	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
+	background-color: var(--color-surface);
+	box-shadow: var(--shadow-md);
+	z-index: 10;
+	display: flex; /* Hinzugefügt für Titelausrichtung */
+	align-items: center; /* Hinzugefügt für Titelausrichtung */
+	justify-content: center; /* Hinzugefügt für Titelausrichtung */
+	border-bottom: 1px solid var(--color-border); /* Subtile Trennlinie */
+}
+.app-header-placeholder h1 {
+	font-size: 1.5rem;
+	color: var(--color-primary);
+	margin: 0;
+	font-weight: 600; /* Etwas dickerer Titel */
+}
+
+.main-content-area {
+	flex-grow: 1;
+	overflow-y: auto;
+	padding: calc(var(--spacing-unit) * 3);
+	position: relative;
+}
+
+.theme-switcher-container {
+	position: fixed;
+	bottom: calc(var(--spacing-unit) * 3);
+	left: calc(var(--spacing-unit) * 3);
+	z-index: 1000;
+	display: flex;
+	gap: var(--spacing-unit);
+}

@@ -1,0 +1,73 @@
+/* frontend/src/style/Layout/Navbar.css */
+.app-navbar {
+	background-color: var(
+		--color-surface
+	); /* Angepasst an Header-Farbe für Einheitlichkeit */
+	padding: 0 calc(var(--spacing-unit) * 1); /* Weniger horizontales Padding */
+	box-shadow: var(--shadow-sm);
+	display: flex;
+	justify-content: flex-start; /* Tabs linksbündig für typische App-Nav */
+	border-bottom: 1px solid var(--color-border);
+	flex-shrink: 0;
+	overflow-x: auto; /* Falls mehr Tabs als Platz */
+	overflow-y: hidden;
+}
+
+.navbar-tabs-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+}
+
+.navbar-tab-item {
+	/* Styling auf Button */
+}
+
+.navbar-tab-button {
+	background-color: transparent;
+	color: var(--color-text-secondary);
+	border: none;
+	padding: calc(var(--spacing-unit) * 1.75) calc(var(--spacing-unit) * 2.5); /* Etwas mehr Höhe */
+	cursor: pointer;
+	font-weight: 500;
+	font-size: 0.9rem;
+	text-transform: none; /* Normaler Text für bessere Lesbarkeit */
+	letter-spacing: 0.25px;
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--spacing-unit) * 0.75); /* Kleinerer Abstand zum Icon */
+	border-bottom: 3px solid transparent;
+	transition: color var(--transition-speed-fast) ease,
+		border-bottom-color var(--transition-speed-fast) ease,
+		background-color var(--transition-speed-fast) ease;
+	margin-bottom: -1px;
+	white-space: nowrap; /* Verhindert Umbruch des Tab-Labels */
+}
+
+.navbar-tab-button:hover {
+	color: var(--color-text-primary);
+	background-color: var(--color-surface-hover);
+}
+
+.navbar-tab-button.active {
+	color: var(--color-primary);
+	border-bottom-color: var(--color-primary);
+	font-weight: 600; /* Aktiver Tab etwas dicker */
+	background-color: transparent; /* Kein extra Hintergrund für aktiven Tab */
+}
+
+.navbar-tab-icon svg {
+	width: 16px; /* Icons etwas kleiner */
+	height: 16px;
+	stroke-width: 2;
+	transition: stroke var(--transition-speed-fast) ease;
+}
+
+.navbar-tab-button:hover .navbar-tab-icon svg {
+	stroke: var(--color-text-primary);
+}
+
+.navbar-tab-button.active .navbar-tab-icon svg {
+	stroke: var(--color-primary);
+}

@@ -1,0 +1,110 @@
+/* frontend/src/style/Layout/ConfirmModal.css */
+.modal-overlay.confirm-modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: rgba(
+		0,
+		0,
+		0,
+		0.6
+	); /* Dunkleres Overlay für besseren Fokus */
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 2000; /* Sehr hoch, über anderen UI-Elementen */
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity var(--transition-speed-normal) ease,
+		visibility 0s linear var(--transition-speed-normal);
+}
+
+.modal-overlay.confirm-modal-overlay.active {
+	opacity: 1;
+	visibility: visible;
+	transition-delay: 0s;
+}
+
+.modal-content.confirm-modal-content {
+	background-color: var(--color-surface);
+	padding: calc(var(--spacing-unit) * 3); /* 24px */
+	border-radius: var(--border-radius-lg);
+	box-shadow: var(--shadow-lg);
+	width: 100%;
+	max-width: 450px; /* Etwas schmaler für typische Bestätigungen */
+	z-index: 2001;
+	text-align: left; /* Text linksbündig für bessere Lesbarkeit */
+	transform: scale(0.95);
+	opacity: 0;
+	transition: transform var(--transition-speed-normal) ease,
+		opacity var(--transition-speed-normal) ease;
+}
+
+.modal-overlay.confirm-modal-overlay.active .confirm-modal-content {
+	transform: scale(1);
+	opacity: 1;
+}
+
+.confirm-modal-title {
+	margin-top: 0;
+	margin-bottom: calc(var(--spacing-unit) * 1.5); /* 12px */
+	color: var(--color-text-primary);
+	font-size: 1.25rem; /* 20px */
+	font-weight: 600;
+}
+
+.confirm-modal-message {
+	margin-bottom: calc(var(--spacing-unit) * 3); /* 24px */
+	font-size: 1rem; /* 16px */
+	color: var(--color-text-secondary);
+	line-height: 1.6;
+}
+.confirm-modal-message p {
+	/* Falls message ReactNode mit <p> ist */
+	margin-bottom: var(--spacing-unit);
+}
+.confirm-modal-message p:last-child {
+	margin-bottom: 0;
+}
+
+.confirm-modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: calc(var(--spacing-unit) * 1.5); /* 12px */
+	margin-top: calc(var(--spacing-unit) * 2); /* 16px */
+}
+
+/* Spezifische Button-Styles für Modal, die globale .button-Klasse wird genutzt */
+.modal-button {
+	padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2); /* 8px 16px */
+	font-size: 0.9rem;
+}
+
+.cancel-button {
+	background-color: var(--color-surface-alt);
+	color: var(--color-text-secondary);
+	border: 1px solid var(--color-border);
+}
+.cancel-button:hover {
+	background-color: var(--color-surface-hover);
+	color: var(--color-text-primary);
+}
+
+.confirm-button.button-primary-alt {
+	/* Eine alternative Primär-Button-Optik */
+	background-color: var(--color-primary);
+	color: #ffffff;
+}
+.confirm-button.button-primary-alt:hover {
+	background-color: var(--color-primary-hover);
+}
+
+.confirm-button.button-danger {
+	background-color: var(--color-error);
+	color: #ffffff;
+}
+.confirm-button.button-danger:hover {
+	background-color: color-mix(in srgb, var(--color-error) 85%, black);
+}

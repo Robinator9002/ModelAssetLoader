@@ -1,0 +1,216 @@
+/* frontend/src/components/ModelLoader/ModelSearchPage.css */
+.model-search-page {
+	display: flex;
+	flex-direction: column;
+	/* Removed gap here, will be managed by flex items or specific margins */
+	color: var(--color-text-primary);
+	height: 100%; /* Wichtig, damit Flexbox-Kinder die Höhe korrekt nutzen können */
+	overflow: hidden; /* Verhindert, dass die Seite selbst scrollt */
+}
+
+.search-form-container {
+	/* Neuer Wrapper für das Formular */
+	padding: calc(var(--spacing-unit) * 2);
+	background-color: var(--color-surface);
+	border-radius: var(--border-radius-lg);
+	box-shadow: var(--shadow-md);
+	margin-bottom: calc(var(--spacing-unit) * 2); /* Abstand zur Liste */
+	flex-shrink: 0; /* Verhindert, dass das Formular schrumpft */
+}
+
+.search-form {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--spacing-unit) * 2);
+}
+
+.form-row {
+	display: flex;
+	gap: calc(var(--spacing-unit) * 2);
+}
+
+.filter-row,
+.sort-row {
+	flex-wrap: wrap;
+}
+
+.search-input-main {
+	flex-grow: 1;
+	font-size: 1.1rem;
+	padding: calc(var(--spacing-unit) * 1.5);
+}
+
+.search-input-filter,
+.search-select {
+	flex: 1 1 200px;
+	min-width: 180px;
+}
+
+.search-button,
+.load-more-button {
+	background-color: var(--color-primary);
+	color: #ffffff; /* Weißer Text für Kontrast */
+	border: none;
+	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2.5);
+	border-radius: var(--border-radius-md);
+	cursor: pointer;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	transition: background-color var(--transition-speed-fast) ease,
+		transform var(--transition-speed-fast) ease;
+	box-shadow: var(--shadow-sm);
+}
+.search-button:hover,
+.load-more-button:hover {
+	background-color: var(--color-primary-hover);
+	transform: translateY(-1px);
+	box-shadow: var(--shadow-md);
+}
+.search-button:active,
+.load-more-button:active {
+	transform: translateY(0);
+	box-shadow: var(--shadow-sm);
+}
+.search-button:disabled,
+.load-more-button:disabled {
+	background-color: var(--color-border) !important;
+	color: var(--color-text-placeholder) !important;
+	cursor: not-allowed;
+	box-shadow: none;
+	transform: none;
+}
+
+.error-message {
+	color: var(--color-error);
+	text-align: center;
+	padding: var(--spacing-unit);
+	background-color: rgba(207, 102, 121, 0.1); /* cf6679 mit alpha */
+	border: 1px solid var(--color-error);
+	border-radius: var(--border-radius-md);
+	margin: calc(var(--spacing-unit) * 2) 0;
+}
+
+.no-results-message,
+.loading-message {
+	text-align: center;
+	color: var(--color-text-secondary);
+	padding: calc(var(--spacing-unit) * 4) 0;
+	font-style: italic;
+	flex-grow: 1; /* Nimmt Platz ein, wenn keine Ergebnisse da sind */
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.search-results-container {
+	/* Neuer Container für die Liste und den "Mehr laden"-Button */
+	flex-grow: 1; /* Nimmt den restlichen Platz ein */
+	overflow-y: auto; /* ERMÖGLICHT SCROLLEN HIER */
+	padding-right: calc(
+		var(--spacing-unit) * 0.5
+	); /* Platz für Scrollbar, um Layout-Sprünge zu minimieren */
+	display: flex;
+	flex-direction: column; /* Damit der Button unter der Liste bleibt */
+}
+
+.search-results-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: auto;
+	gap: calc(var(--spacing-unit) * 1.5);
+}
+
+.result-item {
+	background-color: var(
+		--color-surface-alt
+	); /* Etwas andere Farbe für Listenelemente */
+	border-radius: var(--border-radius-md);
+	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2); /* Angepasstes Padding */
+	display: flex;
+	align-items: center;
+	gap: calc(var(--spacing-unit) * 2);
+	cursor: pointer;
+	transition: background-color var(--transition-speed-normal) ease,
+		transform var(--transition-speed-normal) ease,
+		box-shadow var(--transition-speed-normal) ease;
+	border: 1px solid transparent; /* Für Hover-Effekt */
+}
+
+.result-item:hover {
+	background-color: var(--color-surface-hover);
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-md);
+	border-color: var(--color-primary); /* Akzentuierung beim Hover */
+}
+
+.result-item-icon {
+	flex-shrink: 0;
+	color: var(--color-accent);
+	background-color: rgba(
+		var(--color-accent-rgb, 3),
+		var(--color-accent-rgb, 218),
+		var(--color-accent-rgb, 198),
+		0.1
+	); /* Hintergrund für Icon */
+	border-radius: 50%;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.model-icon {
+	width: 24px;
+	height: 24px;
+}
+
+.result-item-info {
+	flex-grow: 1;
+	overflow: hidden; /* Verhindert, dass Text das Layout sprengt */
+}
+
+.result-item-info h3 {
+	margin-bottom: calc(var(--spacing-unit) * 0.25);
+	color: var(--color-text-primary);
+	font-size: 1.1rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis; /* Lange Titel abschneiden */
+}
+
+.author-info {
+	font-size: 0.9rem;
+	color: var(--color-text-secondary);
+	margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
+.pipeline-tag {
+	background-color: var(--color-border);
+	color: var(--color-text-secondary);
+	padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.75);
+	border-radius: var(--border-radius-sm);
+	font-size: 0.75rem;
+	display: inline-block;
+}
+
+.result-item-stats {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	font-size: 0.8rem;
+	color: var(--color-text-secondary);
+	gap: calc(var(--spacing-unit) * 0.25);
+	min-width: 160px; /* Mehr Platz */
+	text-align: right;
+	flex-shrink: 0;
+}
+
+.load-more-button {
+	align-self: center;
+	margin: calc(var(--spacing-unit) * 3) 0 calc(var(--spacing-unit) * 1); /* Mehr Abstand oben und unten */
+	padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 3); /* Etwas kompakter */
+}

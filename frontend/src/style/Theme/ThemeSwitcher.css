@@ -1,0 +1,33 @@
+/* frontend/src/components/ThemeSwitcher/ThemeSwitcher.css */
+.theme-switcher-button {
+	background-color: var(--color-surface);
+	color: var(--color-text-primary);
+	border: 1px solid var(--color-border);
+	border-radius: 50%; /* Macht den Button rund */
+	width: 48px; /* Feste Größe für den Button */
+	height: 48px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	padding: 0; /* Entferne Standard-Padding von Buttons */
+	box-shadow: var(--shadow-md);
+	transition: background-color var(--transition-speed-normal) ease,
+		transform var(--transition-speed-fast) ease;
+}
+
+.theme-switcher-button:hover {
+	background-color: var(--color-surface-hover);
+	transform: translateY(-2px); /* Leichter Schwebeeffekt */
+}
+
+.theme-switcher-button:active {
+	transform: translateY(0px);
+	box-shadow: var(--shadow-sm);
+}
+
+.theme-switcher-button svg {
+	width: 24px;
+	height: 24px;
+	stroke: var(--color-primary); /* Nutze die Primärfarbe für die Icons */
+}
