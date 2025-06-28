@@ -8,13 +8,14 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+__pycache__
 dist
 dist-ssr
 *.local
 
 # Editor directories and files
 .vscode/*
-__pycache__
+__pycache__/*
 !.vscode/extensions.json
 .idea
 .DS_Store
