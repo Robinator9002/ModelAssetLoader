@@ -1,9 +1,9 @@
 # backend/main.py
 from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional, Dict, Any # Removed 'Depends' as it's not used
+from typing import List, Optional
 
-# Assuming your project structure is:
+# The Project structure is:
 # project_root/
 #  ├─ backend/
 #  │  ├─ main.py
@@ -16,12 +16,10 @@ from typing import List, Optional, Dict, Any # Removed 'Depends' as it's not use
 #  └─ config/
 #     └─ mal_settings.json
 #
-# Adjust imports if your structure differs.
 # For this structure, direct relative imports like `from .core...` are common if backend is a package.
 # If running main.py directly and backend is not installed as a package,
 # Python's path might need adjustment, or use absolute imports assuming 'backend' is in PYTHONPATH.
 # For simplicity with uvicorn main:app, we'll assume 'backend' is discoverable.
-# If you have an __init__.py in 'backend', 'core', and 'api', it helps treat them as packages.
 
 from backend.core.model_loader import ModelLoader
 from backend.core.file_manager import FileManager
@@ -36,10 +34,9 @@ from backend.api.models import (
 )
 
 import logging
-import pathlib # Not directly used here, but good for path manipulations if needed
 
 # --- Logging Configuration ---
-# Basic logging setup. For production, consider more advanced configurations
+# Basic logging setup. For production, we should consider more advanced configurations
 # (e.g., structured logging, sending logs to a file or service).
 logging.basicConfig(
     level=logging.INFO, # Set to DEBUG for more verbose output during development
@@ -62,15 +59,15 @@ app = FastAPI(
 # --- CORS (Cross-Origin Resource Sharing) Middleware ---
 # Configure allowed origins for frontend requests.
 # For development, "http://localhost:5173" (default Vite dev server) is common.
-# For production, replace with your frontend's actual domain.
+# For production, this should be replaced by the frontend's actual domain.
 origins = [
     "http://localhost:5173", # Vite dev server
-    # Add other origins if needed, e.g., your production frontend URL
+    # Add other origins if needed, e.g., the production frontend URL
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins,  # Only allow certain Origins, for Safety and Best Practice
     allow_credentials=True, # Allows cookies to be included in requests
     allow_methods=["*"],    # Allows all standard HTTP methods
     allow_headers=["*"],    # Allows all headers
@@ -83,7 +80,7 @@ try:
     file_manager = FileManager()
 except Exception as e:
     logger.critical(f"Failed to initialize core services: {e}", exc_info=True)
-    # Depending on severity, you might want the app to not start or enter a degraded mode.
+    # Depending on severity, we might want the app to not start or enter a degraded mode.
     # For now, it will likely raise an error if services are None.
     # Consider adding health check endpoints.
     raise RuntimeError(f"Core service initialization failed: {e}") from e
