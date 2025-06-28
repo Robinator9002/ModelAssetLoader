@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Project Data Folder
+config
+
 # Editor directories and files
 .vscode/*
 __pycache__
