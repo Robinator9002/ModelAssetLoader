@@ -8,6 +8,7 @@
 @import url("./style/Layout/FolderSelector.css");
 @import url("./style/Files/ConfigurationsPage.css");
 @import url("./style/Files/DownloadModal.css");
+@import url("./style/Files/DownloadManager.css");
 
 .app-wrapper {
 	display: flex;
