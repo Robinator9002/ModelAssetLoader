@@ -231,7 +231,7 @@ async def download_model_file_endpoint(download_request: FileDownloadRequest):
     The FileManager determines the correct local subdirectory based on configuration.
     """
     logger.info(f"Received download request: {download_request.model_dump()}")
-    if not file_manager.base_path:
+    if not file_manager.config.base_path:
         logger.warning("Download request failed: Base path not configured.")
         raise HTTPException(status_code=400, detail="Base path not configured. Please configure paths first.")
 
