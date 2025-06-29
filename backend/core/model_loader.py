@@ -8,33 +8,40 @@ logger = logging.getLogger(__name__)
 
 class ModelLoader:
     """
-    Handles interactions with the Hugging Face Hub API to search,
-    list, and retrieve information about models.
+    Handles interactions with the Hugging Face Hub API.
 
-    Attributes:
-        client (HfApi): An instance of the Hugging Face API client.
+    This class provides methods to search, list, and retrieve detailed
+    information about models hosted on the Hugging Face Hub. It serves as a
+    dedicated layer for all Hub-related communications.
     """
 
     def __init__(self):
         """Initializes the ModelLoader with an HfApi client."""
         self.client = HfApi()
+        logger.info("ModelLoader initialized with HfApi client.")
 
     def _model_info_to_dict_list_item(self, model_info: ModelInfo) -> Dict[str, Any]:
         """
-        Converts a ModelInfo object to a dictionary suitable for representing
-        a model in a list (e.g., for search results, matching HFModelListItem).
+        Converts a ModelInfo object into a dictionary for a model list item.
 
-        Internal helper method.
+        This helper method maps fields from the Hugging Face `ModelInfo` object
+        to the structure defined by the `HFModelListItem` Pydantic model, ensuring
+        consistency for API responses.
+
+        Args:
+            model_info: The ModelInfo object from the huggingface_hub library.
+
+        Returns:
+            A dictionary representing the model for a list view.
         """
-        # Derive model_name from id if it contains a '/', otherwise use id as is.
-        # This is a common pattern if the full ID is like "author/model_name".
+        # The model name is often the last part of the repo ID (e.g., 'model_name' in 'author/model_name').
         model_name_derived = model_info.id.split('/')[-1] if '/' in model_info.id else model_info.id
         return {
             "id": model_info.id,
             "author": model_info.author,
             "model_name": model_name_derived,
             "lastModified": model_info.lastModified,
-            "tags": model_info.tags or [], # Ensure tags is always a list
+            "tags": model_info.tags or [], # Ensure tags is always a list, not None.
             "pipeline_tag": model_info.pipeline_tag,
             "downloads": model_info.downloads,
             "likes": model_info.likes
@@ -42,29 +49,28 @@ class ModelLoader:
 
     def _model_info_to_dict_details(self, model_info: ModelInfo, readme_content: Optional[str]) -> Dict[str, Any]:
         """
-        Converts a ModelInfo object and README content to a dictionary
-        suitable for representing detailed model information (matching HFModelDetails).
+        Converts a ModelInfo object and README content into a detailed model dictionary.
 
-        Internal helper method.
+        This helper maps fields to the structure defined by the `HFModelDetails`
+        Pydantic model, including file lists and README content.
+
+        Args:
+            model_info: The full ModelInfo object from the huggingface_hub library.
+            readme_content: The string content of the model's README file.
+
+        Returns:
+            A dictionary with detailed model information.
         """
         model_name_derived = model_info.id.split('/')[-1] if '/' in model_info.id else model_info.id
-        files = []
-        if model_info.siblings:  # siblings represent the files in the repository
-            files = [{"rfilename": f.rfilename, "size": f.size} for f in model_info.siblings]
+        files = [{"rfilename": f.rfilename, "size": f.size} for f in model_info.siblings] if model_info.siblings else []
 
-        # --- Pydantic Compatibility for 'gated' attribute ---
-        # The 'gated' attribute from Hugging Face's ModelInfo can be a boolean,
-        # a string (e.g., "auto", "manual"), or None.
-        # Pydantic models (like HFModelDetails) might expect a consistent type, e.g., Optional[str].
-        # This conversion ensures that boolean True/False are converted to "True"/"False" strings,
-        # None remains None, and existing strings are passed through.
+        # Pydantic Compatibility Fix for the 'gated' attribute:
+        # The 'gated' attribute from ModelInfo can be a bool, a string ("auto", "manual"), or None.
+        # Our Pydantic model `HFModelDetails` expects Optional[str] for consistency.
+        # This logic converts boolean values to their string representation.
         gated_value = model_info.gated
         if isinstance(gated_value, bool):
-            gated_value = str(gated_value)  # Convert True to "True", False to "False"
-        # elif gated_value is None: # This check is redundant if Pydantic model expects Optional[str]
-        #     gated_value = None    # as None is a valid value for Optional[str].
-        # If it's already a string (e.g., "auto", "manual") or None, it's fine for Optional[str].
-        # --- End of Pydantic Compatibility Fix ---
+            gated_value = str(gated_value)  # Convert True -> "True", False -> "False"
 
         return {
             "id": model_info.id,
@@ -77,7 +83,7 @@ class ModelLoader:
             "likes": model_info.likes,
             "sha": model_info.sha,
             "private": model_info.private,
-            "gated": gated_value,  # Use the processed value
+            "gated": gated_value,  # Use the processed, string-compatible value
             "library_name": model_info.library_name,
             "siblings": files,
             "readme_content": readme_content,
@@ -94,138 +100,127 @@ class ModelLoader:
         page: int = 1,
     ) -> Tuple[List[Dict[str, Any]], bool]:
         """
-        Searches for models on the Hugging Face Hub with pagination.
+        Searches for models on the Hugging Face Hub with server-side pagination.
+
+        This method fetches a list of models based on search criteria and paginates
+        the results.
 
         Args:
-            search_query: The search term.
-            author: Filter by author.
+            search_query: The main search term.
+            author: Filter models by a specific author or organization.
             tags: A list of tags to filter by.
-            sort_by: Field to sort by (e.g., "lastModified", "downloads", "likes").
-            sort_direction: -1 for descending, 1 for ascending.
-            limit: Number of results per page.
-            page: The page number to retrieve (1-indexed).
+            sort_by: The field to sort results by (e.g., "downloads", "likes").
+            sort_direction: Sort direction: -1 for descending, 1 for ascending.
+            limit: The number of results to return per page.
+            page: The desired page number (1-indexed).
 
         Returns:
             A tuple containing:
-                - A list of model dictionaries (matching HFModelListItem structure).
-                - A boolean indicating if more results are available (has_more).
+                - A list of model dictionaries for the requested page.
+                - A boolean indicating if more pages are available (`has_more`).
         """
-        # Note: HfApi().list_models returns an iterator.
-        # To implement pagination and determine 'has_more' without a total count from the API,
-        # we fetch a bit more than needed for the current page if possible, or iterate
-        # and count.
-        # Setting 'limit=None' in list_models fetches all matching models if not further constrained.
-        # We will fetch all and then paginate manually from the iterator's results.
+        # --- Pagination Strategy ---
+        # The `huggingface_hub.list_models` returns an iterator over all matching models.
+        # It does not provide a total count, making traditional database-style pagination
+        # (e.g., with OFFSET) impossible.
+        # To implement pagination and determine if a next page exists (`has_more`),
+        # we manually process the iterator. We iterate up to the end of the *next* page
+        # to see if there are enough items to confirm a "next page" exists.
+        
+        logger.info(f"Searching HF models: page={page}, limit={limit}, query='{search_query}', sort='{sort_by}'")
+
         models_iterator = self.client.list_models(
             search=search_query,
             author=author,
             filter=tags,
             sort=sort_by,
             direction=sort_direction,
-            limit=None, # Fetch all metadata, then paginate manually
-            full=False, # Avoid fetching full model card data for list items for performance
-            cardData=False # Avoid fetching card data for list items
+            limit=None,       # Fetch all matching metadata from the Hub API.
+            full=False,       # Performance: Don't fetch full card data for list items.
+            cardData=False
         )
 
-        results = []
+        results_for_page = []
         start_index = (page - 1) * limit
-        # items_considered_count is used to determine if there might be more items
-        # beyond the current page.
-        items_processed_from_iterator = 0
+        # We need to check one item beyond the current page to determine `has_more`.
+        end_index_for_check = start_index + limit + 1
+        
+        items_processed_count = 0
 
         try:
             for i, model_info in enumerate(models_iterator):
-                items_processed_from_iterator = i + 1 # Count how many items we've processed
+                items_processed_count = i + 1
 
-                if i >= start_index and len(results) < limit:
-                    results.append(self._model_info_to_dict_list_item(model_info))
-
-                # Optimization: If we've filled the current page and have already processed
-                # enough items to know there's at least one more for the next page,
-                # we can break early. This avoids iterating through the entire HfApi result
-                # if we only need a few pages.
-                if len(results) == limit and items_processed_from_iterator > (start_index + limit):
+                # If the item is within the bounds of the current page, add it to results.
+                if start_index <= i < (start_index + limit):
+                    results_for_page.append(self._model_info_to_dict_list_item(model_info))
+                
+                # Optimization: If we have processed enough items to determine `has_more`
+                # and have filled the current page, we can stop iterating early.
+                if items_processed_count >= end_index_for_check:
                     break
             
-            # Determine if there are more results.
-            # 'has_more' is true if the number of items processed from the iterator
-            # is greater than the number of items that would fill up to the *end* of the current page.
-            has_more = items_processed_from_iterator > (start_index + limit)
+            # `has_more` is true if the total number of items we could process from the iterator
+            # is greater than the number of items that would fill up to the end of the current page.
+            has_more = items_processed_count > (start_index + limit)
 
         except (GatedRepoError, RepositoryNotFoundError, HFValidationError) as e:
-            logger.error(f"API error during model search (query: '{search_query}'): {e}")
-            return [], False # Return empty list and no more pages on API error
+            logger.error(f"Hugging Face API error during model search (query: '{search_query}'): {e}")
+            return [], False # Return empty list and no more pages on a known API error.
         except Exception as e:
-            logger.error(f"Unexpected error during model search (query: '{search_query}'): {e}", exc_info=True)
-            # Re-raise for unhandled exceptions to allow higher-level error handling
-            # or to be caught by FastAPI's exception handlers.
-            raise
+            logger.error(f"An unexpected error occurred during model search: {e}", exc_info=True)
+            raise # Re-raise for FastAPI's main error handler to catch.
 
-        return results, has_more
+        return results_for_page, has_more
 
     def get_model_details(self, author: str, model_name: str) -> Optional[Dict[str, Any]]:
         """
-        Retrieves detailed information for a specific model, including its README content.
+        Retrieves detailed information for a specific model, including its README.
 
         Args:
-            author: The author or organization of the model.
+            author: The author or organization that owns the model repository.
             model_name: The name of the model.
 
         Returns:
-            A dictionary containing model details (matching HFModelDetails structure),
-            or None if the model is not found or an error occurs.
+            A dictionary containing detailed model information, or None if the
+            model is not found or another error occurs.
         """
         repo_id = f"{author}/{model_name}"
-        try: # Fetch model info, including metadata about its files (siblings)
+        logger.info(f"Fetching details for model repository: {repo_id}")
+        try:
+            # Fetch model info, including metadata about its files (siblings).
             model_info = self.client.model_info(repo_id, files_metadata=True)
-            if not model_info: # Should be caught by RepositoryNotFoundError, but good practice
-                logger.info(f"Model {repo_id} info returned None from API.")
+            if not model_info:
+                # This case is usually caught by RepositoryNotFoundError, but is a safe fallback.
+                logger.warning(f"API call for {repo_id} returned no data.")
                 return None
 
             readme_content = None
-            readme_filename_on_hub = None
+            readme_filename = next((s.rfilename for s in model_info.siblings if s.rfilename.upper() == "README.MD"), None)
 
-            # Find the README file among the model's siblings (files)
-            if model_info.siblings:
-                for sibling in model_info.siblings:
-                    # README.md is case-insensitive on some systems but usually canonical on Hub
-                    if sibling.rfilename.upper() == "README.MD":
-                        readme_filename_on_hub = sibling.rfilename
-                        break # Found the README
-
-            if readme_filename_on_hub:
+            if readme_filename:
                 try:
-                    # Download the README file
-                    readme_path_on_disk = self.client.hf_hub_download(
+                    # Download the README file's content.
+                    readme_path = self.client.hf_hub_download(
                         repo_id=repo_id,
-                        filename=readme_filename_on_hub,
-                        repo_type="model" # Ensure we are looking for a model type repo
+                        filename=readme_filename,
+                        repo_type="model"
                     )
-                    with open(readme_path_on_disk, 'r', encoding='utf-8') as f:
+                    with open(readme_path, 'r', encoding='utf-8') as f:
                         readme_content = f.read()
-                except RepositoryNotFoundError:
-                    # This can happen if the README is listed as a sibling but is not downloadable
-                    # (e.g., due to .gitattributes or other reasons, though rare for READMEs).
-                    logger.warning(
-                        f"README file '{readme_filename_on_hub}' for {repo_id} "
-                        f"was listed in siblings but not found for download."
-                    )
                 except Exception as e:
                     logger.warning(
-                        f"Could not download or read README for {repo_id} "
-                        f"(file: {readme_filename_on_hub}): {e}"
+                        f"Could not download or read README ('{readme_filename}') for repo {repo_id}: {e}"
                     )
             
             return self._model_info_to_dict_details(model_info, readme_content)
 
         except RepositoryNotFoundError:
-            logger.info(f"Model {repo_id} not found on Hugging Face Hub.")
-            return None
+            logger.info(f"Model repository '{repo_id}' not found on Hugging Face Hub.")
+            return None # Expected error, return None for a 404 response upstream.
         except (GatedRepoError, HFValidationError) as e:
-            # These are specific Hugging Face client errors
-            logger.error(f"API error retrieving model details for {repo_id}: {e}")
-            return None
+            logger.error(f"API error for {repo_id}: {e}")
+            return None # Specific, known client errors.
         except Exception as e:
-            logger.error(f"Unexpected error retrieving model details for {repo_id}: {e}", exc_info=True)
-            # Re-raise for unhandled exceptions
-            raise
+            logger.error(f"An unexpected error occurred retrieving details for {repo_id}: {e}", exc_info=True)
+            raise # Re-raise unexpected errors for the server to handle.
