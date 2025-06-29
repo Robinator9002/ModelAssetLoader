@@ -485,7 +485,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
     }, [isOpen, fetchDirectoryStructure, setExpandedPaths]);
 
     const handleNodeInteraction = useCallback(
-        async (path: string, level: number) => {
+        async (path: string) => {
             setSelectedPath(path);
             setCurrentDisplayPath(path);
             setPathInput(path);
@@ -551,7 +551,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
     const handleGoToPathInput = useCallback(async () => {
         const trimmedPath = pathInput.trim();
         if (trimmedPath) {
-            await handleNodeInteraction(trimmedPath, -1);
+            await handleNodeInteraction(trimmedPath);
         } else {
             setError("Bitte geben Sie einen Pfad ein.");
         }
