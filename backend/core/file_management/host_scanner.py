@@ -63,21 +63,18 @@ class HostScanner:
     def _scan_recursive(
         self, current_path: pathlib.Path, depth: int, max_depth: int, visited_ids: Set[tuple], scan_root: pathlib.Path
     ) -> List[Dict[str, Any]]:
-        """Recursively scans directories, handling symlinks and permissions."""
+        """
+        Recursively scans directories, handling symlinks and permissions.
+        This implementation now mirrors the original file's logic to support lazy loading.
+        """
         if depth > max_depth:
             return []
 
-        # Prevent recursion into special system directories on Linux/macOS
-        if platform.system() != "Windows" and any(str(current_path).startswith(p) for p in EXCLUDED_SCAN_PREFIXES_LINUX):
-            return []
-
-        # Use stat on the canonical path to detect symlink loops
         try:
-            # We must stat the target of a symlink to get its real device/inode ID
             target_for_stat = current_path.resolve(strict=True) if current_path.is_symlink() else current_path
             path_id = (target_for_stat.stat().st_dev, target_for_stat.stat().st_ino)
             if path_id in visited_ids:
-                logger.warning(f"Symlink loop or duplicate path detected: {current_path}. Skipping.")
+                logger.warning(f"Symlink loop detected at {current_path}. Skipping.")
                 return []
             visited_ids.add(path_id)
         except (OSError, FileNotFoundError) as e:
@@ -87,30 +84,37 @@ class HostScanner:
         items = []
         try:
             for entry in current_path.iterdir():
-                # Skip hidden entries and non-directories
                 if entry.name.startswith('.') or not entry.is_dir():
                     continue
 
-                # Check if this area should be scanned shallowly (e.g., /mnt, /media)
-                is_shallow_area = False
-                if platform.system() != "Windows":
-                     try:
-                         resolved_entry = entry.resolve(strict=False)
-                         if str(resolved_entry) in SHALLOW_SCAN_PATHS_LINUX and resolved_entry != scan_root:
-                            is_shallow_area = True
-                     except Exception:
-                        pass # Ignore resolution errors for this check
-
-                children = None
-                if not is_shallow_area:
-                     children = self._scan_recursive(entry, depth + 1, max_depth, visited_ids, scan_root)
-
-                items.append({
+                dir_info = {
                     "name": entry.name,
                     "path": str(entry.absolute()),
                     "type": "directory",
-                    "children": children or [] # Ensure children is always a list
-                })
+                    "children": None  # Default to None for lazy loading support
+                }
+
+                # Only recurse if we are not at the depth limit.
+                if depth < max_depth:
+                    # Check for shallow scan areas (e.g., /mnt, /media on Linux)
+                    is_shallow_area = False
+                    if platform.system() != "Windows":
+                        try:
+                            resolved_entry = entry.resolve(strict=False)
+                            if str(resolved_entry) in SHALLOW_SCAN_PATHS_LINUX and resolved_entry != scan_root:
+                                is_shallow_area = True
+                        except Exception: pass
+
+                    if not is_shallow_area:
+                        # Perform the recursive call
+                        children_result = self._scan_recursive(entry, depth + 1, max_depth, visited_ids, scan_root)
+                        # CRITICAL: Only assign children if the result is not empty.
+                        # This ensures empty folders and folders at max_depth have `children: None`,
+                        # which is the trigger for the UI to show a lazy-load control.
+                        if children_result:
+                            dir_info["children"] = children_result
+
+                items.append(dir_info)
         except (PermissionError, FileNotFoundError) as e:
             logger.warning(f"Could not read directory {current_path}: {e}")
 
