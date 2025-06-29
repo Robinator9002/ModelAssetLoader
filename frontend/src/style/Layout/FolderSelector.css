@@ -1,15 +1,8 @@
 /* frontend/src/style/Layout/FolderSelector.css */
 
-/* .folder-selector-overlay wurde entfernt, da .modal-overlay aus global.css genutzt wird */
-/* Die .active Klasse wird weiterhin vom TSX auf .modal-overlay gesetzt */
-
 .folder-selector-content {
-	/* Erbt von .modal-content aus global.css */
 	max-width: 600px;
-	/* width: 95%; ist schon in global.css .modal-content */
-	min-height: 0;
 	max-height: 85vh;
-	/* display: flex; flex-direction: column; background-color, border-radius, box-shadow, overflow: hidden; sind in global.css */
 }
 
 .folder-selector-header {
@@ -41,18 +34,9 @@
 	background-color: var(--color-surface-hover);
 	color: var(--color-text-primary);
 }
-.folder-selector-header .close-button:focus-visible {
-	outline: 2px solid var(--color-primary);
-	outline-offset: 2px;
-}
-.folder-selector-header .close-button:disabled {
-	color: var(--color-text-placeholder);
-	cursor: not-allowed;
-}
 
 .folder-selector-body {
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5)
-		calc(var(--spacing-unit) * 2); /* Padding oben reduziert */
+	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 2);
 	overflow-y: auto;
 	flex-grow: 1;
 	display: flex;
@@ -85,9 +69,6 @@
 	border-radius: var(--border-radius-md);
 	cursor: pointer;
 	font-weight: 500;
-	transition: background-color var(--transition-speed-fast) ease,
-		border-color var(--transition-speed-fast) ease,
-		color var(--transition-speed-fast) ease;
 	display: inline-flex;
 	align-items: center;
 	gap: calc(var(--spacing-unit) * 0.5);
@@ -97,15 +78,8 @@
 	border-color: var(--color-primary);
 	color: var(--color-primary);
 }
-.path-button:focus-visible {
-	outline: 2px solid var(--color-primary);
-	outline-offset: 1px;
-	border-color: var(--color-primary);
-}
 .path-button:disabled {
-	background-color: var(--color-surface-alt);
 	color: var(--color-text-placeholder);
-	border-color: var(--color-border);
 	cursor: not-allowed;
 	opacity: 0.7;
 }
@@ -118,7 +92,6 @@
 	flex-grow: 1;
 }
 .path-input-manual:disabled {
-	background-color: var(--color-surface-alt);
 	opacity: 0.7;
 }
 
@@ -129,7 +102,7 @@
 	border-radius: var(--border-radius-md);
 	padding: var(--spacing-unit);
 	background-color: var(--color-background);
-	min-height: 200px;
+	min-height: 250px;
 }
 
 .folder-tree-root,
@@ -139,36 +112,40 @@
 	margin: 0;
 }
 
+/* No longer indenting the <li>, the .item-content now handles it */
+.folder-selector-item.selected > .item-content {
+	background-color: var(--color-primary);
+	color: #ffffff;
+}
+.folder-selector-item.selected > .item-content .item-icon svg,
+.folder-selector-item.selected > .item-content .item-expand-icon svg,
+.folder-selector-item.selected > .item-content .item-name {
+	stroke: #ffffff;
+	color: #ffffff; /* Make text white too */
+}
+
 .item-content {
 	display: flex;
 	align-items: center;
 	padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
 	cursor: pointer;
 	border-radius: var(--border-radius-sm);
-	transition: background-color var(--transition-speed-fast) ease,
-		color var(--transition-speed-fast) ease;
+	transition: background-color var(--transition-speed-fast) ease, color var(--transition-speed-fast) ease;
 	color: var(--color-text-secondary);
 	outline: none;
 }
 .item-content:focus-visible {
 	box-shadow: 0 0 0 2px var(--color-primary-variant) inset;
-	color: var(--color-text-primary);
 }
 .item-content:hover {
 	background-color: var(--color-surface-hover);
 	color: var(--color-text-primary);
 }
-.folder-selector-item.selected > .item-content {
-	background-color: var(--color-primary);
-	color: #ffffff;
-}
-.folder-selector-item.selected > .item-content .item-icon svg,
-.folder-selector-item.selected > .item-content .item-expand-icon svg {
-	stroke: #ffffff;
-	fill: #ffffff;
-}
-.folder-selector-item.selected > .item-content:focus-visible {
-	box-shadow: 0 0 0 2px var(--color-primary-hover) inset;
+
+/* NEW: Style for the indentation spacer */
+.item-indent {
+	flex-shrink: 0; /* Prevents the spacer from collapsing */
+	transition: width var(--transition-speed-fast) ease; /* Smoothly animates indentation changes if ever needed */
 }
 
 .item-expand-icon {
@@ -176,27 +153,32 @@
 	display: inline-flex;
 	align-items: center;
 	color: var(--color-text-secondary);
-	min-width: 1.5em;
+	min-width: 1.5em; /* Ensure consistent spacing */
+	flex-shrink: 0;
 }
 .item-expand-icon .animate-spin {
 	color: var(--color-primary);
 }
+
 .item-icon {
 	margin-right: var(--spacing-unit);
 	display: inline-flex;
 	align-items: center;
 	color: var(--color-accent);
+	flex-shrink: 0;
 }
+
 .item-name {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	flex-grow: 1;
+	flex-grow: 1; /* Allows the name to take up remaining space */
 }
 
-.loading-indicator.full-width-loader {
+.loading-indicator.full-width-loader,
+.error-message.folder-selector-error,
+.no-results-message {
 	display: flex;
-	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 	gap: var(--spacing-unit);
@@ -204,34 +186,11 @@
 	color: var(--color-text-secondary);
 	text-align: center;
 }
-.loading-indicator.full-width-loader .animate-spin {
-	color: var(--color-primary);
-	margin-bottom: var(--spacing-unit);
-}
 
-.error-message.folder-selector-error,
-.no-results-message {
-	padding: calc(var(--spacing-unit) * 1.5);
-	text-align: center;
-	color: var(--color-text-secondary);
-	border-radius: var(--border-radius-md);
-	margin: var(--spacing-unit) 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: var(--spacing-unit);
-}
 .error-message.folder-selector-error {
 	background-color: rgba(var(--color-error-rgb), 0.1);
 	border: 1px solid var(--color-error);
 	color: var(--color-error);
-}
-.error-message.folder-selector-error svg {
-	color: var(--color-error);
-	flex-shrink: 0;
-}
-.no-results-message {
-	background-color: var(--color-surface-alt);
 }
 
 .folder-selector-actions {
@@ -241,22 +200,4 @@
 	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
 	border-top: 1px solid var(--color-border);
 	flex-shrink: 0;
-}
-.folder-selector-actions .button {
-	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2.5);
-	min-width: 130px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: calc(var(--spacing-unit) * 0.75);
-}
-
-.folder-selector-actions .cancel-button {
-	background-color: var(--color-surface-alt);
-	color: var(--color-text-primary);
-	border: 1px solid var(--color-border);
-}
-.folder-selector-actions .cancel-button:hover:not(:disabled) {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-text-secondary);
 }

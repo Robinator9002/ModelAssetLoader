@@ -23,6 +23,38 @@ const logger = {
     warn: (...args: any[]) => console.warn("[FolderSelector]", ...args),
 };
 
+// --- UTILITY FUNCTION FOR PATH TRUNCATION ---
+/**
+ * Truncates a long file path by replacing middle directories with an ellipsis.
+ * @param path The full path string.
+ * @param maxLength The maximum desired length.
+ * @returns A truncated path string.
+ */
+const truncatePath = (path: string, maxLength: number = 50): string => {
+    if (path.length <= maxLength) {
+        return path;
+    }
+
+    const separator = path.includes('/') ? '/' : '\\';
+    const parts = path.split(separator);
+    
+    if (parts.length <= 4) { // Not much to truncate
+        return path;
+    }
+
+    const start = parts.slice(0, 2).join(separator);
+    const end = parts.slice(-2).join(separator);
+    const truncatedPath = `${start}${separator}...${separator}${end}`;
+
+    // If still too long, fall back to simple end truncation
+    if (truncatedPath.length > maxLength) {
+        return path.substring(0, maxLength - 3) + '...';
+    }
+
+    return truncatedPath;
+};
+
+
 interface MappedNode {
     name: string;
     path: string;
@@ -87,9 +119,9 @@ const FolderSelectorNode: React.FC<FolderSelectorNodeProps> = ({
     }, [canExpand, isLoadingChildren, isExpanded]);
 
     return (
+        // The paddingLeft style is REMOVED from the <li>
         <li
             className={`folder-selector-item ${isSelected ? "selected" : ""}`}
-            style={{ paddingLeft: `${level * 20}px` }}
             role="treeitem"
             aria-selected={isSelected}
             aria-expanded={canExpand ? isExpanded : undefined}
@@ -105,6 +137,8 @@ const FolderSelectorNode: React.FC<FolderSelectorNodeProps> = ({
                 tabIndex={0}
                 title={node.path}
             >
+                {/* A dedicated span now handles indentation */}
+                <span className="item-indent" style={{ width: `${level * 18}px` }} />
                 <span className="item-expand-icon">{ExpandIcon}</span>
                 <span className="item-icon">
                     <Icon size={18} />
@@ -318,26 +352,6 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                                         (rootNode) => rootNode.path
                                     );
                                     setRootPaths(newRootPathsList);
-                                    // Log final root node state after root scan
-                                    if (
-                                        process.env.NODE_ENV ===
-                                            "development" &&
-                                        newRootPathsList.length > 0 &&
-                                        newMap.has(newRootPathsList[0])
-                                    ) {
-                                        const finalRoot = newMap.get(
-                                            newRootPathsList[0]
-                                        );
-                                        console.log(
-                                            `[FolderSelector:DEBUG] Root scan complete. Root node (${
-                                                finalRoot?.path
-                                            }) in map: Name: ${
-                                                finalRoot?.name
-                                            }, Children: ${JSON.stringify(
-                                                finalRoot?.children
-                                            )}`
-                                        );
-                                    }
                                 } else {
                                     setRootPaths([]);
                                 }
@@ -369,48 +383,14 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                                                     mapApiNodeToMappedNode(
                                                         childApiNode
                                                     );
-                                                if (
-                                                    childApiNode.path !==
-                                                    targetPath
-                                                ) {
-                                                    newMap.set(
+                                                newMap.set(
                                                         childApiNode.path,
                                                         childMappedNode
                                                     );
-                                                } else if (
-                                                    childApiNode.path === "/" &&
-                                                    childMappedNode.name !== "/"
-                                                ) {
-                                                    const existingRootCheck =
-                                                        newMap.get("/");
-                                                    if (
-                                                        existingRootCheck &&
-                                                        existingRootCheck.name ===
-                                                            "/"
-                                                    ) {
-                                                        if (
-                                                            existingRootCheck.children &&
-                                                            !childMappedNode.children
-                                                        )
-                                                            return; // Skip less informative symlink
-                                                    }
-                                                    newMap.set(
-                                                        childApiNode.path,
-                                                        childMappedNode
-                                                    ); // Update if not worse
-                                                } else {
-                                                    newMap.set(
-                                                        childApiNode.path,
-                                                        childMappedNode
-                                                    );
-                                                }
                                             }
                                         );
                                     }
                                     newMap.set(targetPath, parentMappedNode); // Set parent last
-                                    // if (process.env.NODE_ENV === 'development') {
-                                    //    console.log(`[FolderSelector:DEBUG] Expanded ${targetPath}. Parent in map: Name: ${parentMappedNode.name}, Children: ${JSON.stringify(parentMappedNode.children)}`);
-                                    // }
                                 } else {
                                     const nodeToUpdate = newMap.get(targetPath);
                                     if (nodeToUpdate)
@@ -418,9 +398,6 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                                             ...nodeToUpdate,
                                             children: [],
                                         });
-                                    logger.warn(
-                                        `[setTreeDataMap EXPAND ${targetPath}] API response for ${targetPath} was not as expected.`
-                                    );
                                 }
                             }
                             return newMap;
@@ -436,15 +413,6 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                                 if (nodeToUpdate)
                                     newMap.set(targetPath, {
                                         ...nodeToUpdate,
-                                        children: [],
-                                    });
-                                else
-                                    newMap.set(targetPath, {
-                                        name:
-                                            targetPath.split("/").pop() ||
-                                            targetPath,
-                                        path: targetPath,
-                                        type: "directory",
                                         children: [],
                                     });
                                 return newMap;
@@ -485,19 +453,6 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                 setError(
                     err.message || "Ein schwerwiegender Fehler ist aufgetreten."
                 );
-                if (isRootScan) setRootPaths([]);
-                else if (targetPath) {
-                    setTreeDataMap((prevMap) => {
-                        const newMap = new Map(prevMap);
-                        const nodeToUpdate = newMap.get(targetPath);
-                        if (nodeToUpdate)
-                            newMap.set(targetPath, {
-                                ...nodeToUpdate,
-                                children: null,
-                            });
-                        return newMap;
-                    });
-                }
             } finally {
                 if (isRootScan) setIsLoadingGlobal(false);
                 else {
@@ -540,17 +495,8 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
             const isCurrentlyExpanded = expandedPaths.has(path);
             const childrenAreUnknown =
                 !nodeFromMap || nodeFromMap.children === null;
-            const isLoadingThisPath = loadingPaths.has(path);
 
-            if (nodeFromMap && nodeFromMap.type !== "directory") {
-                setExpandedPaths((prev) => {
-                    if (prev.has(path)) {
-                        const n = new Set(prev);
-                        n.delete(path);
-                        return n;
-                    }
-                    return prev;
-                }, `file ${path}`);
+            if (nodeFromMap?.type !== "directory") {
                 return;
             }
 
@@ -561,24 +507,17 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                     return n;
                 }, `collapse ${path}`);
             } else {
-                if (childrenAreUnknown && !isLoadingThisPath) {
-                    // logger.info(`[InteractionAttempt: ${path}] Children unknown and not loading. Fetching...`);
+                if (childrenAreUnknown) {
                     await fetchDirectoryStructure(path, false);
                 }
-                setExpandedPaths((prev) => {
-                    const n = new Set(prev);
-                    n.add(path);
-                    return n;
-                }, `expand ${path}`);
+                setExpandedPaths((prev) => new Set(prev).add(path), `expand ${path}`);
             }
         },
         [
             treeDataMap,
             fetchDirectoryStructure,
-            loadingPaths,
-            setExpandedPaths,
-            selectedPath,
             expandedPaths,
+            setExpandedPaths,
         ]
     );
 
@@ -648,7 +587,8 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                             className="current-path-display"
                             title={currentDisplayPath}
                         >
-                            Ausgewählt: {currentDisplayPath || "Keine Auswahl"}
+                            {/* Use the truncatePath utility here */}
+                            Ausgewählt: {currentDisplayPath ? truncatePath(currentDisplayPath, 60) : "Keine Auswahl"}
                         </span>
                         <button
                             onClick={handleRefreshRoot}
@@ -693,24 +633,21 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                             <div className="loading-indicator full-width-loader">
                                 <Loader2 size={24} className="animate-spin" />
                                 <p>
-                                    Lade Wurzelverzeichnisse (Tiefe{" "}
-                                    {API_SCAN_DEPTH_FOR_ROOTS})...
+                                    Lade Wurzelverzeichnisse...
                                 </p>
                             </div>
                         )}
                         {error && (
                             <p className="error-message folder-selector-error">
-                                {" "}
-                                <AlertTriangle size={16} /> {error}{" "}
+                                <AlertTriangle size={16} /> {error}
                             </p>
                         )}
                         {!isLoadingGlobal &&
                             !error &&
                             treeRootNodes.length === 0 && (
                                 <p className="no-results-message">
-                                    {" "}
                                     Keine Verzeichnisse gefunden. Prüfen Sie
-                                    Backend-Logs und Berechtigungen.{" "}
+                                    Backend-Logs und Berechtigungen.
                                 </p>
                             )}
                         {!isLoadingGlobal &&
@@ -739,8 +676,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                         onClick={onCancel}
                         disabled={isLoadingGlobal || loadingPaths.size > 0}
                     >
-                        {" "}
-                        Abbrechen{" "}
+                        Abbrechen
                     </button>
                     <button
                         className="button modal-button confirm-button"
@@ -749,11 +685,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                             !selectedPath ||
                             isLoadingGlobal ||
                             loadingPaths.size > 0 ||
-                            !!(
-                                selectedPath &&
-                                treeDataMap.get(selectedPath)?.type !==
-                                    "directory"
-                            )
+                            treeDataMap.get(selectedPath)?.type !== "directory"
                         }
                     >
                         <Check size={18} /> Ordner Auswählen
