@@ -211,7 +211,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
     return (
         <div className="configurations-page">
             <h2>Speicherorte &amp; UI Profil</h2>
-            {/* ... rest of the JSX ... */}
             <section className="config-section">
                 <label htmlFor="basePathDisplay" className="config-label">
                     Basisordner für Modelle:
