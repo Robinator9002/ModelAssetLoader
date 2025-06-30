@@ -45,13 +45,11 @@ M.A.L. is more than just a downloader. It's aiming to be the central hub for you
 
 🛠️ Tech Stack
 
-M.A.L. is built with a modern, fast, and reliable stack:
+M.A.L. is built with a modern, fast, and reliable stack, running as a local web application.
 
     Backend: Python with FastAPI for a high-performance, asynchronous API.
 
     Frontend: React & TypeScript for a robust, type-safe, and interactive user experience.
-
-    Packaging: (Soon) Tauri to create a cross-platform desktop application.
 
 🤝 Contributing
 
