@@ -4,7 +4,7 @@
 
 M.A.L. is a desktop application I'm building to streamline the entire lifecycle of your AI assets. It connects to popular sources like Hugging Face, lets you search for models, and downloads them directly into the correct, pre-configured folders for your favorite UI.
 
-This project is under active development. I'm building this in the open and shipping features weekly!
+This project is under active development. I'm building this in the open and shipping features as often as possible!
 🚀 Key Features
 
     Universal Search: Find models and resources from Hugging Face (with more sources coming soon!) from a single, clean interface.
