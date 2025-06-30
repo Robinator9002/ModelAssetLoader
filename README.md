@@ -1,5 +1,5 @@
-🤖 M.A.L. (Model Asset Loader)
-Tired of manually downloading .safetensors? So was I.
+****🤖 M.A.L. (Model Asset Loader)****
+**Tired of manually downloading .safetensors? So was I.**
 
 M.A.L. is a desktop application I'm building to streamline the entire lifecycle of your AI assets. It connects to popular sources like Hugging Face, lets you search for models, and downloads them directly into the correct, pre-configured folders for your favorite UI.
 
@@ -18,7 +18,7 @@ This project is under active development. I'm building this in the open and ship
 
     Secure & Robust: Built with a security-first mindset. Downloads are atomic (no corrupted files) and path resolution is locked to your base directory.
 
-🔭 The Vision: My Roadmap
+**🔭 The Vision: My Roadmap**
 
 M.A.L. is more than just a downloader. My goal is for it to be the central hub for your entire local AI ecosystem. Here's where I'm headed:
 Phase 1: Polish the Core (Now Underway)
@@ -41,7 +41,7 @@ Phase 3: The Platform
 
     [ ] Create comprehensive documentation on a dedicated website.
 
-🛠️ Tech Stack
+**🛠️ Tech Stack**
 
 M.A.L. is built with a modern, fast, and reliable stack, running as a local web application.
 
@@ -49,7 +49,7 @@ M.A.L. is built with a modern, fast, and reliable stack, running as a local web 
 
     Frontend: React & TypeScript for a robust, type-safe, and interactive user experience.
 
-🤝 Contributing
+**🤝 Contributing**
 
 This is a community-driven project, and contributions of all kinds are welcome! Whether you're a developer, a designer, or just an enthusiastic user with great ideas, I'd love to have your input.
 
@@ -59,6 +59,6 @@ This is a community-driven project, and contributions of all kinds are welcome! 
 
     Have an idea? Start a new discussion in the Discussions Tab.
 
-📄 License
+**📄 License**
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the Apache License. See the LICENSE file for details.
