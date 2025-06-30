@@ -1,9 +1,9 @@
 🤖 M.A.L. (Model Asset Loader)
-Tired of manually downloading .safetensors? So were we.
+Tired of manually downloading .safetensors? So was I.
 
-M.A.L. is a desktop application built to streamline the entire lifecycle of your AI assets. It connects to popular sources like Hugging Face, lets you search for models, and downloads them directly into the correct, pre-configured folders for your favorite UI.
+M.A.L. is a desktop application I'm building to streamline the entire lifecycle of your AI assets. It connects to popular sources like Hugging Face, lets you search for models, and downloads them directly into the correct, pre-configured folders for your favorite UI.
 
-This project is under active development. We're building this in the open and shipping features weekly!
+This project is under active development. I'm building this in the open and shipping features weekly!
 🚀 Key Features
 
     Universal Search: Find models and resources from Hugging Face (with more sources coming soon!) from a single, clean interface.
@@ -18,9 +18,9 @@ This project is under active development. We're building this in the open and sh
 
     Secure & Robust: Built with a security-first mindset. Downloads are atomic (no corrupted files) and path resolution is locked to your base directory.
 
-🔭 The Vision: Our Roadmap
+🔭 The Vision: My Roadmap
 
-M.A.L. is more than just a downloader. It's aiming to be the central hub for your entire local AI ecosystem. Here's where we're headed:
+M.A.L. is more than just a downloader. My goal is for it to be the central hub for your entire local AI ecosystem. Here's where I'm headed:
 Phase 1: Polish the Core (Now Underway)
 
     [x] Re-implement advanced search sorting and filtering.
@@ -51,9 +51,9 @@ M.A.L. is built with a modern, fast, and reliable stack, running as a local web 
 
 🤝 Contributing
 
-This is a community-driven project, and we welcome contributions of all kinds! Whether you're a developer, a designer, or just an enthusiastic user with great ideas, we'd love to have you.
+This is a community-driven project, and contributions of all kinds are welcome! Whether you're a developer, a designer, or just an enthusiastic user with great ideas, I'd love to have your input.
 
-    Check out the Issues Tab to see our current needs and bug reports.
+    Check out the Issues Tab to see current needs and bug reports.
 
     Fork the repository and submit a pull request!
 
