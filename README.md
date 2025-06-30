@@ -1,27 +1,73 @@
-M.A.L. - The Model Asset Loader
+The Problem
 
-Tired of manually downloading .safetensors into stable-diffusion-webui/models/Lora/ or trying to remember which models/checkpoints folder belongs to ComfyUI vs. Forge? So were we.
+Tired of manually downloading .safetensors into stable-diffusion-webui/models/Lora/? Can't remember which models/checkpoints folder belongs to ComfyUI versus Forge? Spending more time organizing files than generating images?
 
-M.A.L. (Model Asset Loader) is a desktop application built to streamline the entire lifecycle of your AI assets. It connects to popular sources like Hugging Face, lets you search for models, and downloads them directly into the correct, pre-configured folders for your favorite UI.
+We've been there. So we fixed it.
+The Solution
 
-This project is under active development right now! We're building this in the open and shipping features weekly.
-🚀 Key Features (So Far)
+M.A.L. (Model Asset Loader) is a powerful desktop application built to streamline the entire lifecycle of your AI assets. It serves as a central command center, connecting to popular sources like Hugging Face and downloading models directly into the correct, pre-configured folders for your favorite UI.
 
-    Universal Search: Find models and resources from Hugging Face (with more sources coming soon!) from a single, clean interface.
+This project is under active and continuous development. We're building this in the open and shipping features weekly.
+✨ Key Features
 
-    Intelligent Downloads: Download files directly to the right location. M.A.L. knows the default folder structures for ComfyUI, A1111, ForgeUI, and more.
+Feature
+	
 
-    Fully Configurable: Don't like the defaults? Point M.A.L. to any base folder and define your own custom paths for every model type.
+Status
+	
 
-    Detailed Views: See a model's full README and browse all its files before you commit to downloading.
+Description
 
-    Real-Time Download Manager: A sleek, non-intrusive toast notification system keeps you updated on download progress without interrupting your workflow.
+Universal Search
+	
 
-    Secure & Robust: Built with a security-first mindset. Downloads are atomic (no corrupted files) and path resolution is locked to your base directory.
+✅ Released
+	
 
+Find models from Hugging Face (and more soon!) with a single, clean interface.
+
+Intelligent Downloads
+	
+
+✅ Released
+	
+
+M.A.L. knows the default folder structures for ComfyUI, A1111, ForgeUI, and you can define your own.
+
+Fully Configurable
+	
+
+✅ Released
+	
+
+Point to any base folder and define custom relative paths for every model type. Your workflow, your rules.
+
+Real-Time Tracking
+	
+
+✅ Released
+	
+
+A sleek, non-intrusive toast notification system keeps you updated on download progress without interrupting your workflow.
+
+Secure & Atomic
+	
+
+✅ Released
+	
+
+Downloads are fail-safe to prevent corrupted files, and path resolution is securely locked to your chosen base directory.
+
+Local File Manager
+	
+
+🚧 In Progress
+	
+
+A new view to browse, manage, and delete the models you've already downloaded.
 🔭 The Vision: Our Roadmap
 
-M.A.L. is more than just a downloader. It's aiming to be the central hub for your entire local AI ecosystem. Here's where we're headed:
+M.A.L. aims to be the essential hub for your entire local AI ecosystem. This is where we're headed:
 
     Phase 1: Polish the Core (Now Underway)
 
@@ -43,23 +89,23 @@ M.A.L. is more than just a downloader. It's aiming to be the central hub for you
 
         [ ] Create comprehensive documentation on a dedicated website.
 
-🛠️ Tech Stack
+🛠️ Tech Stack & Architecture
 
-M.A.L. is built with a modern, fast, and reliable stack, running as a local web application.
+M.A.L. is built with a modern, fast, and reliable stack, running as a local client-server application to ensure maximum performance and responsiveness.
 
-    Backend: Python with FastAPI for a high-performance, asynchronous API.
+    Backend: A powerful and asynchronous API built with Python and FastAPI.
 
-    Frontend: React & TypeScript for a robust, type-safe, and interactive user experience.
+    Frontend: A beautiful, dynamic, and type-safe user interface built with React & TypeScript.
 
 🤝 Contributing
 
-This is a community-driven project, and we welcome contributions of all kinds! Whether you're a developer, a designer, or just an enthusiastic user with great ideas, we'd love to have you.
+This is a community-driven project, and we welcome contributions of all kinds! Whether you're a developer, a designer, or just an enthusiastic user with great ideas, we'd love for you to get involved.
 
-    Check out the Issues Tab to see our current needs and bug reports.
+    Find an Issue: Check out the Issues Tab to see our current needs, bugs, and feature requests.
 
-    Fork the repository and submit a pull request!
+    Fork & PR: Fork the repository, make your changes, and submit a pull request!
 
-    Have an idea? Start a new discussion in the Discussions Tab.
+    Start a Discussion: Have an idea or a question? Open a new topic in the Discussions Tab.
 
 📄 License
 
