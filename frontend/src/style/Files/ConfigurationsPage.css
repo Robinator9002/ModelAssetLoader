@@ -1,6 +1,6 @@
 /*
  * =================================================================
- * M.A.L. - ConfigurationsPage Styles
+ * M.A.L. - ConfigurationsPage Styles (Purple Contrast Theme)
  * =================================================================
 */
 .configurations-page {
@@ -8,49 +8,79 @@
 	margin: 0 auto;
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 4);
+	gap: calc(var(--spacing-unit) * 5); /* More vertical space */
 }
 .config-section {
 	display: flex;
 	flex-direction: column;
 	gap: var(--spacing-unit);
+    padding: calc(var(--spacing-unit) * 3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    background-color: var(--color-surface);
 }
 .config-label {
 	font-weight: 600;
-	font-size: 1rem;
+	font-size: 1.1rem;
+    color: var(--color-text-primary);
 }
 .base-path-selector {
 	display: flex;
 	gap: var(--spacing-unit);
 }
-.base-path-selector .input {
+.path-input.config-input {
 	cursor: pointer;
+    background-color: var(--color-background);
+    color: var(--color-text-secondary);
+}
+.path-input.config-input:hover {
+    color: var(--color-text-primary);
+}
+.config-hint {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    margin-top: var(--spacing-unit);
+}
+.config-hint.error-hint {
+    color: var(--color-error);
+    font-weight: 500;
 }
 .config-actions {
 	margin-top: var(--spacing-unit);
 	display: flex;
 	justify-content: flex-end;
 }
+.save-config-button {
+    min-width: 240px;
+    padding: var(--spacing-unit) * 1.5;
+    font-size: 1rem;
+}
+
 .custom-paths-section h3 {
-	margin-bottom: var(--spacing-unit);
+	margin-bottom: calc(var(--spacing-unit) * 2);
 	font-size: 1.1rem;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--spacing-unit);
 }
 .custom-paths-section h3 code {
 	font-size: 0.9em;
 	background-color: var(--color-surface-alt);
-	padding: 2px 5px;
+	padding: 3px 6px;
 	border-radius: var(--border-radius-sm);
 	border: 1px solid var(--color-border);
+    font-family: var(--font-monospace);
+    color: var(--color-text-secondary);
 }
 .custom-path-entry {
 	display: grid;
-	grid-template-columns: 150px 1fr;
+	grid-template-columns: 180px 1fr;
 	align-items: center;
 	gap: calc(var(--spacing-unit) * 2);
-	margin-bottom: var(--spacing-unit);
+	margin-bottom: calc(var(--spacing-unit) * 1.5);
 }
 .custom-path-label {
 	text-align: right;
 	font-weight: 500;
 	color: var(--color-text-secondary);
+    font-size: 0.95rem;
 }

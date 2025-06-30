@@ -1,42 +1,49 @@
 /*
  * =================================================================
- * M.A.L. - DownloadManager Component Styles
+ * M.A.L. - DownloadManager Styles (Purple Contrast Theme)
  * =================================================================
 */
 .download-manager-container {
 	position: fixed;
-	bottom: var(--spacing-unit);
-	right: var(--spacing-unit);
+	bottom: var(--spacing-unit) * 2;
+	right: var(--spacing-unit) * 2;
 	z-index: var(--z-index-toast);
 	width: 100%;
-	max-width: 380px;
+	max-width: 400px;
 	display: flex;
 	flex-direction: column;
-	gap: var(--spacing-unit);
+	gap: calc(var(--spacing-unit) * 1.5);
 	pointer-events: none;
 }
 .download-item-toast {
 	background-color: var(--color-surface);
 	border-radius: var(--border-radius-md);
-	padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
 	box-shadow: var(--shadow-lg);
-	border-left: 4px solid var(--color-primary);
+	border-left: 5px solid var(--color-primary);
 	display: flex;
 	flex-direction: column;
-	gap: var(--spacing-unit);
+	gap: calc(var(--spacing-unit) * 1.25);
 	pointer-events: all;
-	animation: slideInUp 0.3s ease-out;
+	animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border: 1px solid var(--color-border);
+    transition: transform 0.2s ease, opacity 0.2s ease;
 }
+.download-item-toast:hover {
+    transform: scale(1.03);
+}
+
 @keyframes slideInUp {
 	from {
 		opacity: 0;
-		transform: translateY(20px);
+		transform: translateY(25px) scale(0.95);
 	}
 	to {
 		opacity: 1;
-		transform: translateY(0);
+		transform: translateY(0) scale(1);
 	}
 }
+
 .download-item-toast.error {
 	border-left-color: var(--color-error);
 }
@@ -50,17 +57,24 @@
 	gap: var(--spacing-unit);
 }
 .download-toast-filename {
-	font-weight: 500;
-	font-size: 0.9rem;
+	font-weight: 600;
+	font-size: 0.95rem;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+    color: var(--color-text-primary);
 }
-.download-toast-status-icon .text-red-500 {
-	color: var(--color-error);
+.download-toast-status-icon .text-red-500 { color: var(--color-error); }
+.download-toast-status-icon .text-green-500 { color: var(--color-success); }
+.dismiss-button {
+    /* Uses .button-icon styles */
+    background: none; border: none; padding: 4px; border-radius: 50%;
+    color: var(--color-text-secondary); cursor: pointer; line-height: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
-.download-toast-status-icon .text-green-500 {
-	color: var(--color-success);
+.dismiss-button:hover {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text-primary);
 }
 .download-toast-body {
 	display: flex;
@@ -69,31 +83,50 @@
 }
 .progress-bar-container {
 	flex-grow: 1;
-	background-color: var(--color-surface-alt);
+	background-color: var(--color-background);
 	border-radius: 100px;
 	overflow: hidden;
-	height: 8px;
+	height: 10px;
+    box-shadow: var(--shadow-inset);
 }
 .progress-bar {
 	height: 100%;
 	background-color: var(--color-primary);
 	width: 0%;
 	border-radius: inherit;
-	transition: width 0.15s linear;
+	transition: width 0.2s linear;
+    background-image: linear-gradient(
+        45deg, 
+        rgba(255,255,255,0.15) 25%, transparent 25%, 
+        transparent 50%, rgba(255,255,255,0.15) 50%, 
+        rgba(255,255,255,0.15) 75%, transparent 75%,
+        transparent
+    );
+    background-size: 20px 20px;
+    animation: progressBarStripes 1s linear infinite;
 }
+
+@keyframes progressBarStripes {
+    from { background-position: 20px 0; }
+    to { background-position: 0 0; }
+}
+
 .progress-bar.completed {
 	background-color: var(--color-success);
+    animation: none;
 }
 .progress-text {
 	font-size: 0.8rem;
 	font-variant-numeric: tabular-nums;
 	color: var(--color-text-secondary);
-	font-weight: 500;
+	font-weight: 600;
 }
 .download-toast-error-message {
-	font-size: 0.85rem;
+	font-size: 0.9rem;
 	color: var(--color-error);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+    font-weight: 500;
 }
+

@@ -1,17 +1,21 @@
 /*
  * =================================================================
- * M.A.L. - ModelSearchPage Styles
+ * M.A.L. - ModelSearchPage Styles (Purple Contrast Theme)
  * =================================================================
 */
 .model-search-page {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 3);
+	gap: calc(var(--spacing-unit) * 4);
 }
 .search-form {
 	display: flex;
 	flex-direction: column;
 	gap: calc(var(--spacing-unit) * 2);
+    padding: calc(var(--spacing-unit) * 3);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
 }
 .form-row {
 	display: flex;
@@ -23,13 +27,15 @@
 	min-width: 200px;
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 0.5);
+	gap: calc(var(--spacing-unit) * 0.75);
 }
 .form-group label {
 	font-size: 0.85rem;
-	font-weight: 500;
+	font-weight: 600;
 	color: var(--color-text-secondary);
 	padding-left: var(--spacing-unit);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 .search-results-container {
 	display: flex;
@@ -39,18 +45,18 @@
 .result-item {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--spacing-unit) * 2);
-	padding: calc(var(--spacing-unit) * 2);
+	gap: calc(var(--spacing-unit) * 3);
+	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
 	background-color: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-lg);
 	transition: border-color var(--transition-speed-fast),
-		transform var(--transition-speed-fast), box-shadow var(--transition-speed-fast);
+		transform var(--transition-speed-fast), box-shadow var(--transition-speed-normal);
 }
 .result-item:hover {
 	border-color: var(--color-primary);
-	transform: translateY(-2px);
-	box-shadow: var(--shadow-md);
+	transform: translateY(-3px);
+	box-shadow: 0 0 20px rgba(var(--color-primary-rgb), 0.1), var(--shadow-md);
 }
 .result-item-info {
 	flex-grow: 1;
@@ -58,14 +64,19 @@
 }
 .result-item-info h3 {
 	margin: 0 0 calc(var(--spacing-unit) * 0.5) 0;
-	font-size: 1.1rem;
+	font-size: 1.15rem;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+    color: var(--color-text-primary);
 }
 .result-item-info .author-info {
 	margin: 0;
 	font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+.result-item-info .author-info span {
+    color: var(--color-text-placeholder);
 }
 .result-item-actions {
 	display: flex;
@@ -75,5 +86,6 @@
 .load-more-button {
 	margin-top: calc(var(--spacing-unit) * 2);
 	align-self: center;
-	min-width: 200px;
+	min-width: 240px;
+    font-size: 1rem;
 }

@@ -1,6 +1,6 @@
 /*
  * =================================================================
- * M.A.L. - Navbar Component Styles
+ * M.A.L. - Navbar Component Styles (Purple Contrast Theme)
  * =================================================================
 */
 .app-navbar {
@@ -13,33 +13,57 @@
 }
 .navbar-tabs-list {
 	display: flex;
+    justify-content: center;
+}
+.navbar-tab-item {
+    /* Ensures buttons don't shrink on small screens if they have labels */
+    flex-shrink: 0;
 }
 .navbar-tab-button {
 	background-color: transparent;
 	color: var(--color-text-secondary);
 	border: none;
-	padding: calc(var(--spacing-unit) * 1.75) calc(var(--spacing-unit) * 2);
+	padding: calc(var(--spacing-unit) * 1.75) calc(var(--spacing-unit) * 3);
 	cursor: pointer;
-	font-weight: 500;
+	font-weight: 600;
 	font-size: 0.95rem;
 	display: inline-flex;
 	align-items: center;
-	gap: var(--spacing-unit);
+	gap: calc(var(--spacing-unit) * 1.25);
 	border-bottom: 3px solid transparent;
 	transition: color var(--transition-speed-fast) ease,
 		border-bottom-color var(--transition-speed-fast) ease,
 		background-color var(--transition-speed-fast) ease;
-	margin-bottom: -1px; /* Overlaps parent border */
+	margin-bottom: -1px; /* Overlaps parent border for a seamless look */
+    position: relative;
 }
-.navbar-tab-button:hover {
+
+.navbar-tab-button::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 3px;
+    background-color: var(--color-primary);
+    border-radius: 2px;
+    transition: width var(--transition-speed-normal) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.navbar-tab-button:hover:not(.active) {
 	color: var(--color-text-primary);
-	background-color: var(--color-surface-hover);
 }
+
 .navbar-tab-button.active {
 	color: var(--color-primary);
-	border-bottom-color: var(--color-primary);
-	font-weight: 600;
+	font-weight: 700;
 }
+
+.navbar-tab-button.active::before {
+    width: calc(100% - var(--spacing-unit) * 4); /* Make underline slightly smaller than the button */
+}
+
 .navbar-tab-icon {
-	line-height: 0;
+	line-height: 0; /* Ensures perfect vertical alignment of SVG */
 }

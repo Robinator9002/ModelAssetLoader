@@ -1,23 +1,23 @@
 /*
  * =================================================================
- * M.A.L. - App Stylesheet & Imports
+ * M.A.L. - App Stylesheet & Imports (Purple Contrast Theme)
  * =================================================================
  * This file imports the global design system and all component-
- * specific stylesheets in the correct order.
+ * specific stylesheets, and defines the main application layout.
 */
 
 /* 1. Import the core design system */
 @import url("./style/global.css");
 
 /* 2. Import component-specific styles */
+/* Note: The order can be important for CSS specificity. */
 @import url("./style/Layout/Navbar.css");
-@import url("./style/Layout/ConfirmModal.css");
-@import url("./style/Layout/Modals.css"); /* Consolidated Modal styles */
+@import url("./style/Layout/Modals.css"); /* Unified Modal styles */
+@import url("./style/Layout/DownloadModal.css"); /* Unified Modal styles */
+@import url("./style/Files/FolderSelector.css"); /* Unified Modal styles */
 
 @import url("./style/Files/ConfigurationsPage.css");
-@import url("./style/Files/FolderSelector.css");
 @import url("./style/Files/DownloadManager.css");
-@import url("./style/Files/DownloadModal.css");
 
 @import url("./style/ModelLoader/ModelSearchPage.css");
 @import url("./style/ModelLoader/ModelDetailsPage.css");
@@ -29,34 +29,77 @@
 .app-wrapper {
 	display: flex;
 	flex-direction: column;
-	height: 100vh;
-	width: 100vw;
-	overflow: hidden;
+	height: 100vh; /* Full viewport height */
+	width: 100vw;  /* Full viewport width */
+	overflow: hidden; /* Prevent body scrollbars */
+    background-color: var(--color-background);
 }
 
-.app-header {
+.app-header-placeholder {
 	display: flex;
 	align-items: center;
+    justify-content: center;
 	gap: calc(var(--spacing-unit) * 1.5);
-	padding: var(--spacing-unit) calc(var(--spacing-unit) * 2);
+	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
 	background-color: var(--color-surface);
 	border-bottom: 1px solid var(--color-border);
 	flex-shrink: 0;
 	user-select: none;
+    text-align: center;
 }
-.app-header img {
-	width: 2rem;
+.app-header-placeholder img {
+	width: 2.25rem; /* Slightly larger icon */
 	height: auto;
+    filter: drop-shadow(0 0 8px rgba(var(--color-primary-rgb), 0.5));
 }
-.app-header h1 {
-	font-size: 1.5rem;
+.app-header-placeholder h1 {
+	font-size: 1.75rem;
 	margin: 0;
+    font-weight: 800;
+    color: var(--color-text-primary);
+    letter-spacing: 0.05em;
 }
 
 .main-content-area {
 	flex-grow: 1;
 	overflow-y: auto; /* Allows content within the main area to scroll */
-	padding: calc(var(--spacing-unit) * 3);
+	padding: calc(var(--spacing-unit) * 4);
+    background-color: var(--color-background);
+}
+
+/* --- Theme Switcher Positioning --- */
+.theme-switcher-container {
+    position: fixed;
+    bottom: calc(var(--spacing-unit) * 2);
+    left: calc(var(--spacing-unit) * 2);
+    z-index: var(--z-index-toast); /* Ensure it's above most content */
+}
+
+.theme-switcher-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-lg);
+    transition: all var(--transition-speed-normal) ease;
+}
+
+.theme-switcher-button:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 0 20px rgba(var(--color-primary-rgb), 0.2);
+}
+
+.theme-switcher-button svg {
+    width: 24px;
+    height: 24px;
 }
 
 /* Generic Loading/Error States for Pages */
@@ -65,8 +108,15 @@
 	align-items: center;
 	justify-content: center;
 	flex-direction: column;
-	gap: var(--spacing-unit);
+	gap: var(--spacing-unit) * 2;
 	height: 100%;
+    min-height: 400px; /* Ensure it has some height even if parent is small */
 	color: var(--color-text-secondary);
 	text-align: center;
+}
+.page-state-container .icon {
+    color: var(--color-primary);
+}
+.page-state-container p {
+    font-size: 1.1rem;
 }
