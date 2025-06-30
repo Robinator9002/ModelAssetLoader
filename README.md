@@ -1,4 +1,5 @@
 ****🤖 M.A.L. (Model Asset Loader)****
+
 **Tired of manually downloading .safetensors? So was I.**
 
 M.A.L. is a desktop application I'm building to streamline the entire lifecycle of your AI assets. It connects to popular sources like Hugging Face, lets you search for models, and downloads them directly into the correct, pre-configured folders for your favorite UI.
