@@ -1,413 +1,83 @@
-/* frontend/src/style/Files/DownloadModal.css */
-
-/* Globale Modal-Stile werden idealerweise aus einer globalen CSS-Datei geerbt.
-   .modal-overlay und .modal-content könnten z.B. global definiert sein.
-   Hier sind sie der Vollständigkeit halber mit den spezifischen Anpassungen. */
-
-.download-modal-overlay {
-	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	background-color: rgba(
-		0,
-		0,
-		0,
-		0.6
-	); /* Dunklerer Hintergrund für besseren Fokus */
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 1000; /* Stellt sicher, dass das Modal über anderen Elementen liegt */
-	opacity: 0;
-	visibility: hidden;
-	transition: opacity 0.3s ease, visibility 0.3s ease;
-}
-
-.download-modal-overlay.active {
-	opacity: 1;
-	visibility: visible;
-}
-
-.download-modal-content {
-	background-color: var(
-		--color-surface
-	); /* Hintergrundfarbe aus CSS-Variablen */
-	border-radius: var(
-		--border-radius-lg
-	); /* Größerer Radius für modernes Aussehen */
-	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); /* Deutlicherer Schatten */
-	width: 90%;
-	max-width: 750px; /* Maximale Breite des Modals */
-	max-height: 85vh; /* Maximale Höhe, um Scrollen auf kleinen Bildschirmen zu ermöglichen */
-	display: flex;
-	flex-direction: column;
-	overflow: hidden; /* Verhindert, dass Inhalte über den Radius hinausragen */
-}
-
-.download-modal-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
-	border-bottom: 1px solid var(--color-border);
-	flex-shrink: 0; /* Verhindert, dass der Header schrumpft */
-}
-.download-modal-header h3 {
-	margin: 0;
-	font-size: 1.3rem;
-	color: var(--color-text-primary);
-	font-weight: 600;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	padding-right: var(--spacing-unit); /* Platz für den Schließen-Button */
-}
-.download-modal-header .close-button {
-	background: transparent;
-	border: none;
-	color: var(--color-text-secondary);
-	cursor: pointer;
-	padding: calc(var(--spacing-unit) * 0.75);
-	border-radius: var(--border-radius-md);
-	display: inline-flex; /* Für korrekte Ausrichtung des Icons */
-	align-items: center;
-	justify-content: center;
-	transition: background-color var(--transition-speed-fast) ease,
-		color var(--transition-speed-fast) ease;
-}
-.download-modal-header .close-button:hover:not(:disabled) {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text-primary);
-}
-.download-modal-header .close-button:focus-visible {
-	/* Bessere Sichtbarkeit des Fokus */
-	outline: 2px solid var(--color-primary);
-	outline-offset: 2px;
-}
-.download-modal-header .close-button:disabled {
-	color: var(--color-text-placeholder);
-	cursor: not-allowed;
-}
-
-.download-modal-body {
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5)
-		calc(var(--spacing-unit) * 2);
-	overflow-y: auto; /* Ermöglicht Scrollen, wenn der Inhalt zu lang ist */
-	flex-grow: 1; /* Nimmt den verfügbaren Platz ein */
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 2); /* Abstand zwischen Elementen im Body */
-}
-.loading-indicator-modal-body {
-	/* Spezielles Styling für den Ladezustand des Modals selbst */
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	padding: calc(var(--spacing-unit) * 4);
-	gap: var(--spacing-unit);
-	color: var(--color-text-secondary);
-	text-align: center;
-	flex-grow: 1;
-}
-.loading-indicator-modal-body .animate-spin {
-	/* Farbe des Lade-Icons */
-	color: var(--color-primary);
-}
-
-.select-all-container {
-	display: flex;
-	align-items: center;
-	gap: var(--spacing-unit);
-	padding-bottom: calc(
-		var(--spacing-unit) * 1.5
-	); /* Etwas mehr Platz nach unten */
-	border-bottom: 1px solid var(--color-border);
-}
-.select-all-container input[type="checkbox"] {
-	width: 18px; /* Größe der Checkbox */
-	height: 18px;
-	accent-color: var(--color-primary); /* Farbe der Checkbox, wenn ausgewählt */
-}
-.select-all-container label {
-	font-size: 0.9rem;
-	color: var(--color-text-secondary);
-	cursor: pointer;
-}
+/*
+ * =================================================================
+ * M.A.L. - DownloadModal Specific Styles
+ * =================================================================
+ * Note: General modal layout is inherited from Modals.css.
+ * This file styles the unique elements of the DownloadModal.
+*/
 
 .download-modal-file-list {
 	display: flex;
 	flex-direction: column;
-	gap: calc(
-		var(--spacing-unit) * 1.25
-	); /* Abstand zwischen den einzelnen Datei-Items */
-}
-.no-files-message {
-	padding: calc(var(--spacing-unit) * 2);
-	text-align: center;
-	color: var(--color-text-placeholder);
-	background-color: var(--color-surface-alt);
-	border-radius: var(--border-radius-md);
+	gap: calc(var(--spacing-unit) * 1.5);
 }
 
 .download-file-item {
-	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 1.5);
+	padding: calc(var(--spacing-unit) * 2);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-md);
 	background-color: var(--color-surface-alt);
 	display: flex;
-	flex-direction: column; /* Haupt-Info und Optionen untereinander */
-	gap: calc(var(--spacing-unit) * 1.25);
+	flex-direction: column;
+	gap: calc(var(--spacing-unit) * 2);
 	transition: background-color var(--transition-speed-fast),
-		border-color var(--transition-speed-fast);
+		border-color var(--transition-speed-fast),
+        transform var(--transition-speed-fast);
 }
+
 .download-file-item.selected {
-	/* Hervorhebung, wenn ausgewählt */
-	background-color: rgba(
-		var(--color-primary-rgb),
-		0.1
-	); /* Leichte Primärfarbe als Hintergrund */
-	border-color: var(--color-primary);
+	background-color: rgba(var(--color-primary-rgb), 0.1);
+	border-color: rgba(var(--color-primary-rgb), 0.4);
+    transform: scale(1.01);
 }
 
 .file-item-main-info {
 	display: flex;
-	align-items: flex-start; /* Sorgt dafür, dass Checkbox und Text oben beginnen */
-	gap: calc(var(--spacing-unit) * 1.25);
+	align-items: flex-start;
+	gap: calc(var(--spacing-unit) * 1.5);
 }
+
 .file-item-main-info input[type="checkbox"] {
 	width: 20px;
 	height: 20px;
 	accent-color: var(--color-primary);
-	flex-shrink: 0; /* Verhindert, dass die Checkbox schrumpft */
-	margin-top: calc(
-		var(--spacing-unit) * 0.25
-	); /* Kleine Anpassung für bessere vertikale Ausrichtung */
+	flex-shrink: 0;
+    margin-top: 2px; /* Fine-tune vertical alignment */
 }
+
 .file-name-label {
 	display: flex;
 	flex-direction: column;
 	cursor: pointer;
-	flex-grow: 1; /* Nimmt verfügbaren Platz ein */
-	gap: calc(
-		var(--spacing-unit) * 0.25
-	); /* Kleiner Abstand zwischen Dateiname und Größe */
+	flex-grow: 1;
+	gap: calc(var(--spacing-unit) * 0.5);
 }
-.file-name {
-	font-weight: 500;
-	color: var(--color-text-primary);
-	word-break: break-all; /* Erlaubt Umbruch langer Dateinamen */
-	line-height: 1.4;
+
+.file-name-label span {
+    font-family: var(--font-monospace);
+	font-size: 0.95rem;
+	word-break: break-all;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
 }
-.file-size {
-	font-size: 0.85rem;
-	color: var(--color-text-secondary);
+
+.download-file-item.selected .file-name-label span {
+    color: var(--color-text-primary);
+    font-weight: 500;
 }
 
 .file-item-options {
 	display: flex;
-	flex-wrap: wrap; /* Erlaubt Umbruch bei wenig Platz */
+    flex-wrap: wrap;
 	gap: var(--spacing-unit);
 	align-items: center;
-	/* Einzug, um Optionen unter dem Dateinamen auszurichten, relativ zur Checkbox */
-	padding-left: calc(20px + var(--spacing-unit) * 1.25);
+	/* Indent options to align with the file name */
+	padding-left: calc(20px + var(--spacing-unit) * 1.5);
 }
-.model-type-select,
-.custom-path-input {
-	padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
+
+.file-item-options select,
+.file-item-options input {
+	padding: var(--spacing-unit);
 	font-size: 0.9rem;
-	background-color: var(--color-surface);
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-sm);
-	color: var(--color-text-primary);
-	flex-grow: 1; /* Nimmt verfügbaren Platz in der Zeile ein */
-	min-width: 160px; /* Mindestbreite für bessere Lesbarkeit */
+    flex-grow: 1;
 }
-.model-type-select {
-	flex-basis: 180px; /* Basisbreite für das Select-Feld */
-	flex-grow: 0; /* Verhindert, dass es unnötig wächst */
-}
-.model-type-select:disabled,
-.custom-path-input:disabled {
-	background-color: var(--color-surface-alt);
-	opacity: 0.7; /* Visuelles Feedback für deaktivierte Felder */
-	cursor: not-allowed;
-}
-.custom-path-input::placeholder {
-	color: var(--color-text-placeholder);
-}
-
-.download-feedback-container {
-	padding: calc(var(--spacing-unit) * 1.5);
-	background-color: var(
-		--color-background
-	); /* Leicht anderer Hintergrund zur Abgrenzung */
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-md);
-	max-height: 200px; /* Maximale Höhe, bevor Scrollen einsetzt */
-	overflow-y: auto;
-	font-size: 0.9rem;
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 0.75); /* Abstand zwischen Feedback-Items */
-}
-.download-feedback-container h4 {
-	margin-top: 0;
-	margin-bottom: calc(
-		var(--spacing-unit) * 0.5
-	); /* Weniger Abstand nach der Überschrift */
-	font-size: 1rem;
-	color: var(--color-text-secondary);
-	font-weight: 600;
-}
-
-/* Wrapper für jedes Feedback-Item (Text + Ladebalken) */
-.feedback-item-wrapper {
-	padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
-	border-radius: var(--border-radius-sm);
-	display: flex;
-	flex-direction: column;
-	gap: calc(
-		var(--spacing-unit) * 0.5
-	); /* Abstand zwischen Info-Text und Ladebalken */
-}
-.feedback-item-wrapper.pending {
-	/* Kein spezieller Hintergrund für "pending" */
-}
-.feedback-item-wrapper.downloading {
-	background-color: rgba(
-		var(--color-primary-rgb),
-		0.05
-	); /* Sehr leichter Primärfarben-Hintergrund */
-}
-.feedback-item-wrapper.success {
-	background-color: rgba(
-		var(--color-success-rgb),
-		0.1
-	); /* Hintergrund passend zur Erfolgsfarbe */
-}
-.feedback-item-wrapper.error {
-	background-color: rgba(
-		var(--color-error-rgb),
-		0.1
-	); /* Hintergrund passend zur Fehlerfarbe */
-}
-
-/* Info-Teil des Feedbacks (Dateiname, Status-Text) */
-.feedback-item-info {
-	display: flex;
-	align-items: center;
-	gap: calc(var(--spacing-unit) * 0.75);
-	line-height: 1.5;
-}
-.feedback-item-info strong {
-	/* Dateiname */
-	color: var(--color-text-primary);
-	word-break: break-all;
-}
-.feedback-item-info .inline-icon {
-	/* Lade-Icon */
-	flex-shrink: 0;
-}
-
-/* Textfarben basierend auf Status */
-.feedback-item-wrapper.pending .feedback-item-info {
-	color: var(--color-text-placeholder);
-}
-.feedback-item-wrapper.downloading .feedback-item-info {
-	color: var(--color-primary);
-}
-.feedback-item-wrapper.success .feedback-item-info {
-	color: var(--color-success);
-}
-.feedback-item-wrapper.error .feedback-item-info {
-	color: var(--color-error);
-}
-
-/* Ladebalken-Stile */
-.progress-bar-container {
-	width: 100%;
-	background-color: var(
-		--color-surface-alt
-	); /* Hintergrund des Balken-Containers */
-	border-radius: var(
-		--border-radius-sm
-	); /* Abgerundete Ecken für den Container */
-	overflow: hidden; /* Stellt sicher, dass der innere Balken nicht überläuft */
-	height: 20px; /* Höhe des Ladebalkens */
-	border: 1px solid var(--color-border-alt, var(--color-border)); /* Optional: etwas hellerer Rand */
-}
-
-.progress-bar {
-	height: 100%;
-	background-color: var(--color-primary); /* Standardfarbe des Fortschritts */
-	width: 0%; /* Startet bei 0% Breite */
-	display: flex;
-	align-items: center;
-	justify-content: center; /* Zentriert den Text im Balken */
-	color: var(--color-text-on-primary, white); /* Textfarbe auf dem Balken */
-	font-size: 0.75rem;
-	font-weight: 600;
-	transition: width 0.2s ease-out; /* Sanfter Übergang für die Breitenänderung */
-	white-space: nowrap; /* Verhindert Umbruch des Prozenttextes */
-	border-radius: inherit; /* Übernimmt den Radius vom Container, wenn der Balken voll ist */
-}
-
-.progress-bar.success {
-	/* Spezielle Farbe für erfolgreichen Abschluss */
-	background-color: var(--color-success);
-	color: var(
-		--color-text-on-accent,
-		white
-	); /* Anpassbare Textfarbe für Erfolg */
-}
-
-.progress-bar-text {
-	/* Styling für den Text innerhalb des Balkens */
-	padding: 0 calc(var(--spacing-unit) * 0.5);
-}
-
-.download-modal-actions {
-	display: flex;
-	justify-content: flex-end; /* Buttons rechtsbündig */
-	gap: calc(var(--spacing-unit) * 1.5);
-	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
-	border-top: 1px solid var(--color-border);
-	flex-shrink: 0; /* Verhindert Schrumpfen des Action-Bereichs */
-	background-color: var(
-		--color-surface-alt
-	); /* Leichter Hintergrund für den Footer */
-}
-.download-modal-actions .button {
-	/* Basis-Styling für Buttons im Modal-Footer */
-	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2.5);
-	min-width: 130px; /* Mindestbreite für Buttons */
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: calc(
-		var(--spacing-unit) * 0.75
-	); /* Abstand zwischen Text und Icon im Button */
-	/* Weitere Button-Stile (Schriftart, Radius etc.) sollten global definiert sein */
-}
-.download-modal-actions .button .animate-spin {
-	/* Kein explizites Margin mehr nötig, da 'gap' im Button verwendet wird */
-}
-
-.download-modal-actions .cancel-button {
-	/* Styling für den Abbrechen-Button */
-	background-color: var(
-		--color-surface-alt
-	); /* Oder transparent, je nach Design */
-	color: var(--color-text-primary);
-	border: 1px solid var(--color-border);
-}
-.download-modal-actions .cancel-button:hover:not(:disabled) {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-text-secondary);
-}
-
-/* Primärer Button (z.B. Herunterladen) erbt Stile von einer globalen .button-primary Klasse */
-/* .download-modal-actions .confirm-button.button-primary { ... } */

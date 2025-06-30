@@ -1,19 +1,23 @@
 /*
  * =================================================================
- * M.A.L. - FolderSelector Component Styles
+ * M.A.L. - FolderSelector Specific Styles
  * =================================================================
+ * Note: General modal layout is inherited from Modals.css.
 */
 
+/* Styles for the bars above the tree view */
 .folder-selector-path-bar {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	gap: var(--spacing-unit);
-	padding: var(--spacing-unit);
-	background-color: var(--color-surface-alt);
+	padding: calc(var(--spacing-unit) * 1.5);
+	background-color: var(--color-background);
 	border-radius: var(--border-radius-md);
-	margin-bottom: var(--spacing-unit);
+	margin-bottom: calc(var(--spacing-unit) * 2);
+    border: 1px solid var(--color-border);
 }
+
 .current-path-display {
 	font-family: var(--font-monospace);
 	font-size: 0.9rem;
@@ -22,64 +26,90 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
 .folder-selector-input-bar {
 	display: flex;
 	gap: var(--spacing-unit);
 	margin-bottom: var(--spacing-unit);
 }
+
+/* Container for the actual tree */
 .folder-selector-tree-container {
-	height: 40vh;
-	min-height: 200px;
+	height: 45vh;
+	min-height: 250px;
 	overflow-y: auto;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-md);
 	padding: var(--spacing-unit);
 	background-color: var(--color-background);
 }
-.folder-tree-root {
-	/* The root ul element for the tree */
-}
+
+/* A single item in the tree */
 .folder-selector-item .item-content {
 	display: flex;
 	align-items: center;
-	padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+	padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
 	border-radius: var(--border-radius-sm);
 	cursor: pointer;
 	user-select: none;
+    transition: background-color var(--transition-speed-fast), color var(--transition-speed-fast);
 }
+
 .folder-selector-item .item-content:hover {
 	background-color: var(--color-surface-hover);
 }
+
 .folder-selector-item.selected > .item-content {
 	background-color: var(--color-primary);
-	color: var(--color-primary-text);
+	color: var(--color-text-on-primary);
 }
+
 .folder-selector-item.selected > .item-content .item-icon,
-.folder-selector-item.selected > .item-content .item-name,
 .folder-selector-item.selected > .item-content .item-expand-icon {
-	color: var(--color-primary-text);
+	color: var(--color-text-on-primary);
 }
+
 .item-indent {
-	flex-shrink: 0;
+    flex-shrink: 0;
+    transition: width 0.1s ease;
 }
+
 .item-expand-icon {
 	color: var(--color-text-secondary);
-	margin-right: calc(var(--spacing-unit) * 0.5);
-	width: 1.5em; /* Ensure consistent spacing */
+	margin-right: calc(var(--spacing-unit) * 0.75);
+	width: 1.5em;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
+
 .item-icon {
 	color: var(--color-accent);
-	margin-right: var(--spacing-unit);
+	margin-right: calc(var(--spacing-unit) * 1.25);
 }
+
 .item-name {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+
+/* The list containing child nodes */
 .nested-list {
-	padding-left: 0;
-	overflow: hidden;
+    padding-left: 0;
+    overflow: hidden;
+}
+
+/* Loading and error states specific to the tree container */
+.folder-selector-tree-container .loading-indicator,
+.folder-selector-tree-container .error-message,
+.folder-selector-tree-container .no-results-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: var(--spacing-unit);
+    height: 100%;
+    color: var(--color-text-secondary);
+    text-align: center;
 }

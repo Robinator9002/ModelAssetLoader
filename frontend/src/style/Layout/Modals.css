@@ -1,10 +1,8 @@
 /*
  * =================================================================
- * M.A.L. - Unified Modal Styles (Purple Contrast Theme)
+ * M.A.L. - Unified Modal Styles (Refined)
  * =================================================================
- * NOTE: This file aims to unify styles for all modals. You can
- * consolidate your modal CSS into this single file for easier
- * maintenance.
+ * This file contains the foundational styles for all modal dialogs.
 */
 
 /* --- Generic Modal Structure --- */
@@ -12,7 +10,8 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+	/* Increased padding for more breathing room */
+	padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 3);
 	border-bottom: 1px solid var(--color-border);
 	flex-shrink: 0;
 }
@@ -21,23 +20,29 @@
 	font-size: 1.4rem;
     font-weight: 600;
     color: var(--color-text-primary);
+    padding-right: var(--spacing-unit); /* Ensure space for close button */
 }
 .modal-header .close-button {
-	/* Uses .button-icon styles from global.css */
+    /* Uses .button-icon styles from global.css */
     flex-shrink: 0;
 }
+
 .modal-body {
+	/* Increased padding for the main content area */
 	padding: calc(var(--spacing-unit) * 3);
 	overflow-y: auto;
 	flex-grow: 1;
+    background-color: var(--color-surface);
 }
+
 .modal-actions {
 	display: flex;
 	justify-content: flex-end;
 	gap: calc(var(--spacing-unit) * 1.5);
-	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+	/* Increased padding for the action footer */
+	padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 3);
 	border-top: 1px solid var(--color-border);
-	background-color: var(--color-background); /* Slight contrast from modal body */
+	background-color: var(--color-background);
 	flex-shrink: 0;
     border-bottom-left-radius: var(--border-radius-lg);
     border-bottom-right-radius: var(--border-radius-lg);
@@ -46,153 +51,8 @@
 	min-width: 140px;
 }
 
-/* --- ConfirmModal Specifics --- */
-.confirm-modal-content {
-	max-width: 480px;
-	text-align: center;
-}
-.confirm-modal-content .modal-body {
-    padding-top: calc(var(--spacing-unit) * 4);
-    padding-bottom: calc(var(--spacing-unit) * 4);
-}
-.confirm-modal-message {
-	font-size: 1rem;
-	color: var(--color-text-secondary);
-	line-height: 1.6;
-}
-
-/* --- DownloadModal Specifics --- */
+/* --- Specific Modal Content Sizing --- */
+/* These can be overridden but provide good defaults */
 .download-modal-content { max-width: 800px; }
-.download-modal-file-list {
-	display: flex;
-	flex-direction: column;
-	gap: var(--spacing-unit);
-}
-.download-file-item {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--spacing-unit) calc(var(--spacing-unit) * 2);
-	padding: var(--spacing-unit) * 1.5;
-	border-radius: var(--border-radius-md);
-	border: 1px solid var(--color-border);
-    background-color: var(--color-surface-alt);
-	transition: background-color var(--transition-speed-fast),
-		border-color var(--transition-speed-fast),
-        transform var(--transition-speed-fast);
-}
-.download-file-item.selected {
-	background-color: rgba(var(--color-primary-rgb), 0.1);
-	border-color: rgba(var(--color-primary-rgb), 0.4);
-    transform: scale(1.01);
-}
-.file-item-main-info {
-	flex-grow: 1;
-	display: flex;
-	align-items: center;
-	gap: var(--spacing-unit) * 1.5;
-	min-width: 300px;
-}
-.file-item-main-info input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    accent-color: var(--color-primary);
-    flex-shrink: 0;
-}
-.file-item-main-info .file-name-label {
-	font-family: var(--font-monospace);
-	font-size: 0.95rem;
-	word-break: break-all;
-    color: var(--color-text-secondary);
-}
-.download-file-item.selected .file-name-label {
-    color: var(--color-text-primary);
-}
-.file-item-options {
-	display: flex;
-    flex-wrap: wrap;
-	gap: var(--spacing-unit);
-	flex-basis: auto;
-    flex-grow: 1;
-    padding-left: calc(20px + var(--spacing-unit) * 1.5); /* align with checkbox */
-}
-.file-item-options .select, .file-item-options .input {
-	padding: var(--spacing-unit);
-	font-size: 0.9rem;
-    flex-grow: 1;
-}
-
-/* --- FolderSelector Specifics --- */
+.confirm-modal-content { max-width: 480px; }
 .folder-selector-content { max-width: 650px; }
-.folder-selector-path-bar {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: var(--spacing-unit);
-	padding: calc(var(--spacing-unit) * 1.5);
-	background-color: var(--color-background);
-	border-radius: var(--border-radius-md);
-	margin-bottom: calc(var(--spacing-unit) * 1.5);
-    border: 1px solid var(--color-border);
-}
-.current-path-display {
-	font-family: var(--font-monospace);
-	font-size: 0.9rem;
-	color: var(--color-text-secondary);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-.folder-selector-input-bar {
-	display: flex;
-	gap: var(--spacing-unit);
-	margin-bottom: var(--spacing-unit);
-}
-.folder-selector-tree-container {
-	height: 45vh;
-	min-height: 250px;
-	overflow-y: auto;
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-md);
-	padding: var(--spacing-unit);
-	background-color: var(--color-background);
-}
-.folder-selector-item .item-content {
-	display: flex;
-	align-items: center;
-	padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
-	border-radius: var(--border-radius-sm);
-	cursor: pointer;
-	user-select: none;
-    transition: background-color var(--transition-speed-fast), color var(--transition-speed-fast);
-}
-.folder-selector-item .item-content:hover {
-	background-color: var(--color-surface-hover);
-}
-.folder-selector-item.selected > .item-content {
-	background-color: var(--color-primary);
-	color: var(--color-text-on-primary);
-}
-.folder-selector-item.selected > .item-content .item-icon,
-.folder-selector-item.selected > .item-content .item-expand-icon {
-	color: var(--color-text-on-primary);
-}
-.item-indent { flex-shrink: 0; transition: width 0.1s ease; }
-.item-expand-icon {
-	color: var(--color-text-secondary);
-	margin-right: calc(var(--spacing-unit) * 0.75);
-	width: 1.5em;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-.item-icon {
-	color: var(--color-accent);
-	margin-right: calc(var(--spacing-unit) * 1.25);
-}
-.item-name {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.nested-list { padding-left: 0; overflow: hidden; }
