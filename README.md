@@ -22,6 +22,7 @@ This project is under active development. I'm building this in the open and ship
 **🔭 The Vision: My Roadmap**
 
 M.A.L. is more than just a downloader. My goal is for it to be the central hub for your entire local AI ecosystem. Here's where I'm headed:
+
 Phase 1: Polish the Core (Now Underway)
 
     [x] Re-implement advanced search sorting and filtering.
