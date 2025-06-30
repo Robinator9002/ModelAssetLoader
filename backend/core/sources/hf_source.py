@@ -1,12 +1,15 @@
 # backend/core/sources/hf_source.py
 from typing import List, Dict, Optional, Tuple, Any
 from huggingface_hub import HfApi, ModelInfo
-from huggingface_hub.utils import GatedRepoError, RepositoryNotFoundError, HFValidationError
+from huggingface_hub.utils import GatedRepoError, RepositoryNotFoundError, HFValidationError, HfHubHTTPError
 import logging
 
 from .base import APISource
 
 logger = logging.getLogger(__name__)
+
+# Define the sort keys that Hugging Face API restricts to descending order only.
+DESC_ONLY_SORTS = {"downloads", "likes", "lastModified"}
 
 class HuggingFaceSource(APISource):
     """
@@ -75,11 +78,21 @@ class HuggingFaceSource(APISource):
         page: int = 1,
     ) -> Tuple[List[Dict[str, Any]], bool]:
         """Searches for models on the Hugging Face Hub with server-side pagination."""
-        logger.info(f"[{self.name}] Searching models: page={page}, limit={limit}, query='{search_query}', sort='{sort_by}'")
+
+        final_sort_direction = sort_direction
+        if sort_by in DESC_ONLY_SORTS and sort_direction == 1:
+            logger.warning(
+                f"[{self.name}] The API does not support ascending sort for '{sort_by}'. "
+                f"Forcing direction to -1 (descending) for API call."
+            )
+            final_sort_direction = -1
+        
+        logger.info(f"[{self.name}] Searching models: page={page}, limit={limit}, query='{search_query}', sort='{sort_by}', direction='{final_sort_direction}'")
         
         models_iterator = self.client.list_models(
             search=search_query, author=author, filter=tags, sort=sort_by,
-            direction=sort_direction, limit=None, full=False, cardData=False
+            direction=final_sort_direction,
+            limit=None, full=False, cardData=False
         )
         
         results_for_page = []
@@ -92,15 +105,28 @@ class HuggingFaceSource(APISource):
                 items_processed_count = i + 1
                 if start_index <= i < (start_index + limit):
                     results_for_page.append(self._model_info_to_dict_list_item(model_info))
+                
                 if items_processed_count >= end_index_for_check:
                     break
+            
             has_more = items_processed_count > (start_index + limit)
+
+        except HfHubHTTPError as e:
+            logger.error(f"[{self.name}] HTTP error during search (query: '{search_query}'): {e}")
+            raise
         except (GatedRepoError, RepositoryNotFoundError, HFValidationError) as e:
             logger.error(f"[{self.name}] API error during search (query: '{search_query}'): {e}")
             return [], False
         except Exception as e:
             logger.error(f"[{self.name}] Unexpected error during search: {e}", exc_info=True)
             raise
+
+        # --- FIX: If the original request was for ascending sort on a descending-only field,
+        # we reverse the results of the page to simulate the expected ascending order.
+        if sort_by in DESC_ONLY_SORTS and sort_direction == 1:
+            logger.info(f"[{self.name}] Reversing page results for '{sort_by}' to simulate ascending order.")
+            results_for_page.reverse()
+        # --- END FIX ---
 
         return results_for_page, has_more
 
@@ -126,9 +152,9 @@ class HuggingFaceSource(APISource):
         except RepositoryNotFoundError:
             logger.info(f"[{self.name}] Model repository '{model_id}' not found.")
             return None
-        except (GatedRepoError, HFValidationError) as e:
+        except (GatedRepoError, HFValidationError, HfHubHTTPError) as e:
             logger.error(f"[{self.name}] API error for {model_id}: {e}")
-            return None
+            raise
         except Exception as e:
             logger.error(f"[{self.name}] Unexpected error retrieving details for {model_id}: {e}", exc_info=True)
             raise
