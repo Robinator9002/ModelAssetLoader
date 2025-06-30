@@ -1,0 +1,112 @@
+/*
+ * =================================================================
+ * M.A.L. - Modal Styles
+ * =================================================================
+ * This file contains consolidated styles for all modal dialogs.
+*/
+
+/* --- Download Modal & Generic Modal Headers/Footers --- */
+.download-modal-content {
+	max-width: 800px;
+}
+.confirm-modal-content {
+	max-width: 480px;
+	text-align: left;
+}
+.folder-selector-content {
+	max-width: 600px;
+}
+
+.modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+	border-bottom: 1px solid var(--color-border);
+	flex-shrink: 0;
+}
+.modal-header h3 {
+	margin: 0;
+	font-size: 1.3rem;
+}
+.modal-header .close-button {
+	background: transparent;
+	border: none;
+	color: var(--color-text-secondary);
+	cursor: pointer;
+	padding: var(--spacing-unit);
+	border-radius: var(--border-radius-md);
+}
+.modal-header .close-button:hover:not(:disabled) {
+	background-color: var(--color-surface-hover);
+	color: var(--color-text-primary);
+}
+
+.modal-body {
+	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+	overflow-y: auto;
+	flex-grow: 1;
+}
+
+.modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: calc(var(--spacing-unit) * 1.5);
+	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+	border-top: 1px solid var(--color-border);
+	background-color: var(--color-surface-alt);
+	flex-shrink: 0;
+}
+.modal-actions .button {
+	min-width: 140px;
+}
+
+/* Specific list items for Download Modal */
+.download-file-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-unit);
+}
+.download-file-item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--spacing-unit) * 2);
+	padding: var(--spacing-unit);
+	border-radius: var(--border-radius-md);
+	background-color: transparent;
+	border: 1px solid transparent;
+	transition: background-color var(--transition-speed-fast),
+		border-color var(--transition-speed-fast);
+}
+.download-file-item.selected {
+	background-color: hsla(var(--color-primary-hue), 90%, 65%, 0.1);
+	border-color: hsla(var(--color-primary-hue), 90%, 65%, 0.3);
+}
+.file-item-main-info {
+	flex-grow: 1;
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-unit);
+	min-width: 250px;
+}
+.file-item-main-info .file-name-label {
+	font-family: var(--font-monospace);
+	font-size: 0.9rem;
+	word-break: break-all;
+}
+.file-item-options {
+	display: flex;
+	gap: var(--spacing-unit);
+	flex-basis: 300px;
+}
+.file-item-options .select,
+.file-item-options .input {
+	padding: var(--spacing-unit);
+	font-size: 0.9rem;
+}
+
+/* Specific body for Confirm Modal */
+.confirm-modal-content .modal-body {
+	padding-top: calc(var(--spacing-unit) * 3);
+}

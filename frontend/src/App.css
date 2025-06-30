@@ -1,53 +1,72 @@
-/* frontend/src/App.css */
+/*
+ * =================================================================
+ * M.A.L. - App Stylesheet & Imports
+ * =================================================================
+ * This file imports the global design system and all component-
+ * specific stylesheets in the correct order.
+*/
+
+/* 1. Import the core design system */
 @import url("./style/global.css");
-@import url("./style/Theme/ThemeSwitcher.css");
-@import url("./style/ModelLoader/ModelSearchPage.css");
-@import url("./style/ModelLoader/ModelDetailsPage.css");
+
+/* 2. Import component-specific styles */
 @import url("./style/Layout/Navbar.css");
 @import url("./style/Layout/ConfirmModal.css");
-@import url("./style/Layout/FolderSelector.css");
+@import url("./style/Layout/Modals.css"); /* Consolidated Modal styles */
+
 @import url("./style/Files/ConfigurationsPage.css");
-@import url("./style/Files/DownloadModal.css");
+@import url("./style/Files/FolderSelector.css");
 @import url("./style/Files/DownloadManager.css");
+@import url("./style/Files/DownloadModal.css");
+
+@import url("./style/ModelLoader/ModelSearchPage.css");
+@import url("./style/ModelLoader/ModelDetailsPage.css");
+
+@import url("./style/Theme/ThemeSwitcher.css");
+
+/* --- Main Application Layout --- */
 
 .app-wrapper {
 	display: flex;
 	flex-direction: column;
 	height: 100vh;
+	width: 100vw;
 	overflow: hidden;
-	background-color: var(--color-background);
 }
 
-.app-header-placeholder {
-	flex-shrink: 0;
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
+.app-header {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--spacing-unit) * 1.5);
+	padding: var(--spacing-unit) calc(var(--spacing-unit) * 2);
 	background-color: var(--color-surface);
-	box-shadow: var(--shadow-md);
-	z-index: 10;
-	display: flex; /* Hinzugefügt für Titelausrichtung */
-	align-items: center; /* Hinzugefügt für Titelausrichtung */
-	justify-content: center; /* Hinzugefügt für Titelausrichtung */
-	border-bottom: 1px solid var(--color-border); /* Subtile Trennlinie */
+	border-bottom: 1px solid var(--color-border);
+	flex-shrink: 0;
+	user-select: none;
 }
-.app-header-placeholder h1 {
+.app-header img {
+	width: 2rem;
+	height: auto;
+}
+.app-header h1 {
 	font-size: 1.5rem;
-	color: var(--color-primary);
 	margin: 0;
-	font-weight: 600; /* Etwas dickerer Titel */
 }
 
 .main-content-area {
 	flex-grow: 1;
-	overflow-y: auto;
+	overflow-y: auto; /* Allows content within the main area to scroll */
 	padding: calc(var(--spacing-unit) * 3);
-	position: relative;
 }
 
-.theme-switcher-container {
-	position: fixed;
-	bottom: calc(var(--spacing-unit) * 3);
-	left: calc(var(--spacing-unit) * 3);
-	z-index: 1000;
+/* Generic Loading/Error States for Pages */
+.page-state-container {
 	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
 	gap: var(--spacing-unit);
+	height: 100%;
+	color: var(--color-text-secondary);
+	text-align: center;
 }

@@ -1,0 +1,85 @@
+/*
+ * =================================================================
+ * M.A.L. - FolderSelector Component Styles
+ * =================================================================
+*/
+
+.folder-selector-path-bar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--spacing-unit);
+	padding: var(--spacing-unit);
+	background-color: var(--color-surface-alt);
+	border-radius: var(--border-radius-md);
+	margin-bottom: var(--spacing-unit);
+}
+.current-path-display {
+	font-family: var(--font-monospace);
+	font-size: 0.9rem;
+	color: var(--color-text-secondary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.folder-selector-input-bar {
+	display: flex;
+	gap: var(--spacing-unit);
+	margin-bottom: var(--spacing-unit);
+}
+.folder-selector-tree-container {
+	height: 40vh;
+	min-height: 200px;
+	overflow-y: auto;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-md);
+	padding: var(--spacing-unit);
+	background-color: var(--color-background);
+}
+.folder-tree-root {
+	/* The root ul element for the tree */
+}
+.folder-selector-item .item-content {
+	display: flex;
+	align-items: center;
+	padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+	border-radius: var(--border-radius-sm);
+	cursor: pointer;
+	user-select: none;
+}
+.folder-selector-item .item-content:hover {
+	background-color: var(--color-surface-hover);
+}
+.folder-selector-item.selected > .item-content {
+	background-color: var(--color-primary);
+	color: var(--color-primary-text);
+}
+.folder-selector-item.selected > .item-content .item-icon,
+.folder-selector-item.selected > .item-content .item-name,
+.folder-selector-item.selected > .item-content .item-expand-icon {
+	color: var(--color-primary-text);
+}
+.item-indent {
+	flex-shrink: 0;
+}
+.item-expand-icon {
+	color: var(--color-text-secondary);
+	margin-right: calc(var(--spacing-unit) * 0.5);
+	width: 1.5em; /* Ensure consistent spacing */
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.item-icon {
+	color: var(--color-accent);
+	margin-right: var(--spacing-unit);
+}
+.item-name {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.nested-list {
+	padding-left: 0;
+	overflow: hidden;
+}

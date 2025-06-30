@@ -1,258 +1,323 @@
-/* frontend/src/style/global.css */
+/*
+ * =================================================================
+ * M.A.L. - Global Stylesheet (Overhauled)
+ * =================================================================
+ * This file establishes the core design system for the application.
+ * It includes CSS variables for theming (dark/light), base styles
+ * for common HTML elements, and utility classes for reusable
+ * components like buttons and inputs.
+*/
 
+/* --- THEME & DESIGN TOKENS --- */
 :root {
-	/* Schriftarten */
-	--font-primary: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-		Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+	/* Font Families */
+	--font-primary: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+		Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue",
+		sans-serif;
 	--font-monospace: "Fira Code", "Courier New", Courier, monospace;
 
-	/* Basisgrößen */
+	/* Core Sizing */
 	--font-size-base: 16px;
 	--spacing-unit: 8px;
 
-	/* Übergänge */
+	/* Transitions */
 	--transition-speed-fast: 0.15s;
 	--transition-speed-normal: 0.25s;
-	--transition-speed-slow: 0.4s;
 
-	/* Standard Theme: Dark */
-	--color-background: #121212;
-	--color-surface: #1e1e1e;
-	--color-surface-alt: #2c2c2c;
-	--color-surface-hover: #333333;
-	--color-border: #383838;
-	--color-text-primary: #e0e0e0;
-	--color-text-secondary: #b0b0b0;
-	--color-text-placeholder: #757575;
-	--color-primary: #6200ea;
-	--color-primary-variant: #3700b3;
-	--color-primary-hover: #7c4dff;
-	--color-primary-active: #5d10c8;
-	--color-accent: #03dac6;
-	--color-accent-hover: #66fff9;
-	--color-error: #cf6679;
-	--color-success: var(
-		--color-accent
-	); /* Using accent for success by default */
-	--color-error-rgb: 207, 102, 121; /* RGB for error color */
-	--color-accent-rgb: 3, 218, 198; /* RGB for accent color */
-
-	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.26);
-	--shadow-md: 0 3px 6px rgba(0, 0, 0, 0.36), 0 3px 6px rgba(0, 0, 0, 0.28);
-	--shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.39), 0 6px 6px rgba(0, 0, 0, 0.23);
-	--shadow-interactive-focus: 0 0 0 3px
-		rgba(
-			var(--color-primary-rgb, 98),
-			var(--color-primary-rgb, 0),
-			var(--color-primary-rgb, 234),
-			0.4
-		);
-
+	/* Border Radius */
 	--border-radius-sm: 4px;
 	--border-radius-md: 8px;
-	--border-radius-lg: 16px;
+	--border-radius-lg: 12px;
 
-	--color-primary-rgb: 98, 0, 234;
-	/* --color-accent-rgb: 3, 218, 198; Already defined above */
+	/* Shadows - Subtle and layered */
+	--shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+	--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+		0 2px 4px -1px rgba(0, 0, 0, 0.06);
+	--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+		0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+	/* Z-Indexes */
+	--z-index-navbar: 100;
+	--z-index-modal: 1000;
+	--z-index-toast: 2000;
+
+	/* -------------------------- */
+	/* --- Dark Theme (Default) - */
+	/* -------------------------- */
+	--color-background: #1a1b1e; /* Slightly softer black */
+	--color-surface: #242529; /* Main component background */
+	--color-surface-alt: #2c2e33; /* Contrasting background */
+	--color-surface-hover: #35373c;
+	--color-border: #3e4046;
+	--color-border-hover: #585b63;
+
+	--color-text-primary: #f0f0f0;
+	--color-text-secondary: #a0a0a0;
+	--color-text-placeholder: #707070;
+
+	--color-primary-hue: 210; /* Blue hue */
+	--color-primary: hsl(var(--color-primary-hue), 90%, 65%);
+	--color-primary-hover: hsl(var(--color-primary-hue), 90%, 70%);
+	--color-primary-active: hsl(var(--color-primary-hue), 85%, 60%);
+	--color-primary-text: #ffffff;
+
+	--color-accent-hue: 160; /* Teal/Cyan hue */
+	--color-accent: hsl(var(--color-accent-hue), 80%, 50%);
+
+	--color-success-hue: 140;
+	--color-success: hsl(var(--color-success-hue), 55%, 50%);
+	--color-error-hue: 0;
+	--color-error: hsl(var(--color-error-hue), 80%, 60%);
 }
 
 .light-theme {
-	--color-background: #ffffff;
-	--color-surface: #f5f5f5;
-	--color-surface-alt: #eeeeee;
-	--color-surface-hover: #e0e0e0;
-	--color-border: #d1d1d1;
-	--color-text-primary: #212121;
-	--color-text-secondary: #616161;
-	--color-text-placeholder: #9e9e9e;
-	--color-primary: #6200ea;
-	--color-primary-variant: #3700b3;
-	--color-primary-hover: #7c4dff;
-	--color-primary-active: #5d10c8;
-	--color-accent: #00bfa5;
-	--color-accent-hover: #1de9b6;
-	--color-error: #b00020;
-	--color-error-rgb: 176, 0, 32; /* RGB for light theme error */
-	--color-accent-rgb: 0, 191, 165; /* RGB for light theme accent */
+	/* -------------------------- */
+	/* --- Light Theme ---------- */
+	/* -------------------------- */
+	--color-background: #f4f5f7;
+	--color-surface: #ffffff;
+	--color-surface-alt: #fcfcfc;
+	--color-surface-hover: #f0f0f0;
+	--color-border: #e1e4e8;
+	--color-border-hover: #d1d5da;
 
-	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.08);
-	--shadow-md: 0 3px 6px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.1);
-	--shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 6px 6px rgba(0, 0, 0, 0.08);
-	--shadow-interactive-focus: 0 0 0 3px
-		rgba(
-			var(--color-primary-rgb, 98),
-			var(--color-primary-rgb, 0),
-			var(--color-primary-rgb, 234),
-			0.3
-		);
-
-	/* --color-primary-rgb: 98, 0, 234; Already defined above */
+	--color-text-primary: #1f2328;
+	--color-text-secondary: #586069;
+	--color-text-placeholder: #8b949e;
 }
+
+/* --- BASE & ELEMENT STYLES --- */
 
 *,
 *::before,
 *::after {
 	box-sizing: border-box;
-	margin: 0;
-	padding: 0;
 }
 
-html {
+body {
+	margin: 0;
+	padding: 0;
+	font-family: var(--font-primary);
 	font-size: var(--font-size-base);
-	line-height: 1.6;
+	background-color: var(--color-background);
+	color: var(--color-text-primary);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
 
-body {
-	font-family: var(--font-primary);
-	background-color: var(--color-background);
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	margin: 0 0 calc(var(--spacing-unit) * 2) 0;
+	font-weight: 600;
 	color: var(--color-text-primary);
-	transition: background-color var(--transition-speed-normal) ease,
-		color var(--transition-speed-normal) ease;
-	min-height: 100vh;
-	overflow: hidden; /* Verhindert Scrollbalken am Body, wenn ein Modal offen ist */
-	display: flex;
-	flex-direction: column;
+	line-height: 1.3;
 }
-/* Spezifische Klasse für Body, wenn ein Modal offen ist, um Scrollen zu verhindern */
-body.modal-open {
-	overflow: hidden;
+h1 {
+	font-size: 2rem;
 }
-
-#root {
-	flex-grow: 1;
-	display: flex;
-	flex-direction: column;
-	overflow: hidden; /* Verhindert Scrollen des Hauptinhalts, wenn nicht nötig */
+h2 {
+	font-size: 1.5rem;
+	padding-bottom: var(--spacing-unit);
+	border-bottom: 1px solid var(--color-border);
+}
+h3 {
+	font-size: 1.25rem;
 }
 
-input,
-button,
-select,
-textarea {
-	font-family: inherit;
-	font-size: 1rem;
+p {
+	margin: 0 0 var(--spacing-unit) 0;
+	line-height: 1.6;
+	color: var(--color-text-secondary);
+}
+p:last-child {
+	margin-bottom: 0;
+}
+
+a {
+	color: var(--color-primary);
+	text-decoration: none;
+	transition: color var(--transition-speed-fast);
+}
+a:hover {
+	text-decoration: underline;
+	color: var(--color-primary-hover);
+}
+
+ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+/* --- GENERIC COMPONENT & UTILITY CLASSES --- */
+
+/* Basic Button Styling */
+.button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--spacing-unit);
+	font-family: var(--font-primary);
+	font-weight: 600;
+	font-size: 0.95rem;
+	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2.5);
 	border-radius: var(--border-radius-md);
 	border: 1px solid var(--color-border);
+	background-color: var(--color-surface-alt);
+	color: var(--color-text-primary);
+	cursor: pointer;
+	text-align: center;
+	white-space: nowrap;
+	transition: all var(--transition-speed-fast) ease-in-out;
+}
+.button:hover:not(:disabled) {
+	background-color: var(--color-surface-hover);
+	border-color: var(--color-border-hover);
+	transform: translateY(-1px);
+	box-shadow: var(--shadow-sm);
+}
+.button:active:not(:disabled) {
+	transform: translateY(0);
+	box-shadow: none;
+}
+.button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Button Variants */
+.button-primary {
+	background-color: var(--color-primary);
+	border-color: var(--color-primary);
+	color: var(--color-primary-text);
+}
+.button-primary:hover:not(:disabled) {
+	background-color: var(--color-primary-hover);
+	border-color: var(--color-primary-hover);
+}
+.button-danger {
+	background-color: var(--color-error);
+	border-color: var(--color-error);
+	color: var(--color-primary-text);
+}
+
+/* Icon-only Button */
+.button-icon {
+	background-color: transparent;
+	border: 1px solid transparent;
+	color: var(--color-text-secondary);
+	padding: var(--spacing-unit);
+	border-radius: 50%;
+	line-height: 0; /* Ensures icon is centered */
+}
+.button-icon:hover:not(:disabled) {
+	background-color: var(--color-surface-hover);
+	color: var(--color-text-primary);
+	border-color: var(--color-border);
+	transform: none; /* No lift for icon buttons */
+	box-shadow: none;
+}
+
+/* Basic Input & Select Styling */
+.input,
+.select {
+	width: 100%;
 	background-color: var(--color-surface);
 	color: var(--color-text-primary);
-	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 1.5);
-	transition: border-color var(--transition-speed-fast) ease,
-		background-color var(--transition-speed-fast) ease,
-		box-shadow var(--transition-speed-fast) ease,
-		transform var(--transition-speed-fast) ease;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-md);
+	padding: calc(var(--spacing-unit) * 1.25);
+	font-size: 1rem;
+	font-family: var(--font-primary);
+	transition: border-color var(--transition-speed-fast),
+		box-shadow var(--transition-speed-fast);
 }
-
-input:focus,
-select:focus,
-textarea:focus {
+.input:hover:not(:disabled),
+.select:hover:not(:disabled) {
+	border-color: var(--color-border-hover);
+}
+.input:focus,
+.select:focus {
 	outline: none;
 	border-color: var(--color-primary);
-	box-shadow: var(--shadow-interactive-focus);
+	box-shadow: 0 0 0 2px hsla(var(--color-primary-hue), 90%, 65%, 0.3);
 }
-
-input::placeholder {
+.input::placeholder {
 	color: var(--color-text-placeholder);
 	opacity: 1;
 }
-
-button {
-	cursor: pointer;
-	background-color: var(--color-primary);
-	color: #ffffff;
-	border: none;
-	font-weight: 500;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-	box-shadow: var(--shadow-sm);
-}
-
-button:hover:not(:disabled) {
-	/* :not(:disabled) hinzugefügt */
-	background-color: var(--color-primary-hover);
-	box-shadow: var(--shadow-md);
-	transform: translateY(-1px);
-}
-button:active:not(:disabled) {
-	/* :not(:disabled) hinzugefügt */
-	background-color: var(--color-primary-active);
-	box-shadow: none;
-	transform: translateY(0px);
-}
-button:disabled {
-	background-color: var(
-		--color-border
-	) !important; /* Wichtig, um spezifischere Styles zu überschreiben */
-	color: var(--color-text-placeholder) !important;
+.input:disabled,
+.select:disabled {
+	background-color: var(--color-surface-alt);
 	cursor: not-allowed;
-	box-shadow: none;
-	transform: none;
+	opacity: 0.6;
 }
 
-::-webkit-scrollbar {
-	width: 12px;
-	height: 12px;
-}
-::-webkit-scrollbar-track {
-	background: var(--color-surface-alt);
-	border-radius: var(
-		--border-radius-lg
-	); /* Gilt nur, wenn der Track selbst abgerundet ist */
-}
-::-webkit-scrollbar-thumb {
-	background: var(--color-border);
-	border-radius: var(--border-radius-lg);
-	border: 3px solid var(--color-surface-alt); /* Erzeugt einen "Padding"-Effekt */
-}
-::-webkit-scrollbar-thumb:hover {
-	background: var(--color-primary-hover);
-}
-::-webkit-scrollbar-thumb:active {
-	/* :active statt :hover:active */
-	background: var(--color-primary);
-}
-
-.container {
-	width: 90%;
-	max-width: 1400px;
-	margin-left: auto;
-	margin-right: auto;
-	padding-left: calc(var(--spacing-unit) * 2);
-	padding-right: calc(var(--spacing-unit) * 2);
-}
-
-/* Generischer Modal Overlay Style */
+/* Generic Modal Styling */
 .modal-overlay {
-	position: fixed; /* Bleibt beim Scrollen an Ort und Stelle */
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	background-color: rgba(0, 0, 0, 0.65); /* Halbtransparenter Hintergrund */
-	display: none; /* Standardmäßig ausgeblendet */
-	align-items: center; /* Zentriert den Inhalt vertikal */
-	justify-content: center; /* Zentriert den Inhalt horizontal */
-	z-index: 1000; /* Stellt sicher, dass es über anderen Inhalten liegt */
-	padding: var(
-		--spacing-unit
-	); /* Kleiner Abstand zum Rand bei sehr kleinen Bildschirmen */
-	/* overflow-y: auto; /* Erlaubt Scrollen des Overlays, falls Inhalt doch größer als Viewport - besser am modal-content */
+	position: fixed;
+	inset: 0;
+	background-color: hsla(0, 0%, 0%, 0.7);
+	display: flex; /* Changed from none */
+	align-items: center;
+	justify-content: center;
+	z-index: var(--z-index-modal);
+	padding: var(--spacing-unit);
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity var(--transition-speed-normal) ease,
+		visibility 0s linear var(--transition-speed-normal);
 }
-
 .modal-overlay.active {
-	display: flex; /* Zeigt das Overlay an, wenn aktiv */
+	opacity: 1;
+	visibility: visible;
+	transition-delay: 0s;
 }
-
-/* Generischer Stil für den Modal-Inhaltscontainer */
-/* Spezifische Größen und Scrolling werden in den jeweiligen Modal-CSS-Dateien gehandhabt */
 .modal-content {
 	background-color: var(--color-surface);
 	border-radius: var(--border-radius-lg);
 	box-shadow: var(--shadow-lg);
 	display: flex;
 	flex-direction: column;
-	overflow: hidden; /* Verhindert, dass der Content-Block selbst scrollt; Scrolling im Body */
-	width: 95%; /* Default responsive width */
-	/* max-width, min-height, max-height sollten spezifisch pro Modal gesetzt werden */
+	max-height: 90vh;
+	width: 100%;
+	transform: scale(0.95);
+	opacity: 0;
+	transition: transform var(--transition-speed-normal) ease,
+		opacity var(--transition-speed-normal) ease;
+}
+.modal-overlay.active .modal-content {
+	transform: scale(1);
+	opacity: 1;
+}
+
+/* Generic Message/Feedback Styling */
+.feedback-message {
+	margin-top: calc(var(--spacing-unit) * 2);
+	padding: calc(var(--spacing-unit) * 1.5);
+	border-radius: var(--border-radius-md);
+	text-align: center;
+	font-weight: 500;
+	font-size: 0.95rem;
+	border: 1px solid transparent;
+}
+.feedback-message.success {
+	background-color: hsla(var(--color-success-hue), 55%, 50%, 0.15);
+	border-color: hsla(var(--color-success-hue), 55%, 50%, 0.4);
+	color: hsl(var(--color-success-hue), 55%, 85%);
+}
+.light-theme .feedback-message.success {
+	color: hsl(var(--color-success-hue), 55%, 25%);
+}
+.feedback-message.error {
+	background-color: hsla(var(--color-error-hue), 80%, 60%, 0.15);
+	border-color: hsla(var(--color-error-hue), 80%, 60%, 0.4);
+	color: hsl(var(--color-error-hue), 80%, 85%);
+}
+.light-theme .feedback-message.error {
+	color: hsl(var(--color-error-hue), 80%, 35%);
 }

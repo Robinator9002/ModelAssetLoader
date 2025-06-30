@@ -1,181 +1,56 @@
-/* frontend/src/style/Files/ConfigurationsPage.css */
+/*
+ * =================================================================
+ * M.A.L. - ConfigurationsPage Styles
+ * =================================================================
+*/
 .configurations-page {
-	padding: calc(var(--spacing-unit) * 3); /* Mehr Padding für die Gesamtseite */
 	max-width: 800px;
-	margin: calc(var(--spacing-unit) * 2) auto; /* Etwas Abstand oben/unten */
+	margin: 0 auto;
 	display: flex;
 	flex-direction: column;
-	gap: calc(
-		var(--spacing-unit) * 3.5
-	); /* Etwas größerer Abstand zwischen Sektionen */
+	gap: calc(var(--spacing-unit) * 4);
 }
-
-.configurations-page h2 {
-	color: var(--color-primary);
-	text-align: center;
-	margin-bottom: var(--spacing-unit);
-	font-size: 2rem; /* Größer und präsenter */
-	font-weight: 600;
-}
-
-.config-intro {
-	text-align: center;
-	color: var(--color-text-secondary);
-	margin-bottom: calc(var(--spacing-unit) * 2.5); /* Mehr Abstand */
-	font-size: 1rem; /* Etwas größer */
-	line-height: 1.7;
-	max-width: 650px; /* Begrenzt Breite für bessere Lesbarkeit */
-	align-self: center; /* Zentriert den Intro-Textblock */
-}
-
 .config-section {
-	background-color: var(--color-surface);
-	padding: calc(var(--spacing-unit) * 3); /* Mehr Padding innen */
-	border-radius: var(--border-radius-lg);
-	box-shadow: var(--shadow-md);
 	display: flex;
 	flex-direction: column;
-	gap: var(--spacing-unit) * 2; /* Größerer Abstand zwischen Elementen in der Sektion */
+	gap: var(--spacing-unit);
 }
-
 .config-label {
-	font-weight: 600; /* Etwas fetter */
-	color: var(--color-text-primary);
-	margin-bottom: calc(
-		var(--spacing-unit) * 0.75
-	); /* Etwas mehr Abstand zum Input */
-	font-size: 0.95rem; /* Leicht vergrößert */
+	font-weight: 600;
+	font-size: 1rem;
 }
-
 .base-path-selector {
 	display: flex;
 	gap: var(--spacing-unit);
-	align-items: center; /* Vertikale Ausrichtung */
 }
-
-.config-input,
-.config-select {
-	width: 100%;
-	background-color: var(--color-surface-alt);
-	border-color: var(--color-border);
-	/* Globale Input-Styles werden angewendet */
+.base-path-selector .input {
+	cursor: pointer;
 }
-.config-input.path-input {
-	flex-grow: 1;
-	/* Spezielles Styling für den Pfad-Input, falls nötig */
-}
-.config-input.path-input[readOnly]:hover {
-	/* Visuelles Feedback für Klickbarkeit */
-	border-color: var(--color-primary-hover);
-}
-
-/* "Ordner Wählen..." Button - Anpassung an .button-secondary Stil */
-.browse-button {
-	/* Nutzt globale Button-Styles als Basis, aber mit sekundärem Aussehen */
-	background-color: var(--color-surface-alt);
-	color: var(--color-primary);
-	border: 1px solid var(--color-primary);
-	text-transform: none; /* Oft haben sekundäre Buttons keinen Uppercase */
-	font-weight: 500;
-	padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2);
-	flex-shrink: 0;
-	transition: background-color var(--transition-speed-fast) ease,
-		color var(--transition-speed-fast) ease,
-		border-color var(--transition-speed-fast) ease;
-}
-.browse-button:hover:not(:disabled) {
-	background-color: var(--color-primary);
-	color: #ffffff; /* Textfarbe auf Primärfarbe anpassen */
-	border-color: var(--color-primary);
-}
-.browse-button:disabled {
-	border-color: var(--color-border);
-	color: var(--color-text-placeholder);
-	background-color: var(
-		--color-surface
-	); /* Leicht anders als globale :disabled */
-}
-
-.config-hint {
-	font-size: 0.9rem; /* Etwas größer für bessere Lesbarkeit */
-	color: var(--color-text-placeholder);
-	margin-top: calc(
-		var(--spacing-unit) * 0.5
-	); /* Weniger Abstand, wenn direkt unter einem Element */
-}
-.config-hint.error-hint {
-	color: var(--color-error);
-	font-weight: 500;
-}
-
-.custom-paths-section h3 {
-	font-size: 1.2rem; /* Etwas größer */
-	color: var(--color-accent);
-	margin-bottom: calc(var(--spacing-unit) * 1.5);
-	padding-bottom: var(--spacing-unit);
-	border-bottom: 1px solid var(--color-border);
-	font-weight: 600;
-}
-.custom-paths-section > .config-hint {
-	/* Hint direkt unter H3 */
-	margin-top: calc(var(--spacing-unit) * -0.5); /* Reduziert Abstand nach H3 */
-	margin-bottom: var(--spacing-unit);
-}
-
-.custom-path-entry {
-	display: grid;
-	grid-template-columns: 160px 1fr; /* Label-Breite leicht angepasst */
-	align-items: center;
-	gap: calc(var(--spacing-unit) * 1.5); /* Etwas mehr Gap */
-	margin-bottom: calc(var(--spacing-unit) * 1.25); /* Konsistenter Abstand */
-}
-.custom-path-label {
-	font-size: 0.9rem;
-	color: var(--color-text-secondary);
-	text-align: right;
-	padding-right: var(--spacing-unit); /* Abstand zum Input */
-}
-
 .config-actions {
-	margin-top: calc(var(--spacing-unit) * 2.5); /* Mehr Abstand nach oben */
+	margin-top: var(--spacing-unit);
 	display: flex;
 	justify-content: flex-end;
 }
-
-/* "Konfiguration Speichern" Button */
-.save-config-button {
-	/* Nutzt globale Button-Styles (wahrscheinlich primär) */
-	min-width: 220px; /* Etwas breiter */
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3.5); /* Großzügigeres Padding */
-	font-size: 1.05rem; /* Leicht größere Schrift */
-	/* Der globale :disabled Style sollte hier greifen */
+.custom-paths-section h3 {
+	margin-bottom: var(--spacing-unit);
+	font-size: 1.1rem;
 }
-
-.feedback-message {
-	margin-top: var(--spacing-unit) * 2;
-	padding: calc(var(--spacing-unit) * 1.75); /* Etwas mehr Padding */
-	border-radius: var(--border-radius-md);
-	text-align: center;
+.custom-paths-section h3 code {
+	font-size: 0.9em;
+	background-color: var(--color-surface-alt);
+	padding: 2px 5px;
+	border-radius: var(--border-radius-sm);
+	border: 1px solid var(--color-border);
+}
+.custom-path-entry {
+	display: grid;
+	grid-template-columns: 150px 1fr;
+	align-items: center;
+	gap: calc(var(--spacing-unit) * 2);
+	margin-bottom: var(--spacing-unit);
+}
+.custom-path-label {
+	text-align: right;
 	font-weight: 500;
-	font-size: 0.95rem; /* Leicht größer */
-}
-.feedback-message.success {
-	background-color: rgba(
-		var(--color-accent-rgb, 3),
-		var(--color-accent-rgb, 218),
-		var(--color-accent-rgb, 198),
-		0.15
-	);
-	color: var(--color-accent);
-	border: 1px solid var(--color-accent);
-}
-.feedback-message.error {
-	background-color: rgba(
-		var(--color-error-rgb, 207),
-		var(--color-error-rgb, 102),
-		var(--color-error-rgb, 121),
-		0.15
-	); /* Annahme: --color-error-rgb existiert */
-	color: var(--color-error);
-	border: 1px solid var(--color-error);
+	color: var(--color-text-secondary);
 }

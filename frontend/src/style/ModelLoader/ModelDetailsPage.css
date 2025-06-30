@@ -1,302 +1,100 @@
-/* frontend/src/components/ModelLoader/ModelDetailsPage.css */
+/*
+ * =================================================================
+ * M.A.L. - ModelDetailsPage Styles
+ * =================================================================
+*/
 .model-details-page {
-	/* padding wurde entfernt, wird vom .main-content-area in App.css gehandhabt */
-	color: var(--color-text-primary);
-	display: flex;
-	flex-direction: column;
-	height: 100%; /* Wichtig für Flexbox-Kinder */
-	overflow: hidden; /* Verhindert, dass die Seite selbst scrollt */
+	max-width: 1000px;
+	margin: 0 auto;
 }
-
 .details-page-header {
-	/* Neuer Wrapper für Zurück-Button und Header-Infos */
-	padding: calc(var(--spacing-unit) * 2);
-	padding-bottom: 0; /* Kein unteres Padding, da der border-bottom der nächste ist */
-	background-color: var(
-		--color-surface
-	); /* Kann auch transparent sein, je nach Design */
-	flex-shrink: 0;
-	position: sticky; /* Versucht, oben zu bleiben, wenn der Content-Bereich scrollt */
-	top: 0;
-	z-index: 5; /* Unter dem globalen App-Header, falls vorhanden */
-}
-
-.back-button {
-	align-self: flex-start;
-	background-color: var(--color-surface-alt); /* Etwas abgesetzt */
-	color: var(--color-primary);
-	border: 1px solid transparent; /* Rahmen erst bei Hover */
-	padding: calc(var(--spacing-unit)) calc(var(--spacing-unit) * 1.5);
-	margin-bottom: calc(var(--spacing-unit) * 2);
-	border-radius: var(--border-radius-md);
-	display: inline-flex;
-	align-items: center;
-	gap: var(--spacing-unit);
-	font-weight: 500;
-	text-transform: uppercase;
-}
-.back-button:hover {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-primary);
-	transform: translateX(-2px); /* Leichter Effekt */
-}
-.error-page-back-button {
-	margin-bottom: 0;
-}
-
-.details-header {
-	padding-bottom: calc(var(--spacing-unit) * 2);
-	border-bottom: 1px solid var(--color-border);
-}
-
-.details-header h1 {
-	font-size: 1.8rem; /* Etwas kleiner für bessere Balance */
-	margin-bottom: calc(var(--spacing-unit) * 0.5);
-	color: var(--color-text-primary);
-}
-
-.details-author {
-	font-size: 1rem;
-	color: var(--color-text-secondary);
-	margin-bottom: var(--spacing-unit);
-}
-
-.details-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--spacing-unit) calc(var(--spacing-unit) * 2);
-	font-size: 0.9rem;
-	color: var(--color-text-secondary);
-}
-.details-meta span {
-	display: inline-flex;
-	align-items: center;
-}
-
-.details-pipeline-tag,
-.library-tag {
-	background-color: var(--color-surface-alt);
-	padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.75);
-	border-radius: var(--border-radius-sm);
-}
-
-.details-content-wrapper {
-	/* Neuer Scroll-Container für den Rest des Inhalts */
-	flex-grow: 1;
-	overflow-y: auto;
-	padding: calc(
-		var(--spacing-unit) * 2
-	); /* Padding für den scrollbaren Inhalt */
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 3);
+	gap: calc(var(--spacing-unit) * 2);
+	margin-bottom: calc(var(--spacing-unit) * 3);
 }
-
-.details-section {
-	background-color: var(--color-surface);
-	padding: calc(var(--spacing-unit) * 2);
-	border-radius: var(--border-radius-lg);
-	box-shadow: var(--shadow-md);
+.details-page-header .back-button {
+	align-self: flex-start;
 }
-
-.details-section h2 {
-	font-size: 1.3rem; /* Etwas kleiner */
+.details-content-wrapper {
+	display: grid;
+	grid-template-columns: 350px 1fr;
+	gap: calc(var(--spacing-unit) * 4);
+	align-items: flex-start;
+}
+.files-section h2,
+.readme-section h2 {
 	margin-bottom: var(--spacing-unit);
-	padding-bottom: calc(var(--spacing-unit) * 0.5);
-	border-bottom: 1px solid var(--color-border);
-	color: var(--color-accent);
 }
-
-.tags-section .tags-list {
+.files-list {
 	display: flex;
-	flex-wrap: wrap;
-	gap: var(--spacing-unit);
+	flex-direction: column;
+	gap: calc(var(--spacing-unit) * 0.5);
 }
-
-.tag-item {
-	background-color: var(--color-border);
-	color: var(--color-text-secondary);
-	padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-	border-radius: var(--border-radius-sm);
-	font-size: 0.85rem;
-	transition: background-color var(--transition-speed-fast);
-}
-.tag-item:hover {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text-primary);
-}
-
-.files-section .files-list-container {
-	/* Container für die Dateiliste, um max-height zu setzen */
-	max-height: 15rem; /* Beispielhöhe, anpassen nach Bedarf */
-	overflow-y: auto;
-	padding-right: calc(var(--spacing-unit) * 0.5); /* Platz für Scrollbar */
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-md);
-	background-color: var(
-		--color-surface-alt
-	); /* Hintergrund für den Scrollbereich */
-}
-.files-section .files-list {
-	list-style: none;
-	padding: 0;
-	margin: 0;
-}
-
-.file-item {
+.files-list .file-item {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5); /* Mehr Padding */
-	border-bottom: 1px solid var(--color-border);
-	transition: background-color var(--transition-speed-fast);
-}
-.file-item:last-child {
-	border-bottom: none;
-}
-.file-item:hover {
-	background-color: var(--color-surface-hover);
-}
-
-.file-name {
-	flex-grow: 1;
-	word-break: break-all;
-	margin-right: var(--spacing-unit);
-}
-
-.file-size {
-	min-width: 100px;
-	text-align: right;
-	color: var(--color-text-secondary);
-	margin-left: var(--spacing-unit);
-	flex-shrink: 0;
-}
-
-.download-button-placeholder {
-	background-color: transparent;
-	border: 1px solid var(--color-primary);
-	color: var(--color-primary);
-	border-radius: var(--border-radius-sm);
-	padding: calc(var(--spacing-unit) * 0.5);
-	margin-left: var(--spacing-unit);
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	transition: background-color var(--transition-speed-fast),
-		color var(--transition-speed-fast);
-	flex-shrink: 0;
-}
-.download-button-placeholder:hover {
-	background-color: var(--color-primary);
-	color: #ffffff; /* Weißer Text für Kontrast */
-}
-.download-button-placeholder svg {
-	transition: transform var(--transition-speed-fast) ease;
-}
-.download-button-placeholder:hover svg {
-	transform: scale(1.1);
-}
-
-.readme-section .readme-content {
-	background-color: var(
-		--color-surface-alt
-	); /* Angepasst an Listenhintergrund */
 	padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
 	border-radius: var(--border-radius-md);
-	border: 1px solid var(--color-border);
-	max-height: 500px; /* Beispielhöhe */
-	overflow-y: auto;
-	line-height: 1.7;
+	transition: background-color var(--transition-speed-fast);
 }
-
+.files-list .file-item:hover {
+	background-color: var(--color-surface-alt);
+}
+.files-list .file-item span {
+	font-size: 0.9rem;
+	font-family: var(--font-monospace);
+	word-break: break-all;
+	padding-right: var(--spacing-unit);
+}
+.readme-content {
+	background-color: var(--color-surface);
+	padding: calc(var(--spacing-unit) * 3);
+	border-radius: var(--border-radius-lg);
+	border: 1px solid var(--color-border);
+	font-size: 0.95rem;
+}
+.readme-content > *:first-child {
+	margin-top: 0;
+}
+.readme-content > *:last-child {
+	margin-bottom: 0;
+}
+/* Basic Markdown Element Styling */
 .readme-content h1,
 .readme-content h2,
 .readme-content h3 {
-	margin-top: calc(var(--spacing-unit) * 2);
-	margin-bottom: var(--spacing-unit);
-	border-bottom: none;
-	color: var(--color-text-primary);
+	border-bottom: 1px solid var(--color-border);
+	padding-bottom: var(--spacing-unit);
+	margin-top: calc(var(--spacing-unit) * 3);
 }
-.readme-content h1 {
-	font-size: 1.6em;
-} /* Angepasste Größen für eingebettetes Markdown */
-.readme-content h2 {
-	font-size: 1.3em;
-}
-.readme-content h3 {
-	font-size: 1.15em;
-}
-
-.readme-content p {
-	margin-bottom: var(--spacing-unit);
-}
-.readme-content a {
-	color: var(--color-primary);
-	text-decoration: none;
-}
-.readme-content a:hover {
-	text-decoration: underline;
-}
-.readme-content ul,
-.readme-content ol {
-	margin-left: calc(var(--spacing-unit) * 2.5);
-	margin-bottom: var(--spacing-unit);
-}
-
 .readme-content code {
-	background-color: var(--color-border); /* Dunkler für Code-Snippets */
+	background-color: var(--color-surface-alt);
 	padding: 0.2em 0.4em;
-	margin: 0;
 	font-size: 85%;
 	border-radius: var(--border-radius-sm);
 	font-family: var(--font-monospace);
-	color: var(--color-text-primary); /* Hellerer Text auf dunklerem Code-BG */
 }
 .readme-content pre {
-	background-color: var(--color-background); /* Sehr dunkel für Code-Blöcke */
-	padding: var(--spacing-unit);
+	background-color: var(--color-background);
+	padding: var(--spacing-unit) * 1.5;
 	border-radius: var(--border-radius-md);
-	overflow-x: auto;
 	border: 1px solid var(--color-border);
+	overflow-x: auto;
 }
 .readme-content pre code {
-	background-color: transparent;
+	background: none;
 	padding: 0;
-	margin: 0;
-	font-size: inherit;
-	border-radius: 0;
 }
 .readme-content blockquote {
-	border-left: 4px solid var(--color-border);
-	padding-left: var(--spacing-unit);
-	margin-left: 0;
-	margin-bottom: var(--spacing-unit);
+	border-left: 3px solid var(--color-border-hover);
+	padding-left: calc(var(--spacing-unit) * 2);
+	margin: 0 0 var(--spacing-unit) 0;
 	color: var(--color-text-secondary);
 }
-.readme-content table {
-	border-collapse: collapse;
-	margin-bottom: var(--spacing-unit);
-	width: auto;
-}
-.readme-content th,
-.readme-content td {
-	border: 1px solid var(--color-border);
-	padding: calc(var(--spacing-unit) * 0.75);
-}
-.readme-content th {
-	background-color: var(--color-surface-alt);
-}
-
-.details-loading,
-.no-results-message {
-	/* Wiederverwendung der Klassen von SearchPage */
-	text-align: center;
-	color: var(--color-text-secondary);
-	padding: calc(var(--spacing-unit) * 4) 0;
-	font-style: italic;
-	flex-grow: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
+@media (max-width: 800px) {
+	.details-content-wrapper {
+		grid-template-columns: 1fr;
+	}
 }

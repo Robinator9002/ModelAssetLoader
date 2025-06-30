@@ -1,148 +1,99 @@
-/* frontend/src/style/Files/DownloadManager.css */
-
 /*
- * Hauptcontainer für alle Benachrichtigungen.
- * Wird fest unten rechts positioniert.
- */
+ * =================================================================
+ * M.A.L. - DownloadManager Component Styles
+ * =================================================================
+*/
 .download-manager-container {
 	position: fixed;
-	bottom: calc(var(--spacing-unit) * 2);
-	right: calc(var(--spacing-unit) * 2);
-	z-index: 2000; /* Sehr hoher z-index, um über allen anderen Elementen zu liegen */
+	bottom: var(--spacing-unit);
+	right: var(--spacing-unit);
+	z-index: var(--z-index-toast);
 	width: 100%;
 	max-width: 380px;
 	display: flex;
-	flex-direction: column-reverse; /* WICHTIG: Neue Toasts erscheinen oben */
-	gap: calc(var(--spacing-unit) * 1.5);
-	/* Pointer-events: none, damit man durch den leeren Container klicken kann */
+	flex-direction: column;
+	gap: var(--spacing-unit);
 	pointer-events: none;
 }
-
-/*
- * Der einzelne Toast.
- * Definiert das Aussehen und die Animationen.
- */
 .download-item-toast {
 	background-color: var(--color-surface);
-	color: var(--color-text-primary);
 	border-radius: var(--border-radius-md);
-	padding: calc(var(--spacing-unit) * 1.5);
+	padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
 	box-shadow: var(--shadow-lg);
-	border-left: 5px solid var(--color-primary); /* Blauer Indikator für "in Arbeit" */
+	border-left: 4px solid var(--color-primary);
 	display: flex;
 	flex-direction: column;
 	gap: var(--spacing-unit);
-	position: relative;
-	pointer-events: all; /* Toasts selbst sollen klickbar sein */
-
-	/* Animation für das Erscheinen und Verschwinden */
-	animation: toast-slide-in 0.4s cubic-bezier(0.21, 1.02, 0.73, 1);
-	transition: opacity 0.3s ease, transform 0.3s ease, height 0.3s ease;
+	pointer-events: all;
+	animation: slideInUp 0.3s ease-out;
 }
-
-/* Spezifische Zustände */
-.download-item-toast.completed {
-	border-left-color: var(--color-accent); /* Grün für Erfolg */
+@keyframes slideInUp {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 .download-item-toast.error {
-	border-left-color: var(--color-error); /* Rot für Fehler */
+	border-left-color: var(--color-error);
 }
-
-/* Header des Toasts */
+.download-item-toast.completed {
+	border-left-color: var(--color-success);
+}
 .download-toast-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	gap: var(--spacing-unit);
-	padding-right: calc(var(--spacing-unit) * 3); /* Platz für den X-Button */
 }
-
 .download-toast-filename {
-	font-weight: 600;
+	font-weight: 500;
 	font-size: 0.9rem;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-
-.download-toast-status-icon {
-	flex-shrink: 0;
+.download-toast-status-icon .text-red-500 {
+	color: var(--color-error);
 }
-
-/* Der Schließen-Button ('X') */
-.dismiss-button {
-    position: absolute;
-    top: calc(var(--spacing-unit) * 0.5);
-    right: calc(var(--spacing-unit) * 0.5);
-    background: transparent;
-    border: none;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    padding: var(--spacing-unit);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s, color 0.2s;
+.download-toast-status-icon .text-green-500 {
+	color: var(--color-success);
 }
-.dismiss-button:hover {
-    background-color: var(--color-surface-hover);
-    color: var(--color-text-primary);
-}
-
-/* Körper des Toasts mit Fortschrittsanzeige */
 .download-toast-body {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--spacing-unit) * 1.5);
+	gap: var(--spacing-unit);
 }
-
 .progress-bar-container {
 	flex-grow: 1;
 	background-color: var(--color-surface-alt);
 	border-radius: 100px;
 	overflow: hidden;
-	height: 10px; /* Etwas dicker für bessere Sichtbarkeit */
+	height: 8px;
 }
-
 .progress-bar {
 	height: 100%;
 	background-color: var(--color-primary);
 	width: 0%;
 	border-radius: inherit;
-	transition: width 0.15s linear; /* Schnellere, flüssigere Animation */
+	transition: width 0.15s linear;
 }
 .progress-bar.completed {
-	background-color: var(--color-accent);
+	background-color: var(--color-success);
 }
-
 .progress-text {
 	font-size: 0.8rem;
-	font-variant-numeric: tabular-nums; /* Sorgt dafür, dass Zahlen nicht springen */
+	font-variant-numeric: tabular-nums;
 	color: var(--color-text-secondary);
 	font-weight: 500;
-	min-width: 45px; /* Feste Breite, um Layout-Sprünge zu verhindern */
-	text-align: right;
 }
-
 .download-toast-error-message {
 	font-size: 0.85rem;
 	color: var(--color-error);
-	background-color: rgba(var(--color-error-rgb), 0.1);
-	padding: var(--spacing-unit);
-	border-radius: var(--border-radius-sm);
-	width: 100%;
-	word-break: break-word;
-}
-
-/* Animation für das Hineingleiten des Toasts */
-@keyframes toast-slide-in {
-	from {
-		opacity: 0;
-		transform: translateX(110%);
-	}
-	to {
-		opacity: 1;
-		transform: translateX(0);
-	}
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
