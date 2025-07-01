@@ -27,9 +27,9 @@
     flex-shrink: 0;
 }
 
-.modal-body {
+.modal-content {
 	/* Increased padding for the main content area */
-	padding: calc(var(--spacing-unit) * 3);
+	padding: calc(var(--spacing-unit));
 	overflow-y: auto;
 	flex-grow: 1;
     background-color: var(--color-surface);
