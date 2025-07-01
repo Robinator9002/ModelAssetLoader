@@ -1,14 +1,22 @@
 /*
  * =================================================================
- * M.A.L. - ModelSearchPage Styles (Purple Contrast Theme)
+ * M.A.L. - ModelSearchPage Styles (IMPROVED)
  * =================================================================
 */
+
+/* New layout: Make the page a flex column that fills the height */
 .model-search-page {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 4);
+	gap: calc(var(--spacing-unit) * 2); /* Reduced gap */
+    /* This assumes the parent container allows it to grow. 
+       Might need adjustment based on the root App layout. */
+    height: 100%; 
+    max-height: calc(100vh - 64px - 40px); /* vh - navbar_height - parent_padding */
 }
+
 .search-form {
+    flex-shrink: 0; /* Prevent form from shrinking */
 	display: flex;
 	flex-direction: column;
 	gap: calc(var(--spacing-unit) * 2);
@@ -17,11 +25,13 @@
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-lg);
 }
+
 .form-row {
 	display: flex;
 	flex-wrap: wrap;
 	gap: calc(var(--spacing-unit) * 2);
 }
+
 .form-group {
 	flex: 1;
 	min-width: 200px;
@@ -29,6 +39,7 @@
 	flex-direction: column;
 	gap: calc(var(--spacing-unit) * 0.75);
 }
+
 .form-group label {
 	font-size: 0.85rem;
 	font-weight: 600;
@@ -37,11 +48,36 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
+
+/* New layout: This container will now scroll */
 .search-results-container {
+    flex-grow: 1; /* Allow this to take up remaining space */
+    overflow-y: auto; /* Enable vertical scrolling */
+    position: relative; /* Keep for potential future child positioning */
 	display: flex;
 	flex-direction: column;
 	gap: calc(var(--spacing-unit) * 1.5);
+    padding: var(--spacing-unit);
+    margin: calc(var(--spacing-unit) * -1); /* Counteract parent padding */
 }
+
+/* Custom scrollbar for the results list */
+.search-results-container::-webkit-scrollbar {
+    width: 10px;
+}
+.search-results-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+.search-results-container::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 10px;
+    border: 2px solid var(--color-background);
+}
+.search-results-container::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border-hover);
+}
+
+
 .result-item {
 	display: flex;
 	align-items: center;
@@ -50,18 +86,22 @@
 	background-color: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-lg);
+    cursor: pointer;
 	transition: border-color var(--transition-speed-fast),
 		transform var(--transition-speed-fast), box-shadow var(--transition-speed-normal);
 }
+
 .result-item:hover {
 	border-color: var(--color-primary);
 	transform: translateY(-3px);
 	box-shadow: 0 0 20px rgba(var(--color-primary-rgb), 0.1), var(--shadow-md);
 }
+
 .result-item-info {
 	flex-grow: 1;
 	overflow: hidden;
 }
+
 .result-item-info h3 {
 	margin: 0 0 calc(var(--spacing-unit) * 0.5) 0;
 	font-size: 1.15rem;
@@ -70,22 +110,84 @@
 	text-overflow: ellipsis;
     color: var(--color-text-primary);
 }
+
 .result-item-info .author-info {
 	margin: 0;
 	font-size: 0.9rem;
     color: var(--color-text-secondary);
 }
-.result-item-info .author-info span {
-    color: var(--color-text-placeholder);
-}
+
 .result-item-actions {
 	display: flex;
 	gap: var(--spacing-unit);
 	flex-shrink: 0;
 }
+
+/* Placeholder for loading/error/no-results states */
+.feedback-placeholder {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    height: 100%;
+    min-height: 200px;
+    color: var(--color-text-secondary);
+    gap: var(--spacing-unit);
+}
+.feedback-placeholder.error-text {
+    color: var(--color-error);
+    font-weight: 500;
+}
+
+
+/* Styling for the now-functional Load More button */
 .load-more-button {
-	margin-top: calc(var(--spacing-unit) * 2);
+	margin: calc(var(--spacing-unit) * 2) auto; /* Center horizontally */
 	align-self: center;
 	min-width: 240px;
     font-size: 1rem;
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+/* New Scroll-to-Top Button */
+.scroll-to-top-button {
+    /* Uses .button-icon styles as a base */
+    display: inline-flex;
+	align-items: center;
+	justify-content: center;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    color: var(--color-primary);
+	padding: var(--spacing-unit);
+	border-radius: 50%;
+	line-height: 0;
+    cursor: pointer;
+    box-shadow: var(--shadow-lg);
+
+    /* --- FIX --- */
+    /* Positioning is now 'fixed' to anchor it to the viewport */
+    position: fixed; 
+    /* Positioned to avoid the theme switcher */
+	bottom: calc(var(--spacing-unit) * 2);
+	right: calc(var(--spacing-unit) * 2);
+    /* Ensure it's on top of content but below modals */
+	z-index: calc(var(--z-index-toast) + 2);
+
+    /* Visibility transitions */
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+    visibility: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+
+.scroll-to-top-button.visible {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    visibility: visible;
+}
+
+.scroll-to-top-button:hover {
+    transform: scale(1.1);
+    border-color: var(--color-primary);
 }
