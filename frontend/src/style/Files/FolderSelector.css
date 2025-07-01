@@ -1,53 +1,91 @@
 /*
  * =================================================================
- * M.A.L. - FolderSelector Specific Styles
+ * M.A.L. - FolderSelector Specific Styles (IMPROVED)
  * =================================================================
  * Note: General modal layout is inherited from Modals.css.
 */
 
-/* Styling for the Header */
+/* --- Modal Body & Controls --- */
 
-/* Styles for the bars above the tree view */
-.folder-selector-path-bar {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: var(--spacing-unit);
-	padding: calc(var(--spacing-unit) * 1.5);
-	background-color: var(--color-background);
-	border-radius: var(--border-radius-md);
-	margin-bottom: calc(var(--spacing-unit) * 2);
-    border: 1px solid var(--color-border);
+.folder-selector-body {
+    /* Add more padding to the main body area */
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 2);
 }
 
-.current-path-display {
-	font-family: var(--font-monospace);
-	font-size: 0.9rem;
-	color: var(--color-text-secondary);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+.folder-selector-controls {
+    display: flex;
+    gap: var(--spacing-unit);
+    align-items: center;
 }
 
-.folder-selector-input-bar {
-	display: flex;
-	gap: var(--spacing-unit);
-	margin-bottom: var(--spacing-unit);
+.path-input-group {
+    position: relative;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
 }
 
-/* Container for the actual tree */
+.path-input-manual {
+    /* Padding on the right to make space for the button inside */
+    padding-right: calc(var(--spacing-unit) * 5);
+}
+
+.path-input-group .go-button {
+    position: absolute;
+    right: var(--spacing-unit);
+    /* Make the icon button blend in */
+    background-color: transparent;
+}
+.path-input-group .go-button:hover:not(:disabled) {
+    background-color: var(--color-surface-hover);
+}
+
+
+/* --- Tree View Container --- */
+
 .folder-selector-tree-container {
 	height: 45vh;
-	min-height: 250px;
+	min-height: 300px; /* Increased min-height */
 	overflow-y: auto;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-md);
 	padding: var(--spacing-unit);
-	background-color: var(--color-background);
+	background-color: var(--color-background); /* Darker background for contrast */
+    box-shadow: var(--shadow-inset);
 }
 
-/* A single item in the tree */
-.folder-selector-item .item-content {
+
+/* --- Tree Items & Hierarchy --- */
+
+.folder-tree-root {
+    position: relative;
+}
+
+.folder-selector-item {
+    position: relative;
+}
+
+/* Vertical guide lines for the tree structure */
+.folder-selector-item .nested-list {
+    position: relative;
+    padding-left: calc(var(--spacing-unit) * 2.5); /* Indent for children */
+}
+
+.folder-selector-item .nested-list::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: calc(var(--spacing-unit) * -1);
+    bottom: var(--spacing-unit);
+    width: 1px;
+    background-color: rgba(var(--color-primary-rgb), 0.15);
+}
+
+
+.item-content {
 	display: flex;
 	align-items: center;
 	padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
@@ -55,63 +93,88 @@
 	cursor: pointer;
 	user-select: none;
     transition: background-color var(--transition-speed-fast), color var(--transition-speed-fast);
+    position: relative;
+    /* Default padding-left is handled by inline style now */
 }
 
-.folder-selector-item .item-content:hover {
+.item-content:hover {
 	background-color: var(--color-surface-hover);
 }
 
 .folder-selector-item.selected > .item-content {
-	background-color: var(--color-primary);
-	color: var(--color-text-on-primary);
+	background-color: rgba(var(--color-primary-rgb), 0.15);
+	color: var(--color-text-primary);
+}
+/* Add a border to the selected item for emphasis */
+.folder-selector-item.selected > .item-content::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 5px;
+    bottom: 5px;
+    width: 3px;
+    background-color: var(--color-primary);
+    border-radius: 3px;
 }
 
-.folder-selector-item.selected > .item-content .item-icon,
-.folder-selector-item.selected > .item-content .item-expand-icon {
-	color: var(--color-text-on-primary);
-}
 
-.item-indent {
-    flex-shrink: 0;
-    transition: width 0.1s ease;
-}
-
-.item-expand-icon {
+.item-expand-icon,
+.item-expand-icon-placeholder {
 	color: var(--color-text-secondary);
-	margin-right: calc(var(--spacing-unit) * 0.75);
-	width: 1.5em;
+	margin-right: calc(var(--spacing-unit) * 0.5);
+	width: 20px; /* Fixed width for alignment */
+    height: 20px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+    flex-shrink: 0;
 }
 
 .item-icon {
 	color: var(--color-accent);
-	margin-right: calc(var(--spacing-unit) * 1.25);
+	margin-right: var(--spacing-unit);
+    line-height: 0; /* Helps with vertical alignment */
 }
 
 .item-name {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+    font-size: 0.95rem;
 }
 
-/* The list containing child nodes */
-.nested-list {
-    padding-left: 0;
-    overflow: hidden;
-}
 
-/* Loading and error states specific to the tree container */
-.folder-selector-tree-container .loading-indicator,
-.folder-selector-tree-container .error-message,
-.folder-selector-tree-container .no-results-message {
+/* --- Feedback States (Loading/Error) --- */
+
+.feedback-container {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    gap: var(--spacing-unit);
+    gap: calc(var(--spacing-unit) * 2);
     height: 100%;
     color: var(--color-text-secondary);
     text-align: center;
+    padding: var(--spacing-unit);
+}
+
+.feedback-container .icon-error {
+    color: var(--color-error);
+}
+
+
+/* --- Custom Scrollbar for Tree --- */
+.folder-selector-tree-container::-webkit-scrollbar {
+    width: 10px;
+}
+.folder-selector-tree-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+.folder-selector-tree-container::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 10px;
+    border: 2px solid var(--color-background);
+}
+.folder-selector-tree-container::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border-hover);
 }

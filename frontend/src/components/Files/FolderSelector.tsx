@@ -12,6 +12,7 @@ import {
     ChevronRight,
     ChevronDown,
     Loader2,
+    ArrowRight,
 } from "lucide-react";
 
 const logger = {
@@ -23,38 +24,6 @@ const logger = {
     warn: (...args: any[]) => console.warn("[FolderSelector]", ...args),
 };
 
-// --- UTILITY FUNCTION FOR PATH TRUNCATION ---
-/**
- * Truncates a long file path by replacing middle directories with an ellipsis.
- * @param path The full path string.
- * @param maxLength The maximum desired length.
- * @returns A truncated path string.
- */
-const truncatePath = (path: string, maxLength: number = 50): string => {
-    if (path.length <= maxLength) {
-        return path;
-    }
-
-    const separator = path.includes('/') ? '/' : '\\';
-    const parts = path.split(separator);
-    
-    if (parts.length <= 4) { // Not much to truncate
-        return path;
-    }
-
-    const start = parts.slice(0, 2).join(separator);
-    const end = parts.slice(-2).join(separator);
-    const truncatedPath = `${start}${separator}...${separator}${end}`;
-
-    // If still too long, fall back to simple end truncation
-    if (truncatedPath.length > maxLength) {
-        return path.substring(0, maxLength - 3) + '...';
-    }
-
-    return truncatedPath;
-};
-
-
 interface MappedNode {
     name: string;
     path: string;
@@ -64,7 +33,7 @@ interface MappedNode {
 
 interface FolderSelectorNodeProps {
     node: MappedNode;
-    onNodeClick: (path: string, currentLevel: number) => Promise<void>;
+    onNodeClick: (path: string) => void;
     selectedPath: string | null;
     expandedPaths: Set<string>;
     loadingPaths: Set<string>;
@@ -93,11 +62,11 @@ const FolderSelectorNode: React.FC<FolderSelectorNodeProps> = ({
 
     const handleItemClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onNodeClick(node.path, level);
+        onNodeClick(node.path);
     };
 
     const Icon = useMemo(() => {
-        if (!canExpand) return Folder;
+        if (!canExpand) return Folder; // Should ideally not happen if API is correct
         if (
             level === 0 &&
             (node.path.match(/^[A-Z]:\\$/i) || node.path === "/")
@@ -108,7 +77,7 @@ const FolderSelectorNode: React.FC<FolderSelectorNodeProps> = ({
 
     const ExpandIcon = useMemo(() => {
         if (!canExpand)
-            return <span style={{ width: "1.5em", display: "inline-block" }} />;
+            return <span className="item-expand-icon-placeholder" />;
         if (isLoadingChildren)
             return <Loader2 size={16} className="animate-spin" />;
         return isExpanded ? (
@@ -119,7 +88,6 @@ const FolderSelectorNode: React.FC<FolderSelectorNodeProps> = ({
     }, [canExpand, isLoadingChildren, isExpanded]);
 
     return (
-        // The paddingLeft style is REMOVED from the <li>
         <li
             className={`folder-selector-item ${isSelected ? "selected" : ""}`}
             role="treeitem"
@@ -136,9 +104,10 @@ const FolderSelectorNode: React.FC<FolderSelectorNodeProps> = ({
                 }}
                 tabIndex={0}
                 title={node.path}
+                style={{
+                    paddingLeft: `calc(var(--spacing-unit) + ${level * 20}px)`,
+                }}
             >
-                {/* A dedicated span now handles indentation */}
-                <span className="item-indent" style={{ width: `${level * 18}px` }} />
                 <span className="item-expand-icon">{ExpandIcon}</span>
                 <span className="item-icon">
                     <Icon size={18} />
@@ -154,12 +123,7 @@ const FolderSelectorNode: React.FC<FolderSelectorNodeProps> = ({
                                 const childNode = treeDataMap.get(
                                     childPathInfo.path
                                 );
-                                if (!childNode) {
-                                    logger.warn(
-                                        `[Node:${currentNodeFromMap.name}] Child node with path ${childPathInfo.path} not found in treeDataMap.`
-                                    );
-                                    return null;
-                                }
+                                if (!childNode) return null;
                                 const uniqueKey = `${childNode.path}-${childNode.name}-${index}`;
                                 return (
                                     <FolderSelectorNode
@@ -199,109 +163,36 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
     const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
     const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
-    const [currentDisplayPath, setCurrentDisplayPath] = useState<string>("");
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
-    const [expandedPaths, _setExpandedPaths] = useState<Set<string>>(new Set());
+    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
     const [pathInput, setPathInput] = useState<string>("");
 
-    const setExpandedPaths = useCallback(
-        (
-            updater: Set<string> | ((prevState: Set<string>) => Set<string>),
-            _caller?: string
-        ) => {
-            _setExpandedPaths((prev) => {
-                const newSet =
-                    typeof updater === "function" ? updater(prev) : updater;
-                return newSet;
-            });
-        },
-        []
-    );
-
-    const API_SCAN_DEPTH_FOR_ROOTS = 1;
-    const API_SCAN_DEPTH_FOR_EXPAND = 1;
+    const API_SCAN_DEPTH = 1;
 
     const mapApiNodeToMappedNode = useCallback(
-        (apiNode: HostDirectoryItem): MappedNode => {
-            let childrenRefs: Array<{
-                path: string;
-                name: string;
-                type: string;
-            }> | null;
-            if (apiNode.children === null || apiNode.children === undefined) {
-                childrenRefs = null;
-            } else if (Array.isArray(apiNode.children)) {
-                childrenRefs =
-                    apiNode.children.length > 0
-                        ? apiNode.children.map((c) => ({
-                              path: c.path,
-                              name: c.name,
-                              type: c.type,
-                          }))
-                        : [];
-            } else {
-                logger.warn(
-                    `[mapApiNodeToMappedNode] apiNode.children for ${apiNode.path} is invalid:`,
-                    apiNode.children
-                );
-                childrenRefs = null;
-            }
-            return {
-                name: apiNode.name,
-                path: apiNode.path,
-                type: apiNode.type,
-                children: childrenRefs,
-            };
-        },
+        (apiNode: HostDirectoryItem): MappedNode => ({
+            name: apiNode.name,
+            path: apiNode.path,
+            type: apiNode.type,
+            children: apiNode.children
+                ? apiNode.children.map((c) => ({
+                      path: c.path,
+                      name: c.name,
+                      type: c.type,
+                  }))
+                : null,
+        }),
         []
     );
 
     const processAndStoreNodesRecursively = useCallback(
-        (
-            nodesFromApi: HostDirectoryItem[],
-            mapToUpdate: Map<string, MappedNode>
-        ) => {
-            nodesFromApi.forEach((apiNode) => {
-                const newMappedNode = mapApiNodeToMappedNode(apiNode);
-
-                const existingNode = mapToUpdate.get(apiNode.path);
-                if (
-                    apiNode.path === "/" &&
-                    newMappedNode.name !== "/" &&
-                    existingNode &&
-                    existingNode.name === "/"
-                ) {
-                    if (existingNode.children && !newMappedNode.children) {
-                        logger.warn(
-                            `[processAndStoreNodesRecursively] Symlink ${newMappedNode.name} (${apiNode.path}) would overwrite actual root with less info. Skipping.`
-                        );
-                        return;
-                    }
-                }
-
-                if (
-                    existingNode &&
-                    !newMappedNode.children &&
-                    existingNode.children
-                ) {
-                    logger.warn(
-                        `[processAndStoreNodesRecursively] New node for ${apiNode.path} has no children, existing has. Preferring existing children.`
-                    );
-                    newMappedNode.children = existingNode.children;
-                    if (apiNode.path === "/" && newMappedNode.name !== "/")
-                        newMappedNode.name = existingNode.name; // Prefer original name for root
-                }
-                mapToUpdate.set(apiNode.path, newMappedNode);
-
-                if (
-                    apiNode.children &&
-                    Array.isArray(apiNode.children) &&
-                    apiNode.children.length > 0
-                ) {
-                    processAndStoreNodesRecursively(
-                        apiNode.children,
-                        mapToUpdate
-                    );
+        (nodes: HostDirectoryItem[], map: Map<string, MappedNode>) => {
+            nodes.forEach((apiNode) => {
+                const mappedNode = mapApiNodeToMappedNode(apiNode);
+                map.set(apiNode.path, mappedNode);
+                // FIX: Check if children exist and is an array before recursing
+                if (apiNode.children && Array.isArray(apiNode.children)) {
+                    processAndStoreNodesRecursively(apiNode.children, map);
                 }
             });
         },
@@ -309,54 +200,36 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
     );
 
     const fetchDirectoryStructure = useCallback(
-        async (
-            path?: string,
-            isRootScan: boolean = false
-        ): Promise<boolean> => {
+        async (path?: string, isRootScan: boolean = false) => {
             const targetPath = path || "";
-            const scanDepth = isRootScan
-                ? API_SCAN_DEPTH_FOR_ROOTS
-                : API_SCAN_DEPTH_FOR_EXPAND;
-            if (
-                isRootScan ||
-                (process.env.NODE_ENV === "development" && path === "/run")
-            ) {
-                // Minimal info logging
-                logger.info(
-                    `Workspaceing structure for path: '${
-                        targetPath || "[ROOTS]"
-                    }', isRoot: ${isRootScan}, depth: ${scanDepth}`
-                );
-            }
             if (isRootScan) setIsLoadingGlobal(true);
             else setLoadingPaths((prev) => new Set(prev).add(targetPath));
             setError(null);
-            let operationSuccessful = false;
 
             try {
                 const response = await scanHostDirectoriesAPI(
                     targetPath || undefined,
-                    scanDepth
+                    API_SCAN_DEPTH
                 );
-                if (response?.success) {
-                    if (response.data) {
-                        setTreeDataMap((prevMap) => {
-                            const newMap = new Map(prevMap);
+                // FIX: Ensure response.data is a non-empty array before processing
+                if (
+                    response?.success &&
+                    response.data &&
+                    Array.isArray(response.data)
+                ) {
+                    setTreeDataMap((prevMap) => {
+                        const newMap = new Map(prevMap);
+                        if (response.data) {
                             if (isRootScan) {
-                                if (response.data && response.data.length > 0) {
-                                    processAndStoreNodesRecursively(
-                                        response.data,
-                                        newMap
-                                    );
-                                    const newRootPathsList = response.data.map(
-                                        (rootNode) => rootNode.path
-                                    );
-                                    setRootPaths(newRootPathsList);
-                                } else {
-                                    setRootPaths([]);
-                                }
-                            } else if (targetPath) {
-                                const parentNodeFromApi = response.data?.[0];
+                                processAndStoreNodesRecursively(
+                                    response.data,
+                                    newMap
+                                );
+                                setRootPaths(
+                                    response.data.map((node) => node.path)
+                                );
+                            } else {
+                                const parentNodeFromApi = response.data[0];
                                 if (
                                     parentNodeFromApi &&
                                     parentNodeFromApi.path === targetPath
@@ -365,201 +238,120 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                                         mapApiNodeToMappedNode(
                                             parentNodeFromApi
                                         );
-                                    if (
-                                        parentMappedNode.path === "/" &&
-                                        parentMappedNode.name !== "/"
-                                    ) {
-                                        parentMappedNode.name = "/";
-                                    }
-
-                                    // Process children first, carefully
+                                    // FIX: Check if children exist before processing
                                     if (
                                         parentNodeFromApi.children &&
-                                        parentNodeFromApi.children.length > 0
+                                        Array.isArray(
+                                            parentNodeFromApi.children
+                                        )
                                     ) {
-                                        parentNodeFromApi.children.forEach(
-                                            (childApiNode) => {
-                                                const childMappedNode =
-                                                    mapApiNodeToMappedNode(
-                                                        childApiNode
-                                                    );
-                                                newMap.set(
-                                                        childApiNode.path,
-                                                        childMappedNode
-                                                    );
-                                            }
+                                        processAndStoreNodesRecursively(
+                                            parentNodeFromApi.children,
+                                            newMap
                                         );
                                     }
-                                    newMap.set(targetPath, parentMappedNode); // Set parent last
-                                } else {
-                                    const nodeToUpdate = newMap.get(targetPath);
-                                    if (nodeToUpdate)
-                                        newMap.set(targetPath, {
-                                            ...nodeToUpdate,
-                                            children: [],
-                                        });
+                                    newMap.set(targetPath, parentMappedNode);
                                 }
                             }
-                            return newMap;
-                        });
-                        if (isRootScan)
-                            setCurrentDisplayPath("Wurzelverzeichnisse");
-                        operationSuccessful = true;
-                    } else {
-                        if (targetPath && !isRootScan) {
-                            setTreeDataMap((prevMap) => {
-                                const newMap = new Map(prevMap);
-                                const nodeToUpdate = newMap.get(targetPath);
-                                if (nodeToUpdate)
-                                    newMap.set(targetPath, {
-                                        ...nodeToUpdate,
-                                        children: [],
-                                    });
-                                return newMap;
-                            });
-                            operationSuccessful = true;
-                        } else if (isRootScan) {
-                            setRootPaths([]);
-                            setCurrentDisplayPath("Wurzelverzeichnisse");
-                            operationSuccessful = true;
                         }
-                    }
+                        return newMap;
+                    });
                 } else {
                     setError(
-                        response?.error ||
-                            "Verzeichnisstruktur konnte nicht geladen werden."
+                        response?.error || "Failed to load directory structure."
                     );
                     if (isRootScan) setRootPaths([]);
-                    else if (targetPath) {
-                        setTreeDataMap((prevMap) => {
-                            const newMap = new Map(prevMap);
-                            const nodeToUpdate = newMap.get(targetPath);
-                            if (nodeToUpdate)
-                                newMap.set(targetPath, {
-                                    ...nodeToUpdate,
-                                    children: null,
-                                });
-                            return newMap;
-                        });
-                    }
                 }
             } catch (err: any) {
                 logger.error(
-                    `Error in fetchDirectoryStructure for ${
-                        targetPath || "[ROOTS]"
-                    }:`,
+                    `Error fetching structure for ${targetPath}:`,
                     err
                 );
-                setError(
-                    err.message || "Ein schwerwiegender Fehler ist aufgetreten."
-                );
+                setError(err.message || "A critical error occurred.");
             } finally {
                 if (isRootScan) setIsLoadingGlobal(false);
-                else {
+                else
                     setLoadingPaths((prev) => {
                         const n = new Set(prev);
                         n.delete(targetPath);
                         return n;
                     });
-                }
             }
-            return operationSuccessful;
         },
         [processAndStoreNodesRecursively, mapApiNodeToMappedNode]
     );
 
     useEffect(() => {
         if (isOpen) {
-            logger.info(
-                "FolderSelector wird geöffnet. States zurücksetzen, Wurzeln laden."
-            );
             setTreeDataMap(new Map());
             setRootPaths([]);
             setSelectedPath(null);
-            setExpandedPaths(new Set(), "useEffect[isOpen]");
+            setExpandedPaths(new Set());
             setPathInput("");
-            setCurrentDisplayPath("");
             setError(null);
             fetchDirectoryStructure(undefined, true);
         }
-    }, [isOpen, fetchDirectoryStructure, setExpandedPaths]);
+    }, [isOpen, fetchDirectoryStructure]);
 
     const handleNodeInteraction = useCallback(
         async (path: string) => {
             setSelectedPath(path);
-            setCurrentDisplayPath(path);
             setPathInput(path);
             setError(null);
 
-            const nodeFromMap = treeDataMap.get(path);
-            const isCurrentlyExpanded = expandedPaths.has(path);
-            const childrenAreUnknown =
-                !nodeFromMap || nodeFromMap.children === null;
+            const node = treeDataMap.get(path);
+            if (node?.type !== "directory") return;
 
-            if (nodeFromMap?.type !== "directory") {
-                return;
-            }
-
-            if (isCurrentlyExpanded) {
+            const isExpanded = expandedPaths.has(path);
+            if (isExpanded) {
                 setExpandedPaths((prev) => {
                     const n = new Set(prev);
                     n.delete(path);
                     return n;
-                }, `collapse ${path}`);
+                });
             } else {
-                if (childrenAreUnknown) {
+                if (node.children === null) {
+                    // Only fetch if children are unknown
                     await fetchDirectoryStructure(path, false);
                 }
-                setExpandedPaths((prev) => new Set(prev).add(path), `expand ${path}`);
+                setExpandedPaths((prev) => new Set(prev).add(path));
             }
         },
-        [
-            treeDataMap,
-            fetchDirectoryStructure,
-            expandedPaths,
-            setExpandedPaths,
-        ]
+        [treeDataMap, expandedPaths, fetchDirectoryStructure]
     );
 
     const handleConfirmSelection = useCallback(() => {
         if (selectedPath) {
             const selectedNode = treeDataMap.get(selectedPath);
-            if (selectedNode && selectedNode.type === "directory") {
+            if (selectedNode?.type === "directory") {
                 onSelectFinalPath(selectedPath);
             } else {
-                setError("Bitte wählen Sie einen gültigen Ordner aus.");
+                setError("Please select a valid folder.");
             }
         } else {
-            setError(
-                "Bitte wählen Sie einen Ordner aus oder geben Sie einen Pfad ein."
-            );
+            setError("Please select a folder or enter a path.");
         }
     }, [selectedPath, treeDataMap, onSelectFinalPath]);
 
     const handleRefreshRoot = useCallback(() => {
-        logger.info("Refreshing root directories.");
-        setTreeDataMap(new Map());
-        setRootPaths([]);
-        setSelectedPath(null);
-        setExpandedPaths(new Set(), "handleRefreshRoot");
-        setError(null);
-        setPathInput("");
-        setCurrentDisplayPath("");
         fetchDirectoryStructure(undefined, true);
-    }, [fetchDirectoryStructure, setExpandedPaths]);
+    }, [fetchDirectoryStructure]);
 
     const handleGoToPathInput = useCallback(async () => {
         const trimmedPath = pathInput.trim();
-        if (trimmedPath) {
-            await handleNodeInteraction(trimmedPath);
-        } else {
-            setError("Bitte geben Sie einen Pfad ein.");
+        if (!trimmedPath) {
+            setError("Please enter a path.");
+            return;
         }
-    }, [pathInput, handleNodeInteraction]);
+        await fetchDirectoryStructure(trimmedPath, false);
+        setSelectedPath(trimmedPath);
+        setExpandedPaths((prev) => new Set(prev).add(trimmedPath));
+    }, [pathInput, fetchDirectoryStructure]);
 
     const treeRootNodes = rootPaths
         .map((path) => treeDataMap.get(path))
         .filter(Boolean) as MappedNode[];
+    const isBusy = isLoadingGlobal || loadingPaths.size > 0;
 
     if (!isOpen) return null;
 
@@ -570,85 +362,75 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
             }`}
         >
             <div className="modal-content folder-selector-content">
-                <div className="folder-selector-header">
-                    <h3>Basisordner auswählen</h3>
+                <div className="modal-header">
+                    <h3>Select Base Folder</h3>
                     <button
                         onClick={onCancel}
-                        className="close-button"
-                        title="Schließen"
-                        disabled={isLoadingGlobal || loadingPaths.size > 0}
+                        className="button-icon close-button"
+                        aria-label="Close"
+                        disabled={isBusy}
                     >
                         <X size={20} />
                     </button>
                 </div>
-                <div className="folder-selector-body">
-                    <div className="folder-selector-path-bar">
-                        <span
-                            className="current-path-display"
-                            title={currentDisplayPath}
-                        >
-                            {/* Use the truncatePath utility here */}
-                            Ausgewählt: {currentDisplayPath ? truncatePath(currentDisplayPath, 60) : "Keine Auswahl"}
-                        </span>
+                <div className="modal-body folder-selector-body">
+                    <div className="folder-selector-controls">
+                        <div className="path-input-group">
+                            <input
+                                type="text"
+                                value={pathInput}
+                                onChange={(e) => setPathInput(e.target.value)}
+                                placeholder="Select a folder below or enter a path..."
+                                className="path-input-manual"
+                                onKeyDown={(
+                                    e: React.KeyboardEvent<HTMLInputElement>
+                                ) => e.key === "Enter" && handleGoToPathInput()}
+                                disabled={isBusy}
+                            />
+                            <button
+                                onClick={handleGoToPathInput}
+                                className="button-icon go-button"
+                                aria-label="Go to path"
+                                disabled={!pathInput.trim() || isBusy}
+                            >
+                                <ArrowRight size={16} />
+                            </button>
+                        </div>
                         <button
                             onClick={handleRefreshRoot}
-                            disabled={isLoadingGlobal || loadingPaths.size > 0}
-                            title="Wurzelverzeichnisse neu laden"
-                            className="path-button refresh-button"
+                            className="button-icon refresh-button"
+                            aria-label="Refresh root directories"
+                            disabled={isBusy}
                         >
                             <RefreshCw size={16} />
                         </button>
                     </div>
-                    <div className="folder-selector-input-bar">
-                        <input
-                            type="text"
-                            value={pathInput}
-                            onChange={(e) => setPathInput(e.target.value)}
-                            placeholder="Pfad manuell eingeben oder auswählen..."
-                            className="path-input-manual"
-                            onKeyDown={(
-                                e: React.KeyboardEvent<HTMLInputElement>
-                            ) => {
-                                if (e.key === "Enter") {
-                                    handleGoToPathInput();
-                                }
-                            }}
-                            disabled={isLoadingGlobal || loadingPaths.size > 0}
-                        />
-                        <button
-                            onClick={handleGoToPathInput}
-                            className="path-button go-button"
-                            title="Gehe zu Pfad"
-                            disabled={
-                                !pathInput.trim() ||
-                                isLoadingGlobal ||
-                                loadingPaths.size > 0
-                            }
-                        >
-                            Go
-                        </button>
-                    </div>
+
                     <div className="folder-selector-tree-container">
                         {isLoadingGlobal && (
-                            <div className="loading-indicator full-width-loader">
+                            <div className="feedback-container">
                                 <Loader2 size={24} className="animate-spin" />
-                                <p>
-                                    Lade Wurzelverzeichnisse...
-                                </p>
+                                <p>Loading root directories...</p>
                             </div>
                         )}
                         {error && (
-                            <p className="error-message folder-selector-error">
-                                <AlertTriangle size={16} /> {error}
-                            </p>
+                            <div className="feedback-container">
+                                <AlertTriangle
+                                    size={24}
+                                    className="icon-error"
+                                />
+                                <p>{error}</p>
+                            </div>
                         )}
                         {!isLoadingGlobal &&
                             !error &&
                             treeRootNodes.length === 0 && (
-                                <p className="no-results-message">
-                                    Keine Verzeichnisse gefunden. Prüfen Sie
-                                    Backend-Logs und Berechtigungen.
-                                </p>
+                                <div className="feedback-container">
+                                    <p>
+                                        No directories found. Check backend logs
+                                        and permissions.
+                                    </p>
+                                </div>
                             )}
                         {!isLoadingGlobal &&
                             !error &&
@@ -656,7 +438,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                                 <ul className="folder-tree-root" role="tree">
                                     {treeRootNodes.map((node, index) => (
                                         <FolderSelectorNode
-                                            key={`${node.path}-${node.name}-${index}`}
+                                            key={`${node.path}-${index}`}
                                             node={node}
                                             onNodeClick={handleNodeInteraction}
                                             selectedPath={selectedPath}
@@ -670,25 +452,24 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                             )}
                     </div>
                 </div>
-                <div className="folder-selector-actions">
+                <div className="modal-actions">
                     <button
-                        className="button modal-button cancel-button"
+                        className="button"
                         onClick={onCancel}
-                        disabled={isLoadingGlobal || loadingPaths.size > 0}
+                        disabled={isBusy}
                     >
-                        Abbrechen
+                        Cancel
                     </button>
                     <button
-                        className="button modal-button confirm-button"
+                        className="button button-primary"
                         onClick={handleConfirmSelection}
                         disabled={
                             !selectedPath ||
-                            isLoadingGlobal ||
-                            loadingPaths.size > 0 ||
-                            treeDataMap.get(selectedPath)?.type !== "directory"
+                            isBusy ||
+                            treeDataMap.get(selectedPath!)?.type !== "directory"
                         }
                     >
-                        <Check size={18} /> Ordner Auswählen
+                        <Check size={18} /> Select Folder
                     </button>
                 </div>
             </div>
