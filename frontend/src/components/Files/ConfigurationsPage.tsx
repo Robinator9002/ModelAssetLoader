@@ -8,7 +8,7 @@ import {
     type ColorThemeType,
 } from "../../api/api";
 import type { AppPathConfig } from "../../App";
-import FolderSelector from "../Layout/FolderSelector";
+import FolderSelector from "./FolderSelector";
 
 const logger = {
     info: (...args: any[]) => console.log("[ConfigPage]", ...args),

@@ -6,8 +6,8 @@ import ThemeSwitcher from "./components/Theme/ThemeSwitcher";
 import ModelSearchPage from "./components/ModelLoader/ModelSearchPage";
 import ModelDetailsPage from "./components/ModelLoader/ModelDetailsPage";
 import ConfigurationsPage from "./components/Files/ConfigurationsPage";
-import DownloadModal from "./components/Files/DownloadModal";
-import DownloadManager from "./components/Files/DownloadManager"; // <-- ADDED
+import DownloadModal from "./components/Downloads/DownloadModal";
+import DownloadManager from "./components/Downloads/DownloadManager"; // <-- ADDED
 
 import {
   // API and WebSocket functions

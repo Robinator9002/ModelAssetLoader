@@ -5,6 +5,8 @@
  * Note: General modal layout is inherited from Modals.css.
 */
 
+/* Styling for the Header */
+
 /* Styles for the bars above the tree view */
 .folder-selector-path-bar {
 	display: flex;
