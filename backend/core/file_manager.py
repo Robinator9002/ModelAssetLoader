@@ -29,11 +29,9 @@ class FileManager:
 
     @property
     def base_path(self) -> Optional[pathlib.Path]:
-        """Provides direct access to the configured base_path."""
         return self.config.base_path
 
     def get_current_configuration(self) -> Dict[str, Any]:
-        """Returns the current live configuration from the ConfigManager."""
         return self.config.get_current_configuration()
 
     def configure_paths(
@@ -43,7 +41,6 @@ class FileManager:
         custom_model_type_paths: Optional[Dict[str, str]] = None,
         color_theme: Optional[ColorThemeType] = None
     ) -> Dict[str, Any]:
-        """Delegates configuration updates to the ConfigManager."""
         changed, message = self.config.update_configuration(
             base_path_str, profile, custom_model_type_paths, color_theme
         )
@@ -57,10 +54,11 @@ class FileManager:
             response["error"] = message
         return response
 
+
     def start_download_model_file(
         self,
         background_tasks: BackgroundTasks,
-        source: str, # REFACTOR: Added source to make it extensible
+        source: str,
         repo_id: str,
         filename: str,
         model_type: ModelType,
@@ -68,57 +66,38 @@ class FileManager:
         revision: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Initiates a download as a background task and returns immediately.
+        Initiates a download with a simplified and robust path resolution logic.
         """
-        # REFACTOR: Check for supported sources. Currently only Hugging Face is implemented.
         if source != 'huggingface':
             return {"success": False, "error": f"Source '{source}' is not supported for downloads."}
 
         if not self.base_path:
             return {"success": False, "error": "Base path is not configured. Please configure it first."}
 
-        target_dir = self.paths.get_target_directory(model_type, custom_sub_path)
-        if not target_dir:
-            return {"success": False, "error": f"Could not resolve target directory for model type '{model_type}'."}
-            
-        # Register the download with the tracker to get a unique ID
-        status = download_tracker.start_tracking(repo_id=repo_id, filename=filename)
+        final_save_path = self.paths.resolve_final_save_path(filename, model_type, custom_sub_path)
+        if not final_save_path:
+            return {"success": False, "error": f"Could not resolve a valid save path for model type '{model_type}'."}
+
+        status = download_tracker.start_tracking(repo_id=repo_id, filename=final_save_path.name)
         
-        # Add the download process to run in the background
-        # The downloader itself is currently HF-specific, but this layer is now ready for more.
         background_tasks.add_task(
             self.downloader.download_model_file,
             download_id=status.download_id,
             repo_id=repo_id,
             hf_filename=filename,
-            target_directory=target_dir,
+            target_directory=final_save_path.parent,
+            target_filename_override=final_save_path.name,
             revision=revision
         )
 
-        logger.info(f"Queued download {status.download_id} for '{filename}' as a background task.")
+        logger.info(f"Queued download {status.download_id} for '{filename}' -> '{final_save_path}' as a background task.")
         return {"success": True, "message": "Download started.", "download_id": status.download_id}
+
+    # --- FIXED: Re-added the missing dismiss_download method ---
+    async def dismiss_download(self, download_id: str):
+        """Delegates dismissal request to the download tracker."""
+        await download_tracker.remove_download(download_id)
 
     def list_host_directories(self, path_to_scan_str: Optional[str] = None, max_depth: int = 1) -> Dict[str, Any]:
         """Delegates directory scanning on the host to the HostScanner."""
         return self.scanner.list_host_directories(path_to_scan_str, max_depth)
-
-    def list_managed_directory_contents(self, relative_path_str: Optional[str] = None, depth: int = 1) -> Dict[str, Any]:
-        """
-        Lists contents of a directory within the managed base_path.
-        """
-        if not self.base_path:
-            return {"success": False, "error": "Base path is not configured."}
-
-        try:
-            scan_root = self.base_path.resolve()
-            scan_path = scan_root
-            if relative_path_str:
-                scan_path = (scan_root / relative_path_str).resolve()
-            if not str(scan_path).startswith(str(scan_root)):
-                logger.error(f"Security violation: Attempt to list '{scan_path}' outside of base path '{scan_root}'.")
-                return {"success": False, "error": "Path is outside the managed directory."}
-        except Exception as e:
-            return {"success": False, "error": f"Invalid path specified: {e}"}
-
-        logger.info(f"Listing managed directory contents for '{scan_path}', depth {depth}")
-        return self.scanner.list_host_directories(str(scan_path), depth)
