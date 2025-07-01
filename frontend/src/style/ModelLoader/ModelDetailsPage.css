@@ -1,87 +1,154 @@
 /*
  * =================================================================
- * M.A.L. - ModelDetailsPage Styles (Purple Contrast Theme)
+ * M.A.L. - ModelDetailsPage Styles (IMPROVED)
  * =================================================================
 */
+
+/* New layout: Make the page a flex column that fills the available height */
 .model-details-page {
-	max-width: 1200px;
-	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--spacing-unit) * 3);
+    height: 100%; 
+    max-height: calc(100vh - 64px - 40px); /* vh - navbar_height - parent_padding */
 }
+
 .details-page-header {
+    flex-shrink: 0; /* Prevent header from shrinking */
 	display: flex;
 	flex-direction: column;
 	gap: calc(var(--spacing-unit) * 2);
-	margin-bottom: calc(var(--spacing-unit) * 4);
-}
-.details-page-header .back-button {
-	align-self: flex-start;
-    /* Uses .button class from global.css */
-}
-.details-page-header header h1 {
-    font-size: 2.5rem;
-}
-.details-page-header header p {
-    font-size: 1.1rem;
-    color: var(--color-text-secondary);
 }
 
-.details-content-wrapper {
-	display: grid;
-	grid-template-columns: minmax(300px, 400px) 1fr;
-	gap: calc(var(--spacing-unit) * 5);
-	align-items: flex-start;
+.details-main-header h1 {
+    font-size: 2.25rem;
+    line-height: 1.2;
+    color: var(--color-text-primary);
 }
+.details-main-header p {
+    font-size: 1.1rem;
+    color: var(--color-text-secondary);
+    margin-top: var(--spacing-unit);
+}
+
+/* New layout: This wrapper is now a flex row that grows and allows internal scrolling */
+.details-content-wrapper {
+	display: flex;
+	gap: calc(var(--spacing-unit) * 3);
+    flex-grow: 1;
+    /* This is crucial: it prevents children from overflowing the page */
+    overflow: hidden; 
+}
+
+/* New layout: Sections are now flex columns */
 .details-section {
     background-color: var(--color-surface);
     border-radius: var(--border-radius-lg);
     border: 1px solid var(--color-border);
     padding: calc(var(--spacing-unit) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 2);
+    overflow: hidden; /* Hide any potential overflow from children */
 }
-.files-section h2,
-.readme-section h2 {
-	margin-bottom: calc(var(--spacing-unit) * 2);
-    font-size: 1.4rem;
-    border-bottom: none; /* remove default h2 border */
+
+.files-section {
+    flex-basis: 450px; /* Give the files section a base width */
+    flex-shrink: 0;
 }
+.readme-section {
+    flex-grow: 1; /* Allow the readme to take up the rest of the space */
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: calc(var(--spacing-unit) * 2);
+    flex-shrink: 0;
+}
+.section-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+    color: var(--color-text-primary);
+}
+.section-header .button {
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+    font-size: 0.85rem;
+}
+
+
+/* New layout: The list itself will scroll */
 .files-list {
 	display: flex;
 	flex-direction: column;
 	gap: var(--spacing-unit);
+    overflow-y: auto;
+    flex-grow: 1; /* Make it fill the available space in the section */
+    padding-right: var(--spacing-unit); /* Space for scrollbar */
+    margin-right: calc(var(--spacing-unit) * -1); /* Negative margin trick */
 }
+
 .files-list .file-item {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+	padding: calc(var(--spacing-unit) * 1.5);
 	border-radius: var(--border-radius-md);
-	transition: background-color var(--transition-speed-fast), transform var(--transition-speed-fast);
+	transition: background-color var(--transition-speed-fast);
 }
 .files-list .file-item:hover {
 	background-color: var(--color-surface-hover);
-    transform: translateX(4px);
 }
-.files-list .file-item span {
+
+.file-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 0.5);
+    overflow: hidden;
+    padding-right: var(--spacing-unit);
+}
+
+.file-item-name {
 	font-size: 0.9rem;
 	font-family: var(--font-monospace);
 	word-break: break-all;
-	padding-right: var(--spacing-unit);
+    color: var(--color-text-primary);
+}
+.file-item-size {
+    font-size: 0.8rem;
     color: var(--color-text-secondary);
 }
+
+
+/* New layout: The readme content will scroll */
 .readme-content {
-	padding: var(--spacing-unit); /* Padding is now on parent */
 	font-size: 1rem;
     line-height: 1.7;
-    background-color: transparent;
-    border: none;
+    overflow-y: auto; /* Enable scrolling */
+    flex-grow: 1; /* Make it fill the available space */
+    padding-right: var(--spacing-unit); /* Space for scrollbar */
 }
+
+/* --- Readme Content Formatting --- */
 .readme-content > *:first-child { margin-top: 0; }
 .readme-content > *:last-child { margin-bottom: 0; }
+
 .readme-content h1, .readme-content h2, .readme-content h3 {
 	border-bottom: 1px solid var(--color-border);
 	padding-bottom: var(--spacing-unit);
-	margin-top: calc(var(--spacing-unit) * 4);
+	margin-top: calc(var(--spacing-unit) * 3);
     margin-bottom: calc(var(--spacing-unit) * 2);
 }
+.readme-content h1 { font-size: 1.75rem; }
+.readme-content h2 { font-size: 1.4rem; }
+.readme-content h3 { font-size: 1.2rem; }
+
 .readme-content code {
 	background-color: var(--color-surface-alt);
     border: 1px solid var(--color-border);
@@ -112,8 +179,35 @@
 	color: var(--color-text-secondary);
     background-color: rgba(var(--color-primary-rgb), 0.05);
 }
-@media (max-width: 900px) {
+
+/* Custom Scrollbars */
+.files-list::-webkit-scrollbar,
+.readme-content::-webkit-scrollbar {
+    width: 10px;
+}
+.files-list::-webkit-scrollbar-track,
+.readme-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+.files-list::-webkit-scrollbar-thumb,
+.readme-content::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 10px;
+    border: 2px solid var(--color-surface);
+}
+.files-list::-webkit-scrollbar-thumb:hover,
+.readme-content::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border-hover);
+}
+
+
+/* Responsive adjustment */
+@media (max-width: 1000px) {
 	.details-content-wrapper {
-		grid-template-columns: 1fr;
+		flex-direction: column;
 	}
+    .files-section {
+        flex-basis: auto; /* Reset base width */
+        max-height: 40vh; /* Give a max height on smaller screens */
+    }
 }
