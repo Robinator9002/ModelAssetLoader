@@ -10,7 +10,6 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	/* Increased padding for more breathing room */
 	padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 3);
 	border-bottom: 1px solid var(--color-border);
 	flex-shrink: 0;
@@ -20,39 +19,36 @@
 	font-size: 1.4rem;
     font-weight: 600;
     color: var(--color-text-primary);
-    padding-right: var(--spacing-unit); /* Ensure space for close button */
+    padding-right: var(--spacing-unit);
 }
 .modal-header .close-button {
-    /* Uses .button-icon styles from global.css */
     flex-shrink: 0;
 }
 
-.modal-content {
-	/* Increased padding for the main content area */
-	padding: calc(var(--spacing-unit));
+/* UPDATED: Removed padding from the generic modal content.
+   Specific modals should now manage their own padding,
+   usually within a .modal-body container. */
+.modal-body {
 	overflow-y: auto;
 	flex-grow: 1;
-    background-color: var(--color-surface);
 }
 
 .modal-actions {
 	display: flex;
 	justify-content: flex-end;
 	gap: calc(var(--spacing-unit) * 1.5);
-	/* Increased padding for the action footer */
-	padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 3);
+	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
 	border-top: 1px solid var(--color-border);
-	background-color: var(--color-background);
+	background-color: var(--color-surface-alt);
 	flex-shrink: 0;
     border-bottom-left-radius: var(--border-radius-lg);
     border-bottom-right-radius: var(--border-radius-lg);
 }
 .modal-actions .button {
-	min-width: 140px;
+	min-width: 120px;
 }
 
 /* --- Specific Modal Content Sizing --- */
-/* These can be overridden but provide good defaults */
 .download-modal-content { max-width: 800px; }
 .confirm-modal-content { max-width: 480px; }
 .folder-selector-content { max-width: 650px; }
