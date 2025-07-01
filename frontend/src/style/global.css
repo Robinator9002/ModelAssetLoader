@@ -139,7 +139,7 @@ a:hover { text-decoration: underline; color: var(--color-primary-hover); }
 ul { list-style: none; padding: 0; margin: 0; }
 
 /* --- GENERIC COMPONENT & UTILITY CLASSES --- */
-button {
+.button {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -157,53 +157,68 @@ button {
 	white-space: nowrap;
 	transition: all var(--transition-speed-fast) ease-in-out;
 }
-button:hover:not(:disabled) {
+.button:hover:not(:disabled) {
 	background-color: var(--color-surface-hover);
 	border-color: var(--color-border-hover);
 	transform: translateY(-2px);
 	box-shadow: var(--shadow-md);
 }
-button:active:not(:disabled) {
+.button:active:not(:disabled) {
 	transform: translateY(0);
 	box-shadow: var(--shadow-inset);
 }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-button-primary {
+/* CORRECTED: Changed from element selector to class selector */
+.button.button-primary {
 	background-color: var(--color-primary);
 	border-color: var(--color-primary);
 	color: var(--color-text-on-primary);
     text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
-button-primary:hover:not(:disabled) {
+.button.button-primary:hover:not(:disabled) {
 	background-color: var(--color-primary-hover);
 	border-color: var(--color-primary-hover);
 }
-button-danger {
+
+/* CORRECTED: Changed from element selector to class selector */
+.button.button-danger {
 	background-color: var(--color-error);
 	border-color: var(--color-error);
 	color: var(--color-text-on-primary);
     text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
-button-danger:hover:not(:disabled) {
+.button.button-danger:hover:not(:disabled) {
 	background-color: hsl(var(--color-error-hue), 85%, 55%);
     border-color: hsl(var(--color-error-hue), 85%, 55%);
 }
 
-button-icon {
+.button-icon {
+    /* This is a standalone class, not a modifier for .button */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	background-color: transparent;
 	border: 1px solid transparent;
 	color: var(--color-text-secondary);
 	padding: var(--spacing-unit);
 	border-radius: 50%;
 	line-height: 0;
+    cursor: pointer;
+    transition: all var(--transition-speed-fast) ease;
 }
-button-icon:hover:not(:disabled) {
+.button-icon:hover:not(:disabled) {
 	background-color: var(--color-surface-hover);
 	color: var(--color-text-primary);
 	transform: scale(1.1);
-	box-shadow: none;
 }
+.button-icon:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    background-color: transparent;
+}
+
 
 /* --- REFINED Input & Select Styling --- */
 input, select, .config-input, .config-select {
@@ -244,6 +259,7 @@ input:disabled, select:disabled, .config-input:disabled, .config-select:disabled
     background-size: 1em 1em;
 }
 
+/* --- MODAL & OVERLAY --- */
 .modal-overlay {
 	position: fixed;
 	inset: 0;
@@ -282,6 +298,7 @@ input:disabled, select:disabled, .config-input:disabled, .config-select:disabled
 	opacity: 1;
 }
 
+/* --- FEEDBACK MESSAGES --- */
 .feedback-message {
 	margin-top: calc(var(--spacing-unit) * 2);
 	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
