@@ -1,47 +1,73 @@
 /*
  * =================================================================
- * M.A.L. - Navbar Component Styles (Purple Contrast Theme)
+ * M.A.L. - Navbar Component Styles (IMPROVED)
  * =================================================================
 */
 .app-navbar {
 	background-color: var(--color-surface);
-	padding: 0 var(--spacing-unit);
+	padding: 0 calc(var(--spacing-unit) * 3); /* Increased horizontal padding */
 	border-bottom: 1px solid var(--color-border);
 	flex-shrink: 0;
 	z-index: var(--z-index-navbar);
-	overflow-x: auto;
+    
+    /* New layout properties */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(var(--spacing-unit) * 4);
+    height: 64px; /* Set a fixed height for consistency */
+    box-shadow: var(--shadow-sm);
 }
+
+.navbar-brand {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    flex-shrink: 0; /* Prevent brand from shrinking */
+}
+
+.navbar-brand strong {
+    color: var(--color-primary);
+}
+
+.navbar-tabs-nav {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center; /* Center the tabs within the nav area */
+}
+
 .navbar-tabs-list {
 	display: flex;
-    justify-content: center;
+    align-items: center;
+    height: 100%;
 }
+
 .navbar-tab-item {
-    /* Ensures buttons don't shrink on small screens if they have labels */
     flex-shrink: 0;
 }
+
 .navbar-tab-button {
 	background-color: transparent;
 	color: var(--color-text-secondary);
 	border: none;
-	padding: calc(var(--spacing-unit) * 1.75) calc(var(--spacing-unit) * 3);
+	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5);
 	cursor: pointer;
 	font-weight: 600;
 	font-size: 0.95rem;
 	display: inline-flex;
 	align-items: center;
-	gap: calc(var(--spacing-unit) * 1.25);
-	border-bottom: 3px solid transparent;
+	gap: var(--spacing-unit);
+	position: relative;
+    border-radius: var(--border-radius-md);
 	transition: color var(--transition-speed-fast) ease,
-		border-bottom-color var(--transition-speed-fast) ease,
 		background-color var(--transition-speed-fast) ease;
-	margin-bottom: -1px; /* Overlaps parent border for a seamless look */
-    position: relative;
 }
 
+/* The animated underline effect */
 .navbar-tab-button::before {
     content: '';
     position: absolute;
-    bottom: 0;
+    bottom: -1px; /* Align with the parent's border */
     left: 50%;
     transform: translateX(-50%);
     width: 0;
@@ -53,17 +79,24 @@
 
 .navbar-tab-button:hover:not(.active) {
 	color: var(--color-text-primary);
+    background-color: var(--color-surface-hover);
 }
 
 .navbar-tab-button.active {
 	color: var(--color-primary);
-	font-weight: 700;
 }
 
+/* Animate the underline to full width on the active tab */
 .navbar-tab-button.active::before {
-    width: calc(100% - var(--spacing-unit) * 4); /* Make underline slightly smaller than the button */
+    width: calc(100% - var(--spacing-unit) * 3);
+}
+
+/* Add a subtle glow to the active icon for extra polish */
+.navbar-tab-button.active .navbar-tab-icon {
+    filter: drop-shadow(0 0 5px rgba(var(--color-primary-rgb), 0.5));
 }
 
 .navbar-tab-icon {
 	line-height: 0; /* Ensures perfect vertical alignment of SVG */
+    transition: filter var(--transition-speed-fast) ease;
 }
