@@ -3,7 +3,7 @@ import uuid
 import logging
 import asyncio
 from typing import Dict, Any, Optional, Callable, Coroutine, List
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +16,32 @@ class DownloadStatus:
     download_id: str
     filename: str
     repo_id: str
-    status: str = "pending"  # pending, downloading, completed, error
-    progress: float = 0.0  # Percentage (0.0 to 100.0)
+    status: str = "pending"  # pending, downloading, completed, error, cancelled
+    progress: float = 0.0
     total_size_bytes: int = 0
     downloaded_bytes: int = 0
     error_message: Optional[str] = None
     target_path: Optional[str] = None
+    # This field will hold the running task so we can cancel it.
+    # It won't be part of the JSON response.
+    task: Optional[asyncio.Task] = field(default=None, repr=False, compare=False)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Converts the dataclass to a dictionary, excluding the task object."""
+        return {
+            "download_id": self.download_id,
+            "filename": self.filename,
+            "repo_id": self.repo_id,
+            "status": self.status,
+            "progress": self.progress,
+            "total_size_bytes": self.total_size_bytes,
+            "downloaded_bytes": self.downloaded_bytes,
+            "error_message": self.error_message,
+            "target_path": self.target_path,
+        }
 
 class DownloadTracker:
-    """
-    A singleton-like class to track the status of all active downloads.
-    This provides a central in-memory store for download progress, which
-    can be used to broadcast updates via WebSockets.
-    """
+    """A singleton-like class to track and manage all active downloads."""
     _instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -39,96 +52,86 @@ class DownloadTracker:
         return cls._instance
 
     def set_broadcast_callback(self, callback: Optional[BroadcastCallable]):
-        """
-        Sets the asynchronous callback function used to broadcast updates.
-        This will typically be a function that sends data over a WebSocket.
-        """
         self.broadcast_callback = callback
-        if callback:
-            logger.info("DownloadTracker: Broadcast callback has been set.")
-        else:
-            logger.info("DownloadTracker: Broadcast callback has been cleared.")
+        logger.info(f"DownloadTracker: Broadcast callback has been {'set' if callback else 'cleared'}.")
 
     async def _broadcast(self, data: Dict[str, Any]):
-        """If a callback is set, broadcast the download status."""
         if self.broadcast_callback:
             try:
                 await self.broadcast_callback(data)
             except Exception as e:
                 logger.error(f"Error during broadcast: {e}", exc_info=True)
 
-    def start_tracking(self, repo_id: str, filename: str) -> DownloadStatus:
-        """
-        Registers a new download to be tracked and returns its initial status.
-        """
+    def start_tracking(self, repo_id: str, filename: str, task: asyncio.Task) -> DownloadStatus:
+        """Registers a new download and its task to be tracked."""
         download_id = str(uuid.uuid4())
         status = DownloadStatus(
             download_id=download_id,
             filename=filename,
             repo_id=repo_id,
-            status="pending"
+            status="pending",
+            task=task
         )
         self.active_downloads[download_id] = status
         logger.info(f"Started tracking download {download_id} for '{filename}'.")
-        # The initial state is sent when a client connects, but we can broadcast the new item too.
-        asyncio.create_task(self._broadcast(status.__dict__))
+        asyncio.create_task(self._broadcast(status.to_dict()))
         return status
 
     async def update_progress(self, download_id: str, downloaded_bytes: int, total_size: int):
-        """Updates the progress of a specific download."""
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
-            status.status = "downloading"
+            if status.status != "downloading":
+                status.status = "downloading"
             status.downloaded_bytes = downloaded_bytes
             status.total_size_bytes = total_size
             if total_size > 0:
                 status.progress = round((downloaded_bytes / total_size) * 100, 2)
-            
-            await self._broadcast(status.__dict__)
+            await self._broadcast(status.to_dict())
 
     async def complete_download(self, download_id: str, final_path: str):
-        """Marks a download as successfully completed and schedules its removal."""
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             status.status = "completed"
             status.progress = 100.0
             status.target_path = final_path
             logger.info(f"Download {download_id} completed. Path: {final_path}")
-            
-            await self._broadcast(status.__dict__)
-            
-            # Let it linger for 30s for the UI, then remove it forever.
+            await self._broadcast(status.to_dict())
             await asyncio.sleep(30)
             await self.remove_download(download_id)
 
-    async def fail_download(self, download_id: str, error_message: str):
-        """Marks a download as failed and schedules its removal."""
+    async def fail_download(self, download_id: str, error_message: str, cancelled: bool = False):
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
-            status.status = "error"
+            status.status = "cancelled" if cancelled else "error"
             status.error_message = error_message
-            logger.error(f"Download {download_id} failed: {error_message}")
-
-            await self._broadcast(status.__dict__)
-
-            # Also let failed downloads linger for 30s before removing.
-            await asyncio.sleep(30)
-            await self.remove_download(download_id)
+            logger.error(f"Download {download_id} failed/cancelled: {error_message}")
+            await self._broadcast(status.to_dict())
+            # Don't auto-remove cancelled tasks, let the user see the status.
+            # They can dismiss it manually.
+            if not cancelled:
+                await asyncio.sleep(30)
+                await self.remove_download(download_id)
+    
+    async def cancel_and_remove(self, download_id: str):
+        """Cancels a running download task and removes it from tracking."""
+        if download_id in self.active_downloads:
+            status = self.active_downloads[download_id]
+            if status.task and not status.task.done():
+                logger.info(f"Cancelling download task {download_id}.")
+                status.task.cancel()
+                # The task itself will call fail_download on cancellation.
+            else:
+                # If there's no task or it's already done, just remove it.
+                await self.remove_download(download_id)
 
     async def remove_download(self, download_id: str):
-        """
-        Removes a download from tracking and broadcasts its removal.
-        THIS IS THE 'FOREVER' METHOD.
-        """
+        """Removes a download from tracking and broadcasts its removal."""
         if download_id in self.active_downloads:
             logger.info(f"Removing download {download_id} from tracking.")
             del self.active_downloads[download_id]
-            # Broadcast the removal command so all clients can update their UI.
             await self._broadcast({"type": "remove", "download_id": download_id})
 
     def get_all_statuses(self) -> List[Dict[str, Any]]:
-        """Returns the status of all currently tracked downloads."""
-        return [status.__dict__ for status in self.active_downloads.values()]
+        return [status.to_dict() for status in self.active_downloads.values()]
 
-# Create a single, shared instance of the tracker
 download_tracker = DownloadTracker()

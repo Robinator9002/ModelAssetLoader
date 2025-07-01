@@ -1,6 +1,7 @@
 # backend/core/file_manager.py
 import logging
 import pathlib
+import asyncio # Import asyncio
 from typing import Dict, Any, Optional
 
 from fastapi import BackgroundTasks
@@ -54,10 +55,9 @@ class FileManager:
             response["error"] = message
         return response
 
-
     def start_download_model_file(
         self,
-        background_tasks: BackgroundTasks,
+        # background_tasks is no longer needed here
         source: str,
         repo_id: str,
         filename: str,
@@ -65,9 +65,6 @@ class FileManager:
         custom_sub_path: Optional[str] = None,
         revision: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Initiates a download with a simplified and robust path resolution logic.
-        """
         if source != 'huggingface':
             return {"success": False, "error": f"Source '{source}' is not supported for downloads."}
 
@@ -78,26 +75,53 @@ class FileManager:
         if not final_save_path:
             return {"success": False, "error": f"Could not resolve a valid save path for model type '{model_type}'."}
 
-        status = download_tracker.start_tracking(repo_id=repo_id, filename=final_save_path.name)
-        
-        background_tasks.add_task(
-            self.downloader.download_model_file,
-            download_id=status.download_id,
-            repo_id=repo_id,
-            hf_filename=filename,
-            target_directory=final_save_path.parent,
-            target_filename_override=final_save_path.name,
-            revision=revision
+        # Create the download task
+        download_task = asyncio.create_task(
+            self.downloader.download_model_file(
+                # download_id will be assigned by the tracker
+                download_id="", # Placeholder, will be replaced by tracker
+                repo_id=repo_id,
+                hf_filename=filename,
+                target_directory=final_save_path.parent,
+                target_filename_override=final_save_path.name,
+                revision=revision
+            )
         )
+        
+        # Register the task with the tracker
+        status = download_tracker.start_tracking(
+            repo_id=repo_id,
+            filename=final_save_path.name,
+            task=download_task
+        )
+        
+        # Now, update the task with the real download_id
+        # This is a bit of a workaround to avoid circular dependencies
+        # A better way might be to pass a future/queue to the task
+        # But for now, we can patch the coroutine's arguments.
+        # Let's refine the downloader to accept the ID directly.
+        # Re-creating the task with the correct ID is cleaner.
+        download_task.cancel() # Cancel the placeholder task
+        
+        final_task = asyncio.create_task(
+            self.downloader.download_model_file(
+                download_id=status.download_id, # Use the real ID
+                repo_id=repo_id,
+                hf_filename=filename,
+                target_directory=final_save_path.parent,
+                target_filename_override=final_save_path.name,
+                revision=revision
+            )
+        )
+        status.task = final_task # Update the status with the correct task
 
         logger.info(f"Queued download {status.download_id} for '{filename}' -> '{final_save_path}' as a background task.")
         return {"success": True, "message": "Download started.", "download_id": status.download_id}
 
-    # --- FIXED: Re-added the missing dismiss_download method ---
     async def dismiss_download(self, download_id: str):
-        """Delegates dismissal request to the download tracker."""
-        await download_tracker.remove_download(download_id)
+        """Cancels a running download or removes a finished one."""
+        logger.info(f"Dismiss request received for download {download_id}. Attempting to cancel and remove.")
+        await download_tracker.cancel_and_remove(download_id)
 
     def list_host_directories(self, path_to_scan_str: Optional[str] = None, max_depth: int = 1) -> Dict[str, Any]:
-        """Delegates directory scanning on the host to the HostScanner."""
         return self.scanner.list_host_directories(path_to_scan_str, max_depth)

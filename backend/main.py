@@ -24,7 +24,6 @@ from backend.api.models import (
     PathConfigurationRequest, PathConfigurationResponse,
     FileDownloadRequest, FileDownloadResponse,
     DirectoryStructureResponse,
-    RescanPathRequest, RescanPathResponse,
     MalFullConfiguration,
     ScanHostDirectoriesResponse
 )
@@ -211,21 +210,19 @@ async def configure_file_manager_paths_endpoint(config_request: PathConfiguratio
     "/api/filemanager/download",
     response_model=FileDownloadResponse,
     tags=["FileManager"],
-    summary="Download a Model File",
-    description="Schedules a file from a source repository to be downloaded to the configured local path."
+    summary="Download a Model File"
 )
-async def download_model_file_endpoint(
-    download_request: FileDownloadRequest,
-    background_tasks: BackgroundTasks
-):
+async def download_model_file_endpoint(download_request: FileDownloadRequest):
+    """
+    Schedules a file from a source repository to be downloaded.
+    The download now runs as a native asyncio task, not a FastAPI BackgroundTask.
+    """
     logger.info(f"Received download request: {download_request.model_dump()}")
     if not file_manager.config.base_path:
-        logger.warning("Download request failed: Base path not configured.")
-        raise HTTPException(status_code=400, detail="Base path not configured. Please configure paths first.")
+        raise HTTPException(status_code=400, detail="Base path not configured.")
 
-    # REFACTOR: Pass all relevant fields from the request to the download method.
+    # FIXED: Call start_download_model_file without the background_tasks argument
     result = file_manager.start_download_model_file(
-        background_tasks=background_tasks,
         source=download_request.source,
         repo_id=download_request.repo_id,
         filename=download_request.filename,
@@ -235,8 +232,7 @@ async def download_model_file_endpoint(
     )
 
     if not result.get("success"):
-        error_detail = result.get("error", "Download failed due to an unknown error.")
-        logger.error(f"Download failed for {download_request.repo_id}/{download_request.filename}: {error_detail}")
+        error_detail = result.get("error", "Download failed.")
         status_code = 400
         if "not found" in error_detail.lower(): status_code = 404
         if "gated" in error_detail.lower(): status_code = 403
