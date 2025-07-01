@@ -1,86 +1,201 @@
 /*
  * =================================================================
- * M.A.L. - ConfigurationsPage Styles (Purple Contrast Theme)
+ * M.A.L. - ConfigurationsPage Styles (IMPROVED)
  * =================================================================
 */
+
 .configurations-page {
-	max-width: 800px;
-	margin: 0 auto;
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 5); /* More vertical space */
+	gap: calc(var(--spacing-unit) * 3);
+    height: 100%;
+    max-height: calc(100vh - 64px - 40px); /* vh - navbar_height - parent_padding */
 }
-.config-section {
-	display: flex;
-	flex-direction: column;
-	gap: var(--spacing-unit);
-    padding: calc(var(--spacing-unit) * 3);
+
+.config-header {
+    flex-shrink: 0;
+}
+.config-header h1 {
+    font-size: 1.75rem;
+}
+.config-header p {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    margin-top: calc(var(--spacing-unit) * 0.5);
+}
+
+/* New two-column layout for the main settings */
+.config-main-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: calc(var(--spacing-unit) * 3);
+    flex-grow: 1;
+    overflow: hidden; /* Prevent content from breaking layout */
+}
+
+.config-card {
+    background-color: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-lg);
-    background-color: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Crucial for internal scrolling */
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
-.config-label {
-	font-weight: 600;
-	font-size: 1.1rem;
+
+.config-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+    font-size: 1.2rem;
+    font-weight: 600;
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+    border-bottom: 1px solid var(--color-border);
     color: var(--color-text-primary);
 }
+
+.config-card-body {
+    padding: calc(var(--spacing-unit) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 3);
+    overflow-y: auto; /* Enable scrolling for the body */
+}
+
+.config-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
+}
+
+.config-label {
+	font-weight: 600;
+	font-size: 0.9rem;
+    color: var(--color-text-primary);
+    padding-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
 .base-path-selector {
 	display: flex;
 	gap: var(--spacing-unit);
 }
+
 .path-input.config-input {
 	cursor: pointer;
     background-color: var(--color-background);
     color: var(--color-text-secondary);
+    border: 1px dashed var(--color-border); /* Dashed to indicate it's not a normal input */
 }
 .path-input.config-input:hover {
     color: var(--color-text-primary);
+    border-color: var(--color-primary);
 }
+
 .config-hint {
     font-size: 0.9rem;
     color: var(--color-text-secondary);
-    margin-top: var(--spacing-unit);
+    margin-top: calc(var(--spacing-unit) * 0.5);
 }
 .config-hint.error-hint {
     color: var(--color-error);
     font-weight: 500;
 }
-.config-actions {
-	margin-top: var(--spacing-unit);
-	display: flex;
-	justify-content: flex-end;
+
+/* --- Custom Paths Section --- */
+
+.custom-paths-card {
+    opacity: 0.5;
+    transform: scale(0.98);
+    pointer-events: none;
 }
-.save-config-button {
-    min-width: 240px;
-    padding: var(--spacing-unit) * 1.5;
-    font-size: 1rem;
+.custom-paths-card.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: all;
 }
 
-.custom-paths-section h3 {
-	margin-bottom: calc(var(--spacing-unit) * 2);
-	font-size: 1.1rem;
-    border-bottom: 1px solid var(--color-border);
-    padding-bottom: var(--spacing-unit);
+.custom-paths-body .config-hint {
+    margin-bottom: var(--spacing-unit);
 }
-.custom-paths-section h3 code {
-	font-size: 0.9em;
-	background-color: var(--color-surface-alt);
-	padding: 3px 6px;
-	border-radius: var(--border-radius-sm);
-	border: 1px solid var(--color-border);
+.custom-paths-body .config-hint code {
     font-family: var(--font-monospace);
-    color: var(--color-text-secondary);
+    background-color: var(--color-background);
+    padding: 2px 5px;
+    border-radius: var(--border-radius-sm);
 }
+
+.custom-paths-list {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 2);
+}
+
 .custom-path-entry {
 	display: grid;
-	grid-template-columns: 180px 1fr;
+	grid-template-columns: 140px 1fr;
 	align-items: center;
 	gap: calc(var(--spacing-unit) * 2);
-	margin-bottom: calc(var(--spacing-unit) * 1.5);
 }
+
 .custom-path-label {
 	text-align: right;
 	font-weight: 500;
 	color: var(--color-text-secondary);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+    font-family: var(--font-monospace);
+    text-transform: capitalize;
+}
+.custom-path-label::after {
+    content: ":";
+}
+
+/* --- Footer Actions --- */
+
+.config-footer {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end; /* Aligns button to the right */
+    align-items: center;
+    padding-top: calc(var(--spacing-unit) * 2);
+    border-top: 1px solid var(--color-border);
+    position: relative; /* Positioning context for the feedback message */
+    min-height: 54px; /* Ensure footer has height for centered message */
+}
+
+/* FIX: Center the feedback message and take it out of the flex flow */
+.config-footer .feedback-message {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+    z-index: 1; /* Ensure it's on top */
+}
+
+.save-config-button {
+    min-width: 220px;
+	font-size: 1rem;
+    /* FIX: Ensure the button has generous padding for a large click area */
+    padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
+	z-index: calc(var(--z-index-toast) + 2);
+    position: relative; /* Needed for z-index to work */
+}
+
+/* Custom Scrollbars */
+.config-card-body::-webkit-scrollbar {
+    width: 10px;
+}
+.config-card-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.config-card-body::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 10px;
+    border: 2px solid var(--color-surface);
+}
+.config-card-body::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border-hover);
 }
