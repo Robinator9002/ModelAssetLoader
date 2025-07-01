@@ -1,5 +1,5 @@
 # backend/main.py
-from fastapi import FastAPI, HTTPException, Query, Body, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, status, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 
@@ -245,6 +245,21 @@ async def download_model_file_endpoint(
     logger.info(f"Download successfully queued: {result.get('message')}")
     return FileDownloadResponse(**result)
 
+@app.delete(
+    "/api/filemanager/downloads/{download_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["FileManager"],
+    summary="Dismiss and permanently remove a tracked download",
+    description="Removes a download from the live tracker, preventing it from being shown to any client again."
+)
+async def dismiss_download_endpoint(download_id: str):
+    """
+    Endpoint to permanently remove a download from the tracker.
+    """
+    logger.info(f"Request received to dismiss download: {download_id}")
+    await file_manager.dismiss_download(download_id)
+    # No body is returned on a 204 response.
+    return
 
 @app.get(
     "/api/filemanager/scan-host-directories",

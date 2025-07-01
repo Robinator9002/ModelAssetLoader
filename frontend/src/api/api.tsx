@@ -196,6 +196,17 @@ export const downloadFileAPI = async (
     }
 };
 
+// Function to permanently dismiss a download from the tracker
+export const dismissDownloadAPI = async (downloadId: string): Promise<void> => {
+    try {
+        await apiClient.delete(`/filemanager/downloads/${downloadId}`);
+    } catch (error) {
+        console.error(`Failed to dismiss download ${downloadId}:`, error);
+        // Optionally re-throw or handle the error in the UI
+        throw error;
+    }
+};
+
 export const configurePathsAPI = async (
     config: PathConfigurationRequest
 ): Promise<PathConfigurationResponse> => {

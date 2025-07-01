@@ -1,13 +1,15 @@
 // frontend/src/components/Files/DownloadManager.tsx
 import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, X } from 'lucide-react';
-import type { DownloadStatus } from '../../api/api'; // Import from the central api file
+// Import the new API function and the status type
+import { dismissDownloadAPI, type DownloadStatus } from '../../api/api';
 
-interface DownloadManagerProps {
-    activeDownloads: Map<string, DownloadStatus>;
+interface DownloadItemProps {
+    status: DownloadStatus;
+    onDismiss: (id: string) => void;
 }
 
-const DownloadItem: React.FC<{ status: DownloadStatus, onDismiss: (id: string) => void }> = ({ status, onDismiss }) => {
+const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
     const {
         download_id,
         filename,
@@ -16,17 +18,21 @@ const DownloadItem: React.FC<{ status: DownloadStatus, onDismiss: (id: string) =
         error_message,
     } = status;
 
-    // --- ADDED: Auto-dismissal for completed/error states ---
+    const [isClosing, setIsClosing] = useState(false);
+
+    // This effect now only controls the visual "fading out" animation for auto-dismissal.
+    // The actual removal is handled by the parent via WebSocket.
     useEffect(() => {
+        let timer: NodeJS.Timeout;
         if (downloadStatus === 'completed' || downloadStatus === 'error') {
-            const timer = setTimeout(() => {
-                onDismiss(download_id);
-            }, 5000); // Remove after 5 seconds
-
-            return () => clearTimeout(timer);
+            // Start the closing animation after 4 seconds. The backend will send the
+            // "remove" command after 30 seconds, which will remove the item from the DOM.
+            timer = setTimeout(() => {
+                setIsClosing(true);
+            }, 4000);
         }
-    }, [downloadStatus, download_id, onDismiss]);
-
+        return () => clearTimeout(timer);
+    }, [downloadStatus]);
 
     const getStatusIcon = () => {
         switch (downloadStatus) {
@@ -41,23 +47,29 @@ const DownloadItem: React.FC<{ status: DownloadStatus, onDismiss: (id: string) =
         }
     };
 
+    const handleDismissClick = () => {
+        setIsClosing(true); // Start closing animation immediately on click
+        // After the animation, call the actual dismissal logic
+        setTimeout(() => onDismiss(download_id), 300);
+    };
+
     return (
-        <div 
-            className={`download-item-toast ${downloadStatus} transform transition-all duration-300 ease-in-out`} 
+        <div
+            className={`download-item-toast ${downloadStatus} ${isClosing ? 'closing' : ''} transform transition-all duration-300 ease-in-out`}
             key={download_id}
             role="alert"
         >
             <div className="download-toast-header">
                 <span className="download-toast-filename" title={filename}>{filename}</span>
                 <span className="download-toast-status-icon">{getStatusIcon()}</span>
-                <button onClick={() => onDismiss(download_id)} className="dismiss-button">
+                <button onClick={handleDismissClick} className="dismiss-button">
                     <X size={16} />
                 </button>
             </div>
             <div className="download-toast-body">
                 {downloadStatus === 'error' ? (
-                    <div className="download-toast-error-message" title={error_message || 'Unknown error'}>
-                        {error_message || 'An unknown error occurred.'}
+                    <div className="download-toast-error-message" title={error_message || 'Unbekannter Fehler'}>
+                        {error_message || 'Ein unbekannter Fehler ist aufgetreten.'}
                     </div>
                 ) : (
                     <>
@@ -69,7 +81,7 @@ const DownloadItem: React.FC<{ status: DownloadStatus, onDismiss: (id: string) =
                                 aria-valuenow={progress}
                             />
                         </div>
-                        <span className="progress-text">{progress.toFixed(1)}%</span>
+                        <span className="progress-text">{progress?.toFixed(1) || '0.0'}%</span>
                     </>
                 )}
             </div>
@@ -78,47 +90,40 @@ const DownloadItem: React.FC<{ status: DownloadStatus, onDismiss: (id: string) =
 };
 
 
-const DownloadManager: React.FC<DownloadManagerProps> = ({ activeDownloads }) => {
-    // --- ADDED: Local state to handle dismissals without affecting the source map directly ---
-    const [visibleDownloads, setVisibleDownloads] = useState<Map<string, DownloadStatus>>(new Map());
+interface DownloadManagerProps {
+    activeDownloads: Map<string, DownloadStatus>;
+}
 
-    useEffect(() => {
-        // Sync with the prop, but don't remove items that are already fading out
-        setVisibleDownloads(prevVisible => {
-            const newVisible = new Map(prevVisible);
-            // Add/update downloads from props
-            activeDownloads.forEach((status, id) => {
-                newVisible.set(id, status);
-            });
-            // The removal is handled by the dismiss callback
-            return newVisible;
-        });
-    }, [activeDownloads]);
+// The DownloadManager is now a "dumb" component. It just renders the list
+// it's given and calls a function when an item is dismissed.
+const DownloadManager: React.FC<DownloadManagerProps> = ({ activeDownloads }) => {
 
     const handleDismiss = (downloadId: string) => {
-        setVisibleDownloads(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(downloadId);
-            return newMap;
+        // This function now triggers the API call to remove the download "forever".
+        // The component will re-render and the item will disappear when the parent
+        // component receives the "remove" message via WebSocket and updates the prop.
+        dismissDownloadAPI(downloadId).catch(err => {
+            // Optional: Show an error toast if the dismissal fails
+            console.error("Dismissal failed:", err);
         });
     };
 
-    if (visibleDownloads.size === 0) {
+    if (activeDownloads.size === 0) {
         return null;
     }
 
-    const downloadArray = Array.from(visibleDownloads.values());
+    // Convert map to array for rendering
+    const downloadArray = Array.from(activeDownloads.values());
 
     return (
         <div className="download-manager-container">
             {downloadArray.map(status => (
-                <DownloadItem 
-                    key={status.download_id} 
-                    status={status} 
-                    onDismiss={handleDismiss} 
+                <DownloadItem
+                    key={status.download_id}
+                    status={status}
+                    onDismiss={handleDismiss}
                 />
             ))}
-            Hallo
         </div>
     );
 };

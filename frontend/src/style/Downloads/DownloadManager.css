@@ -5,8 +5,8 @@
 */
 .download-manager-container {
 	position: fixed;
-	bottom: var(--spacing-unit) * 2;
-	right: var(--spacing-unit) * 2;
+	bottom: calc(var(--spacing-unit) * 2);
+	right: calc(var(--spacing-unit) * 2);
 	z-index: var(--z-index-toast);
 	width: 100%;
 	max-width: 400px;
@@ -130,3 +130,8 @@
     font-weight: 500;
 }
 
+.download-item-toast.closing {
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 1s ease, transform 1s ease;
+}
