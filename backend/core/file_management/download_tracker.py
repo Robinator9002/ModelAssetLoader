@@ -3,7 +3,7 @@ import uuid
 import logging
 import asyncio
 from typing import Dict, Any, Optional, Callable, Coroutine, List
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ class DownloadTracker:
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(DownloadTracker, cls).__new__(cls)
-            cls._instance.active_downloads: Dict[str, DownloadStatus] = {}
-            cls._instance.broadcast_callback: Optional[BroadcastCallable] = None
+            cls._instance.active_downloads = {}
+            cls._instance.broadcast_callback = None
         return cls._instance
 
     def set_broadcast_callback(self, callback: BroadcastCallable):
