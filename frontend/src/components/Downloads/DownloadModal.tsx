@@ -1,12 +1,12 @@
-// frontend/src/components/Files/DownloadModal.tsx
-import React, { useState, useEffect, useCallback } from "react";
+// frontend/src/components/Downloads/DownloadModal.tsx
+import React, { useState, useEffect } from "react";
 import {
 	type ModelDetails,
 	type ModelFile,
 	type ModelType,
 	downloadFileAPI,
 } from "../../api/api";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, Download, AlertTriangle } from "lucide-react";
 
 interface DownloadModalProps {
 	isOpen: boolean;
@@ -15,6 +15,7 @@ interface DownloadModalProps {
 	specificFileToDownload?: ModelFile | null;
 }
 
+// Common model types for the dropdown selector
 const COMMON_MODEL_TYPES: ModelType[] = [
 	"checkpoints", "loras", "vae", "embeddings", "controlnet", 
     "diffusers", "clip", "unet", "hypernetworks", "custom"
@@ -29,8 +30,6 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
 	// State for the selected files including their download configuration
 	const [selectedFiles, setSelectedFiles] = useState<Record<string, { file: ModelFile; modelType: ModelType; customPath?: string }>>({});
 	
-    // REFACTOR: Removed local download status tracking.
-    // The global DownloadManager is now responsible for showing progress.
 	const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +41,6 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
 		if (fnLower.includes("vae")) return "vae";
 		if (fnLower.includes("embedding")) return "embeddings";
 		if (fnLower.includes("controlnet")) return "controlnet";
-		// Add more rules as needed
 		return null;
 	};
 
@@ -88,6 +86,24 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
 		setSelectedFiles(prev => ({ ...prev, [filename]: { ...prev[filename], customPath: path } }));
 	};
 
+    const handleSelectAllChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const isChecked = e.target.checked;
+        if (isChecked) {
+            const allSelected: typeof selectedFiles = {};
+            modelDetails?.siblings?.forEach(file => {
+                const initialModelType = guessModelTypeFromFile(file.rfilename) || "custom";
+                allSelected[file.rfilename] = {
+                    file,
+                    modelType: initialModelType,
+                    customPath: initialModelType === "custom" ? file.rfilename.substring(0, file.rfilename.lastIndexOf('/') + 1) || 'custom/' : undefined
+                };
+            });
+            setSelectedFiles(allSelected);
+        } else {
+            setSelectedFiles({});
+        }
+    };
+
 	const handleStartDownloads = async () => {
 		if (!modelDetails || Object.keys(selectedFiles).length === 0) return;
 
@@ -105,90 +121,116 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
 		);
 
 		try {
-			// Wait for all download *requests* to be acknowledged by the backend
 			const results = await Promise.all(downloadPromises);
-			
-			// Check if any of the requests failed to be queued
 			const firstError = results.find(res => !res.success);
 			if (firstError) {
-				throw new Error(firstError.error || "Ein Download konnte nicht gestartet werden.");
+				throw new Error(firstError.error || "One or more downloads could not be started.");
 			}
-
-			// If all requests were successfully queued, close the modal.
-			// The global DownloadManager will now show the progress toasts.
 			onClose();
-
 		} catch (err: any) {
-			setError(err.message || "Fehler beim Starten der Downloads.");
-			setIsSubmitting(false); // Allow the user to try again
-		}
+			setError(err.message || "An error occurred while starting downloads.");
+		} finally {
+            setIsSubmitting(false);
+        }
 	};
 
 	if (!isOpen || !modelDetails) return null;
 
 	const filesToList = modelDetails.siblings || [];
+    const numSelected = Object.keys(selectedFiles).length;
+    const isAllSelected = filesToList.length > 0 && numSelected === filesToList.length;
 
 	return (
-		<div className="modal-overlay download-modal-overlay active" onClick={isSubmitting ? undefined : onClose}>
+		<div className="modal-overlay download-modal-overlay active">
 			<div className="modal-content download-modal-content" onClick={(e) => e.stopPropagation()}>
-				<div className="download-modal-header">
-					<h3>Dateien für "{modelDetails.model_name}" auswählen</h3>
-					<button onClick={onClose} className="close-button" disabled={isSubmitting}><X size={20} /></button>
+				<div className="modal-header">
+                    <div className="download-modal-header-text">
+					    <h3>Download Files</h3>
+                        <span>For model: <strong>{modelDetails.model_name}</strong></span>
+                    </div>
+					<button onClick={onClose} className="button-icon close-button" aria-label="Close" disabled={isSubmitting}><X size={20} /></button>
 				</div>
 
-				<div className="download-modal-body">
+				<div className="modal-body download-modal-body">
+                    <div className="download-modal-controls">
+                        <div className="select-all-container">
+                            <input
+                                type="checkbox"
+                                id="select-all-files"
+                                checked={isAllSelected}
+                                onChange={handleSelectAllChange}
+                                disabled={isSubmitting || filesToList.length === 0}
+                            />
+                            <label htmlFor="select-all-files">Select All</label>
+                        </div>
+                        <span className="selection-count">{numSelected} / {filesToList.length} files selected</span>
+                    </div>
 					<div className="download-modal-file-list">
-						{filesToList.length > 0 ? filesToList.map((file) => (
-							<div key={file.rfilename} className={`download-file-item ${selectedFiles[file.rfilename] ? "selected" : ""}`}>
-								<div className="file-item-main-info">
-									<input
-										type="checkbox"
-										id={`cb-${file.rfilename}`}
-										checked={!!selectedFiles[file.rfilename]}
-										onChange={(e) => handleFileSelectionChange(file, e.target.checked)}
-										disabled={isSubmitting}
-									/>
-									<label htmlFor={`cb-${file.rfilename}`} className="file-name-label">
-										{file.rfilename}
-									</label>
-								</div>
-								{selectedFiles[file.rfilename] && (
-									<div className="file-item-options">
-										<select
-											value={selectedFiles[file.rfilename].modelType}
-											onChange={(e) => handleModelTypeChange(file.rfilename, e.target.value as ModelType)}
-											disabled={isSubmitting}
-										>
-											{COMMON_MODEL_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-										</select>
-										{selectedFiles[file.rfilename].modelType === 'custom' && (
-											<input
-												type="text"
-												placeholder="Relativer Pfad..."
-												value={selectedFiles[file.rfilename].customPath || ''}
-												onChange={(e) => handleCustomPathChange(file.rfilename, e.target.value)}
-												disabled={isSubmitting}
-											/>
-										)}
-									</div>
-								)}
-							</div>
-						)) : <p>Keine Dateien gefunden.</p>}
+						{filesToList.length > 0 ? filesToList.map((file) => {
+                            const isSelected = !!selectedFiles[file.rfilename];
+                            return (
+                                <div key={file.rfilename} className={`download-file-item ${isSelected ? "selected" : ""}`}>
+                                    <div className="file-item-main-info">
+                                        <input
+                                            type="checkbox"
+                                            id={`cb-${file.rfilename}`}
+                                            checked={isSelected}
+                                            onChange={(e) => handleFileSelectionChange(file, e.target.checked)}
+                                            disabled={isSubmitting}
+                                            aria-labelledby={`label-${file.rfilename}`}
+                                        />
+                                        <label htmlFor={`cb-${file.rfilename}`} id={`label-${file.rfilename}`} className="file-name-label">
+                                            {file.rfilename}
+                                        </label>
+                                    </div>
+                                    {isSelected && (
+                                        <div className="file-item-options">
+                                            <select
+                                                value={selectedFiles[file.rfilename].modelType}
+                                                onChange={(e) => handleModelTypeChange(file.rfilename, e.target.value as ModelType)}
+                                                disabled={isSubmitting}
+                                                className="config-select"
+                                            >
+                                                {COMMON_MODEL_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                                            </select>
+                                            {selectedFiles[file.rfilename].modelType === 'custom' && (
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter relative path..."
+                                                    value={selectedFiles[file.rfilename].customPath || ''}
+                                                    onChange={(e) => handleCustomPathChange(file.rfilename, e.target.value)}
+                                                    disabled={isSubmitting}
+                                                    className="config-input"
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        }) : <p className="no-results-message">No files found for this model.</p>}
 					</div>
-					{error && <p className="error-message">{error}</p>}
+					{error && 
+                        <div className="feedback-message error">
+                            <AlertTriangle size={16} />
+                            <span>{error}</span>
+                        </div>
+                    }
 				</div>
 
-				<div className="download-modal-actions">
-					<button onClick={onClose} className="button modal-button" disabled={isSubmitting}>Abbrechen</button>
+				<div className="modal-actions">
+					<button onClick={onClose} className="button" disabled={isSubmitting}>Cancel</button>
 					<button
 						onClick={handleStartDownloads}
-						className="button modal-button confirm-button button-primary"
-						disabled={isSubmitting || Object.keys(selectedFiles).length === 0}
+						className="button button-primary"
+						disabled={isSubmitting || numSelected === 0}
 					>
 						{isSubmitting ? (
 							<Loader2 size={18} className="animate-spin" />
 						) : (
-							`Downloads starten (${Object.keys(selectedFiles).length})`
+                            <>
+							    <Download size={18} />
+							    {`Start Download (${numSelected})`}
+                            </>
 						)}
 					</button>
 				</div>

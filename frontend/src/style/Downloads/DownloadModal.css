@@ -1,39 +1,113 @@
 /*
  * =================================================================
- * M.A.L. - DownloadModal Specific Styles
+ * M.A.L. - DownloadModal Specific Styles (IMPROVED)
  * =================================================================
  * Note: General modal layout is inherited from Modals.css.
- * This file styles the unique elements of the DownloadModal.
 */
 
+/* --- Modal Header & Body --- */
+.download-modal-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 0.5);
+    margin-right: var(--spacing-unit);
+}
+.download-modal-header-text h3 {
+    font-size: 1.25rem; /* Slightly smaller to fit subtitle */
+}
+.download-modal-header-text span {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+.download-modal-header-text strong {
+    color: var(--color-text-primary);
+}
+
+.download-modal-body {
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 2);
+    background-color: var(--color-background); /* Darker bg for contrast */
+}
+
+/* --- Controls (Select All) --- */
+.download-modal-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-unit) var(--spacing-unit) var(--spacing-unit) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.select-all-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+}
+
+.select-all-container label {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+.select-all-container input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+}
+
+.selection-count {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- File List --- */
 .download-modal-file-list {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 1.5);
+	gap: var(--spacing-unit);
+    max-height: 45vh;
+    overflow-y: auto;
+    padding: var(--spacing-unit);
+    margin: 0 calc(var(--spacing-unit) * -1); /* Extend to edges */
 }
 
 .download-file-item {
-	padding: calc(var(--spacing-unit) * 2);
-	border: 1px solid var(--color-border);
+	border: 1px solid transparent;
 	border-radius: var(--border-radius-md);
-	background-color: var(--color-surface-alt);
+	background-color: var(--color-surface);
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 2);
+    padding: calc(var(--spacing-unit) * 1.5);
 	transition: background-color var(--transition-speed-fast),
-		border-color var(--transition-speed-fast),
-        transform var(--transition-speed-fast);
+		border-color var(--transition-speed-fast);
+    position: relative;
+	min-height: 7rem;
+    overflow: hidden;
 }
 
 .download-file-item.selected {
-	background-color: rgba(var(--color-primary-rgb), 0.1);
-	border-color: rgba(var(--color-primary-rgb), 0.4);
-    transform: scale(1.01);
+	background-color: var(--color-surface-alt);
+    border-color: var(--color-border);
+}
+/* Add a colored bar to the left of selected items for emphasis */
+.download-file-item.selected::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: var(--color-primary);
 }
 
 .file-item-main-info {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	gap: calc(var(--spacing-unit) * 1.5);
 }
 
@@ -42,42 +116,66 @@
 	height: 20px;
 	accent-color: var(--color-primary);
 	flex-shrink: 0;
-    margin-top: 2px; /* Fine-tune vertical alignment */
+    cursor: pointer;
 }
 
 .file-name-label {
-	display: flex;
-	flex-direction: column;
-	cursor: pointer;
-	flex-grow: 1;
-	gap: calc(var(--spacing-unit) * 0.5);
-}
-
-.file-name-label span {
-    font-family: var(--font-monospace);
+	font-family: var(--font-monospace);
 	font-size: 0.95rem;
 	word-break: break-all;
     color: var(--color-text-secondary);
-    line-height: 1.4;
+    cursor: pointer;
+    transition: color var(--transition-speed-fast);
 }
-
-.download-file-item.selected .file-name-label span {
+.download-file-item.selected .file-name-label {
     color: var(--color-text-primary);
-    font-weight: 500;
 }
 
+/* --- Options for selected files --- */
 .file-item-options {
+    animation: slideDown 0.3s ease-out;
+    background-color: rgba(var(--color-primary-rgb), 0.05);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-unit);
+    margin-top: var(--spacing-unit);
+    margin-left: calc(20px + var(--spacing-unit) * 1.5); /* Indent */
 	display: flex;
     flex-wrap: wrap;
 	gap: var(--spacing-unit);
 	align-items: center;
-	/* Indent options to align with the file name */
-	padding-left: calc(20px + var(--spacing-unit) * 1.5);
 }
 
-.file-item-options select,
-.file-item-options input {
-	padding: var(--spacing-unit);
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.file-item-options .config-select,
+.file-item-options .config-input {
+	padding: calc(var(--spacing-unit) * 1.25);
 	font-size: 0.9rem;
+    flex-basis: 200px; /* Base width */
     flex-grow: 1;
+}
+
+/* --- Custom Scrollbar for File List --- */
+.download-modal-file-list::-webkit-scrollbar {
+    width: 10px;
+}
+.download-modal-file-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.download-modal-file-list::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 10px;
+    border: 2px solid var(--color-background);
+}
+.download-modal-file-list::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border-hover);
 }
