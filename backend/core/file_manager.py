@@ -2,8 +2,10 @@
 import logging
 import pathlib
 import asyncio
-import uuid # Import uuid
-from typing import Dict, Any, Optional
+import uuid
+import os
+import shutil
+from typing import Dict, Any, Optional, List
 
 # Import specialized managers and helpers
 from .file_management.config_manager import ConfigManager
@@ -31,6 +33,8 @@ class FileManager:
     def base_path(self) -> Optional[pathlib.Path]:
         return self.config.base_path
 
+    # --- Configuration Methods (Existing) ---
+
     def get_current_configuration(self) -> Dict[str, Any]:
         return self.config.get_current_configuration()
 
@@ -54,6 +58,8 @@ class FileManager:
             response["error"] = message
         return response
 
+    # --- Download Methods (Existing) ---
+
     def start_download_model_file(
         self,
         source: str,
@@ -63,21 +69,15 @@ class FileManager:
         custom_sub_path: Optional[str] = None,
         revision: Optional[str] = None
     ) -> Dict[str, Any]:
+        # (Code is unchanged, keeping it for completeness)
         if source != 'huggingface':
             return {"success": False, "error": f"Source '{source}' is not supported for downloads."}
-
         if not self.base_path:
             return {"success": False, "error": "Base path is not configured. Please configure it first."}
-
         final_save_path = self.paths.resolve_final_save_path(filename, model_type, custom_sub_path)
         if not final_save_path:
             return {"success": False, "error": f"Could not resolve a valid save path for model type '{model_type}'."}
-
-        # --- The Refactored Logic ---
-        # 1. Generate a unique ID for the download upfront.
         download_id = str(uuid.uuid4())
-
-        # 2. Create the download task, passing the generated ID to it.
         download_task = asyncio.create_task(
             self.downloader.download_model_file(
                 download_id=download_id,
@@ -88,22 +88,127 @@ class FileManager:
                 revision=revision
             )
         )
-        
-        # 3. Register the task and its ID with the tracker.
         download_tracker.start_tracking(
             download_id=download_id,
             repo_id=repo_id,
             filename=final_save_path.name,
             task=download_task
         )
-
         logger.info(f"Queued download {download_id} for '{filename}' -> '{final_save_path}' as a background task.")
         return {"success": True, "message": "Download started.", "download_id": download_id}
 
     async def dismiss_download(self, download_id: str):
-        """Cancels a running download or removes a finished one."""
         logger.info(f"Dismiss request received for download {download_id}. Attempting to cancel and remove.")
         await download_tracker.cancel_and_remove(download_id)
 
+    # --- Host Scanning Methods (Existing) ---
+
     def list_host_directories(self, path_to_scan_str: Optional[str] = None, max_depth: int = 1) -> Dict[str, Any]:
         return self.scanner.list_host_directories(path_to_scan_str, max_depth)
+
+    # --- NEW: Local File Management Methods ---
+
+    def _resolve_and_validate_path(self, relative_path_str: Optional[str]) -> Optional[pathlib.Path]:
+        """Security helper to resolve a relative path and ensure it's within the base_path."""
+        if not self.base_path:
+            logger.error("Security check failed: base_path is not configured.")
+            return None
+
+        # Normalize the input path to prevent directory traversal attacks
+        # An empty or None path should resolve to the base_path itself
+        if not relative_path_str:
+            return self.base_path
+
+        # Clean the path string
+        clean_path_str = os.path.normpath(relative_path_str.strip())
+        
+        # Disallow absolute paths or paths trying to go "up"
+        if os.path.isabs(clean_path_str) or ".." in clean_path_str.split(os.sep):
+            logger.warning(f"Security violation: Attempted access to invalid path '{relative_path_str}'.")
+            return None
+
+        try:
+            # Resolve the absolute path
+            absolute_path = (self.base_path / clean_path_str).resolve()
+
+            # The crucial check: is the resolved path still inside the base path?
+            if self.base_path.resolve() not in absolute_path.parents and absolute_path != self.base_path.resolve():
+                 logger.warning(f"Security violation: Path '{absolute_path}' is outside of base path '{self.base_path.resolve()}'.")
+                 return None
+            
+            return absolute_path
+        except Exception as e:
+            logger.error(f"Error resolving path '{relative_path_str}': {e}", exc_info=True)
+            return None
+
+    def list_managed_files(self, relative_path_str: Optional[str]) -> List[Dict[str, Any]]:
+        """Lists files and directories at a given relative path within the managed base_path."""
+        target_path = self._resolve_and_validate_path(relative_path_str)
+        if not target_path or not target_path.is_dir():
+            return []
+
+        items = []
+        for p in target_path.iterdir():
+            try:
+                item_type = "directory" if p.is_dir() else "file"
+                items.append({
+                    "name": p.name,
+                    "path": str(p.relative_to(self.base_path)),
+                    "item_type": item_type,
+                    "size": p.stat().st_size if item_type == "file" else None,
+                    "last_modified": p.stat().st_mtime
+                })
+            except (FileNotFoundError, PermissionError) as e:
+                logger.warning(f"Could not access item {p}: {e}")
+        
+        # Sort directories first, then files, both alphabetically
+        items.sort(key=lambda x: (x['item_type'] != 'directory', x['name'].lower()))
+        return items
+
+    def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
+        """Deletes a file or directory at a given relative path."""
+        target_path = self._resolve_and_validate_path(relative_path_str)
+        
+        if not target_path or not target_path.exists():
+            return {"success": False, "error": f"Path '{relative_path_str}' not found or is invalid."}
+        
+        # Final safety check: never delete the base_path itself
+        if target_path == self.base_path.resolve():
+            return {"success": False, "error": "Cannot delete the root base directory."}
+
+        try:
+            item_name = target_path.name
+            if target_path.is_dir():
+                shutil.rmtree(target_path)
+                logger.info(f"Successfully deleted directory: {target_path}")
+                return {"success": True, "message": f"Directory '{item_name}' deleted."}
+            else:
+                os.remove(target_path)
+                logger.info(f"Successfully deleted file: {target_path}")
+                return {"success": True, "message": f"File '{item_name}' deleted."}
+        except Exception as e:
+            logger.error(f"Failed to delete '{target_path}': {e}", exc_info=True)
+            return {"success": False, "error": f"Could not delete item: {e}"}
+
+    def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
+        """Reads the content of a small text file for previewing."""
+        target_path = self._resolve_and_validate_path(relative_path_str)
+
+        if not target_path or not target_path.is_file():
+            return {"success": False, "path": relative_path_str, "error": "File not found or is not a file."}
+
+        # Security: Check file extension and size
+        allowed_extensions = {".txt", ".md", ".json", ".yaml", ".yml", ".py"}
+        if target_path.suffix.lower() not in allowed_extensions:
+            return {"success": False, "path": relative_path_str, "error": "File type not allowed for preview."}
+
+        max_size_bytes = 1 * 1024 * 1024  # 1 MB
+        if target_path.stat().st_size > max_size_bytes:
+            return {"success": False, "path": relative_path_str, "error": "File is too large to preview."}
+
+        try:
+            content = target_path.read_text(encoding="utf-8")
+            return {"success": True, "path": relative_path_str, "content": content}
+        except Exception as e:
+            logger.error(f"Could not read file preview for '{target_path}': {e}", exc_info=True)
+            return {"success": False, "path": relative_path_str, "error": f"Could not read file: {e}"}

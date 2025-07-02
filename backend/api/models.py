@@ -92,7 +92,31 @@ class FileDownloadResponse(BaseModel):
     error: Optional[str] = None
     download_id: Optional[str] = Field(None, description="The unique ID for tracking the download.")
 
-# --- Models for Directory Structure and Scanning ---
+# --- Models for Local File Management (NEW) ---
+
+class LocalFileItem(BaseModel):
+    """Represents a file or directory within the managed base_path."""
+    name: str = Field(..., description="The name of the file or directory.")
+    path: str = Field(..., description="The relative path from the base_path.")
+    item_type: Literal["file", "directory"] = Field(..., alias="type")
+    size: Optional[int] = Field(None, description="Size of the file in bytes (null for directories).")
+    last_modified: Optional[datetime] = Field(None, description="Timestamp of the last modification.")
+
+    class Config:
+        populate_by_name = True
+
+class LocalFileActionRequest(BaseModel):
+    """Request model for actions on a local file or directory."""
+    path: str = Field(..., description="The relative path of the item to act upon.")
+
+class LocalFileContentResponse(BaseModel):
+    """Response model for fetching the content of a text file."""
+    success: bool
+    path: str
+    content: Optional[str] = None
+    error: Optional[str] = None
+
+# --- Models for Directory Structure and Scanning (Existing) ---
 class DirectoryItem(BaseModel):
     name: str
     path: str
