@@ -71,7 +71,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
         
         // Based on your request, we return a message only if the 'Cancel' button was used.
         if (cancelInitiator === 'button') {
-            return { message: "Download cancellation initiated." };
+            return { message: "Download cancelled." };
         }
         // For the 'x' button, we return nothing, so the modal closes instantly.
     };

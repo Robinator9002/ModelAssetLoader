@@ -241,20 +241,28 @@ async def download_model_file_endpoint(download_request: FileDownloadRequest):
     logger.info(f"Download successfully queued: {result.get('message')}")
     return FileDownloadResponse(**result)
 
+# --- NEW: Cancel Endpoint ---
+@app.post(
+    "/api/filemanager/downloads/{download_id}/cancel",
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["FileManager"],
+    summary="Request to cancel a running download"
+)
+async def cancel_download_endpoint(download_id: str):
+    """Requests to cancel a download task that is currently in 'pending' or 'downloading' state."""
+    await file_manager.cancel_download(download_id)
+    return {"message": "Cancellation request accepted."}
+
+# --- UPDATED: Dismiss Endpoint ---
 @app.delete(
     "/api/filemanager/downloads/{download_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["FileManager"],
-    summary="Dismiss and permanently remove a tracked download",
-    description="Removes a download from the live tracker, preventing it from being shown to any client again."
+    summary="Dismiss a finished download from the UI"
 )
 async def dismiss_download_endpoint(download_id: str):
-    """
-    Endpoint to permanently remove a download from the tracker.
-    """
-    logger.info(f"Request received to dismiss download: {download_id}")
+    """Removes a download from the tracker once it is in a final state (completed, error, cancelled)."""
     await file_manager.dismiss_download(download_id)
-    # No body is returned on a 204 response.
     return
 
 @app.get(
@@ -349,4 +357,3 @@ if __name__ == "__main__":
     import uvicorn
     logger.info(f"Starting M.A.L. API server (v{app.version}) for development...")
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-    
