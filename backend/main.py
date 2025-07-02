@@ -1,5 +1,5 @@
 # backend/main.py
-from fastapi import FastAPI, HTTPException, Query, status, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 
@@ -20,12 +20,12 @@ from backend.core.file_management.download_tracker import download_tracker
 
 # --- API Model Imports ---
 from backend.api.models import (
-    PaginatedModelListResponse, HFModelListItem, HFModelDetails,
+    PaginatedModelListResponse, HFModelDetails,
     PathConfigurationRequest, PathConfigurationResponse,
     FileDownloadRequest, FileDownloadResponse,
-    DirectoryStructureResponse,
     MalFullConfiguration,
-    ScanHostDirectoriesResponse
+    ScanHostDirectoriesResponse, HFModelListItem,
+    LocalFileItem, LocalFileActionRequest, LocalFileContentResponse
 )
 
 # --- FastAPI Application Instance ---
@@ -284,33 +284,69 @@ async def scan_host_directories_endpoint(
         raise HTTPException(status_code=500, detail="An internal error occurred while scanning host directories.")
 
 
+# === NEW: Local File Management Endpoints ===
+
 @app.get(
-    "/api/filemanager/list-directory",
-    response_model=DirectoryStructureResponse,
+    "/api/filemanager/files",
+    response_model=List[LocalFileItem],
     tags=["FileManager"],
-    summary="List Contents of a Managed Directory",
-    include_in_schema=False # Hiding as it's for internal/future use
+    summary="List Files in a Managed Directory"
 )
-async def list_directory_contents_endpoint(
-    relative_path: Optional[str] = Query(None),
-    depth: int = Query(1, ge=1, le=5)
-):
+async def list_managed_files_endpoint(path: Optional[str] = Query(None, description="Relative path from the base directory. If empty, lists the root.")):
+    """
+    Lists files and directories within the configured `base_path`.
+    This is the primary endpoint for the local file browser UI.
+    """
     if not file_manager.base_path:
-        return DirectoryStructureResponse(
-            success=False, error="Base path not configured.", base_path_configured=False
-        )
+        raise HTTPException(status_code=400, detail="Base path is not configured.")
     
-    result = file_manager.list_managed_directory_contents(relative_path_str=relative_path, depth=depth)
+    items = file_manager.list_managed_files(relative_path_str=path)
+    return items
+
+@app.delete(
+    "/api/filemanager/files",
+    status_code=status.HTTP_200_OK,
+    tags=["FileManager"],
+    summary="Delete a Managed File or Directory"
+)
+async def delete_managed_item_endpoint(request: LocalFileActionRequest):
+    """
+
+    Deletes a specified file or directory within the `base_path`.
+    The path must be relative to the configured base directory.
+    """
+    if not file_manager.base_path:
+        raise HTTPException(status_code=400, detail="Base path is not configured.")
     
-    return DirectoryStructureResponse(
-        success=result.get("success", False),
-        error=result.get("error"),
-        structure=result.get("structure"),
-        base_path_configured=True
-    )
+    result = file_manager.delete_managed_item(relative_path_str=request.path)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to delete item."))
+    
+    return result
+
+@app.get(
+    "/api/filemanager/files/preview",
+    response_model=LocalFileContentResponse,
+    tags=["FileManager"],
+    summary="Get Content of a Text File"
+)
+async def get_managed_file_preview_endpoint(path: str = Query(..., description="Relative path to the file to be previewed.")):
+    """
+    Retrieves the content of a small, allowed text file (e.g., .txt, .md)
+    for previewing in the UI.
+    """
+    if not file_manager.base_path:
+        raise HTTPException(status_code=400, detail="Base path is not configured.")
+    
+    result = file_manager.get_file_preview(relative_path_str=path)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to get file preview."))
+        
+    return result
 
 # --- Main Execution Block ---
 if __name__ == "__main__":
     import uvicorn
     logger.info(f"Starting M.A.L. API server (v{app.version}) for development...")
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    
