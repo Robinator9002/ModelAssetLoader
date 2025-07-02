@@ -1,10 +1,9 @@
 # backend/core/file_manager.py
 import logging
 import pathlib
-import asyncio # Import asyncio
+import asyncio
+import uuid # Import uuid
 from typing import Dict, Any, Optional
-
-from fastapi import BackgroundTasks
 
 # Import specialized managers and helpers
 from .file_management.config_manager import ConfigManager
@@ -57,7 +56,6 @@ class FileManager:
 
     def start_download_model_file(
         self,
-        # background_tasks is no longer needed here
         source: str,
         repo_id: str,
         filename: str,
@@ -75,11 +73,14 @@ class FileManager:
         if not final_save_path:
             return {"success": False, "error": f"Could not resolve a valid save path for model type '{model_type}'."}
 
-        # Create the download task
+        # --- The Refactored Logic ---
+        # 1. Generate a unique ID for the download upfront.
+        download_id = str(uuid.uuid4())
+
+        # 2. Create the download task, passing the generated ID to it.
         download_task = asyncio.create_task(
             self.downloader.download_model_file(
-                # download_id will be assigned by the tracker
-                download_id="", # Placeholder, will be replaced by tracker
+                download_id=download_id,
                 repo_id=repo_id,
                 hf_filename=filename,
                 target_directory=final_save_path.parent,
@@ -88,35 +89,16 @@ class FileManager:
             )
         )
         
-        # Register the task with the tracker
-        status = download_tracker.start_tracking(
+        # 3. Register the task and its ID with the tracker.
+        download_tracker.start_tracking(
+            download_id=download_id,
             repo_id=repo_id,
             filename=final_save_path.name,
             task=download_task
         )
-        
-        # Now, update the task with the real download_id
-        # This is a bit of a workaround to avoid circular dependencies
-        # A better way might be to pass a future/queue to the task
-        # But for now, we can patch the coroutine's arguments.
-        # Let's refine the downloader to accept the ID directly.
-        # Re-creating the task with the correct ID is cleaner.
-        download_task.cancel() # Cancel the placeholder task
-        
-        final_task = asyncio.create_task(
-            self.downloader.download_model_file(
-                download_id=status.download_id, # Use the real ID
-                repo_id=repo_id,
-                hf_filename=filename,
-                target_directory=final_save_path.parent,
-                target_filename_override=final_save_path.name,
-                revision=revision
-            )
-        )
-        status.task = final_task # Update the status with the correct task
 
-        logger.info(f"Queued download {status.download_id} for '{filename}' -> '{final_save_path}' as a background task.")
-        return {"success": True, "message": "Download started.", "download_id": status.download_id}
+        logger.info(f"Queued download {download_id} for '{filename}' -> '{final_save_path}' as a background task.")
+        return {"success": True, "message": "Download started.", "download_id": download_id}
 
     async def dismiss_download(self, download_id: str):
         """Cancels a running download or removes a finished one."""

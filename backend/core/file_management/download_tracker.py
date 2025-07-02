@@ -62,9 +62,8 @@ class DownloadTracker:
             except Exception as e:
                 logger.error(f"Error during broadcast: {e}", exc_info=True)
 
-    def start_tracking(self, repo_id: str, filename: str, task: asyncio.Task) -> DownloadStatus:
-        """Registers a new download and its task to be tracked."""
-        download_id = str(uuid.uuid4())
+    def start_tracking(self, download_id: str, repo_id: str, filename: str, task: asyncio.Task) -> DownloadStatus:
+        """Registers a new download with a pre-generated ID and its task."""
         status = DownloadStatus(
             download_id=download_id,
             filename=filename,
@@ -74,7 +73,8 @@ class DownloadTracker:
         )
         self.active_downloads[download_id] = status
         logger.info(f"Started tracking download {download_id} for '{filename}'.")
-        asyncio.create_task(self._broadcast(status.to_dict()))
+        # Broadcast a structured message
+        asyncio.create_task(self._broadcast({"type": "update", "data": status.to_dict()}))
         return status
 
     async def update_progress(self, download_id: str, downloaded_bytes: int, total_size: int):
@@ -86,7 +86,8 @@ class DownloadTracker:
             status.total_size_bytes = total_size
             if total_size > 0:
                 status.progress = round((downloaded_bytes / total_size) * 100, 2)
-            await self._broadcast(status.to_dict())
+            # Broadcast a structured message
+            await self._broadcast({"type": "update", "data": status.to_dict()})
 
     async def complete_download(self, download_id: str, final_path: str):
         if download_id in self.active_downloads:
@@ -95,9 +96,8 @@ class DownloadTracker:
             status.progress = 100.0
             status.target_path = final_path
             logger.info(f"Download {download_id} completed. Path: {final_path}")
-            await self._broadcast(status.to_dict())
-            await asyncio.sleep(30)
-            await self.remove_download(download_id)
+            # Broadcast a structured message
+            await self._broadcast({"type": "update", "data": status.to_dict()})
 
     async def fail_download(self, download_id: str, error_message: str, cancelled: bool = False):
         if download_id in self.active_downloads:
@@ -105,12 +105,8 @@ class DownloadTracker:
             status.status = "cancelled" if cancelled else "error"
             status.error_message = error_message
             logger.error(f"Download {download_id} failed/cancelled: {error_message}")
-            await self._broadcast(status.to_dict())
-            # Don't auto-remove cancelled tasks, let the user see the status.
-            # They can dismiss it manually.
-            if not cancelled:
-                await asyncio.sleep(30)
-                await self.remove_download(download_id)
+            # Broadcast a structured message
+            await self._broadcast({"type": "update", "data": status.to_dict()})
     
     async def cancel_and_remove(self, download_id: str):
         """Cancels a running download task and removes it from tracking."""
@@ -119,9 +115,7 @@ class DownloadTracker:
             if status.task and not status.task.done():
                 logger.info(f"Cancelling download task {download_id}.")
                 status.task.cancel()
-                # The task itself will call fail_download on cancellation.
             else:
-                # If there's no task or it's already done, just remove it.
                 await self.remove_download(download_id)
 
     async def remove_download(self, download_id: str):
@@ -129,6 +123,7 @@ class DownloadTracker:
         if download_id in self.active_downloads:
             logger.info(f"Removing download {download_id} from tracking.")
             del self.active_downloads[download_id]
+            # This message type is for removing an item from the UI
             await self._broadcast({"type": "remove", "download_id": download_id})
 
     def get_all_statuses(self) -> List[Dict[str, Any]]:
