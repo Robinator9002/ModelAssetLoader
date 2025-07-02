@@ -137,8 +137,7 @@ export interface ScanHostDirectoriesResponse {
     data?: HostDirectoryItem[] | null;
 }
 
-// --- NEW: Interfaces for Local File Management ---
-
+// --- Interfaces for Local File Management ---
 export interface LocalFileItem {
     name: string;
     path: string; // Relative path from the base_path
@@ -152,6 +151,11 @@ export interface FilePreviewResponse {
     path: string;
     content?: string | null;
     error?: string | null;
+}
+
+export interface FileManagerListResponse {
+    path: string | null;
+    items: LocalFileItem[];
 }
 
 export type ViewMode = 'models' | 'explorer';
@@ -287,18 +291,20 @@ export const scanHostDirectoriesAPI = async (
     }
 };
 
-// --- NEW: API Functions for Local File Management ---
+// --- API Functions for Local File Management ---
 
 /**
- * Lists files and directories under a specific relative path.
- * @param relativePath The relative path from the base_path. If null, the root directory is listed.
+ * Lists files and directories, supporting different view modes.
+ * @param relativePath The relative path from the base_path. If null, the root is listed.
+ * @param mode The view mode ('models' or 'explorer') to request from the backend.
  */
-export const listManagedFilesAPI = async (relativePath: string | null, mode: ViewMode): Promise<LocalFileItem[]> => {
+export const listManagedFilesAPI = async (relativePath: string | null, mode: ViewMode): Promise<FileManagerListResponse> => {
     try {
-        const response = await apiClient.get<LocalFileItem[]>('/filemanager/files', {
+        // The generic type here now correctly expects the new response shape
+        const response = await apiClient.get<FileManagerListResponse>('/filemanager/files', {
             params: { 
                 path: relativePath,
-                mode: mode // Pass the mode to the backend
+                mode: mode
             }
         });
         return response.data;

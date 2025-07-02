@@ -153,3 +153,12 @@ class ScanHostDirectoriesResponse(BaseModel):
     data: Optional[List[HostDirectoryItem]] = None
 
 PathConfigurationResponse.model_rebuild()
+
+# --- Smart Response Model for File Manager ---
+class FileManagerListResponse(BaseModel):
+    """
+    The response for a file listing request, including the final path
+    after any smart navigation and the items at that path.
+    """
+    path: Optional[str] = Field(description="The final relative path that is being displayed.")
+    items: List[LocalFileItem] = Field(description="The list of files and directories at the final path.")

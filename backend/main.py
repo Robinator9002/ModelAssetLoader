@@ -23,7 +23,7 @@ from backend.api.models import (
     PaginatedModelListResponse, HFModelDetails,
     PathConfigurationRequest, PathConfigurationResponse,
     FileDownloadRequest, FileDownloadResponse,
-    MalFullConfiguration,
+    MalFullConfiguration, FileManagerListResponse,
     ScanHostDirectoriesResponse, HFModelListItem,
     LocalFileItem, LocalFileActionRequest, LocalFileContentResponse
 )
@@ -293,17 +293,21 @@ async def scan_host_directories_endpoint(
 
 
 # --- Local File Management Endpoint ---
-@app.get("/api/filemanager/files", response_model=List[LocalFileItem], tags=["FileManager"])
+@app.get(
+    "/api/filemanager/files",
+    response_model=FileManagerListResponse, # <-- Use the new response model
+    tags=["FileManager"],
+    summary="List Files with Smart Navigation"
+)
 async def list_managed_files_endpoint(
     path: Optional[str] = Query(None, description="Relative path from the base directory."),
-    mode: str = Query('explorer', enum=['explorer', 'models'], description="View mode for filtering.")
+    mode: str = Query('models', enum=['explorer', 'models'], description="View mode for filtering.")
 ):
-    """Lists files and directories within the configured `base_path`."""
     if not file_manager.base_path:
         raise HTTPException(status_code=400, detail="Base path is not configured.")
     
-    items = file_manager.list_managed_files(relative_path_str=path, mode=mode)
-    return items
+    result = file_manager.list_managed_files(relative_path_str=path, mode=mode)
+    return result
 
 @app.delete(
     "/api/filemanager/files",

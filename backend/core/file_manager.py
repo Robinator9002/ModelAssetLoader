@@ -113,10 +113,8 @@ class FileManager:
     def list_host_directories(self, path_to_scan_str: Optional[str] = None, max_depth: int = 1) -> Dict[str, Any]:
         return self.scanner.list_host_directories(path_to_scan_str, max_depth)
 
-    # --- Local File Management Methods (UPDATED) ---
-
+    # --- Local File Management Methods ---
     def _resolve_and_validate_path(self, relative_path_str: Optional[str]) -> Optional[pathlib.Path]:
-        # This security helper is unchanged but crucial.
         if not self.base_path: return None
         if not relative_path_str: return self.base_path
         clean_path_str = os.path.normpath(relative_path_str.strip())
@@ -127,97 +125,81 @@ class FileManager:
             return absolute_path
         except Exception: return None
 
-    # --- NEW: Recursive helper for 'models' view ---
     def _has_models_recursive(self, directory: pathlib.Path) -> bool:
-        """Checks if a directory or any of its subdirectories contain a model file."""
         try:
             for entry in os.scandir(directory):
-                # Check if file is a model file
                 if entry.is_file(follow_symlinks=False):
                     if any(entry.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
                         return True
-                # If it's a directory, recurse into it
                 elif entry.is_dir(follow_symlinks=False):
                     if self._has_models_recursive(pathlib.Path(entry.path)):
                         return True
-        except (PermissionError, FileNotFoundError):
-            return False
+        except (PermissionError, FileNotFoundError): return False
         return False
 
-    # --- UPDATED: Main listing method now has a 'mode' ---
-    def list_managed_files(self, relative_path_str: Optional[str], mode: str = 'explorer') -> List[Dict[str, Any]]:
-        """
-        Lists files and directories.
-        In 'models' mode, it only shows model files and directories containing them.
-        In 'explorer' mode, it shows everything.
-        """
-        target_path = self._resolve_and_validate_path(relative_path_str)
-        if not target_path or not target_path.is_dir():
-            return []
-
+    def _get_directory_contents(self, directory: pathlib.Path, mode: str) -> List[Dict[str, Any]]:
         items = []
-        for p in target_path.iterdir():
+        for p in directory.iterdir():
             try:
                 is_dir = p.is_dir()
                 item_data = {
-                    "name": p.name,
-                    "path": str(p.relative_to(self.base_path)),
+                    "name": p.name, "path": str(p.relative_to(self.base_path)),
                     "item_type": "directory" if is_dir else "file",
                     "size": p.stat().st_size if not is_dir else None,
                     "last_modified": p.stat().st_mtime
                 }
-
                 if mode == 'models':
                     if is_dir:
-                        # For directories, only include them if they contain models
-                        if self._has_models_recursive(p):
-                            items.append(item_data)
-                    else:
-                        # For files, only include them if they are model files
-                        if any(p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
-                            items.append(item_data)
-                else: # explorer mode
+                        if self._has_models_recursive(p): items.append(item_data)
+                    elif any(p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
+                        items.append(item_data)
+                else:
                     items.append(item_data)
-
-            except (FileNotFoundError, PermissionError) as e:
-                logger.warning(f"Could not access item {p}: {e}")
-        
-        items.sort(key=lambda x: (x['item_type'] != 'directory', x['name'].lower()))
+            except (FileNotFoundError, PermissionError): continue
         return items
+
+    def list_managed_files(self, relative_path_str: Optional[str], mode: str = 'explorer') -> Dict[str, Any]:
+        current_path = self._resolve_and_validate_path(relative_path_str)
+        if not current_path or not current_path.is_dir():
+            return {"path": relative_path_str, "items": []}
+
+        if mode == 'models':
+            # Limit the drill-down to prevent infinite loops with symlinks, etc.
+            for _ in range(10): # Max drill-down depth of 10
+                items = self._get_directory_contents(current_path, mode='models')
+                if len(items) == 1 and items[0]['item_type'] == 'directory':
+                    new_path_str = items[0]['path']
+                    resolved_new_path = self._resolve_and_validate_path(new_path_str)
+                    if resolved_new_path:
+                        current_path = resolved_new_path
+                    else: break
+                else: break
+        
+        final_items = self._get_directory_contents(current_path, mode)
+        final_items.sort(key=lambda x: (x['item_type'] != 'directory', x['name'].lower()))
+        
+        final_relative_path = str(current_path.relative_to(self.base_path)) if current_path != self.base_path else None
+        if final_relative_path == '.': final_relative_path = None
+
+        return {"path": final_relative_path, "items": final_items}
 
     def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
         target_path = self._resolve_and_validate_path(relative_path_str)
-        if not target_path or not target_path.exists():
-            return {"success": False, "error": f"Path '{relative_path_str}' not found or is invalid."}
-        if target_path == self.base_path.resolve():
-            return {"success": False, "error": "Cannot delete the root base directory."}
+        if not target_path or not target_path.exists(): return {"success": False, "error": "Path not found."}
+        if target_path == self.base_path: return {"success": False, "error": "Cannot delete root."}
         try:
-            item_name = target_path.name
-            if target_path.is_dir():
-                shutil.rmtree(target_path)
-                logger.info(f"Successfully deleted directory: {target_path}")
-                return {"success": True, "message": f"Directory '{item_name}' deleted."}
-            else:
-                os.remove(target_path)
-                logger.info(f"Successfully deleted file: {target_path}")
-                return {"success": True, "message": f"File '{item_name}' deleted."}
-        except Exception as e:
-            logger.error(f"Failed to delete '{target_path}': {e}", exc_info=True)
-            return {"success": False, "error": f"Could not delete item: {e}"}
+            if target_path.is_dir(): shutil.rmtree(target_path)
+            else: os.remove(target_path)
+            return {"success": True, "message": "Item deleted."}
+        except Exception as e: return {"success": False, "error": str(e)}
 
     def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
         target_path = self._resolve_and_validate_path(relative_path_str)
-        if not target_path or not target_path.is_file():
-            return {"success": False, "path": relative_path_str, "error": "File not found or is not a file."}
+        if not target_path or not target_path.is_file(): return {"success": False, "error": "Not a file."}
         allowed_extensions = {".txt", ".md", ".json", ".yaml", ".yml", ".py"}
-        if target_path.suffix.lower() not in allowed_extensions:
-            return {"success": False, "path": relative_path_str, "error": "File type not allowed for preview."}
-        max_size_bytes = 1 * 1024 * 1024
-        if target_path.stat().st_size > max_size_bytes:
-            return {"success": False, "path": relative_path_str, "error": "File is too large to preview."}
+        if target_path.suffix.lower() not in allowed_extensions: return {"success": False, "error": "Preview not allowed."}
+        if target_path.stat().st_size > 1024*1024: return {"success": False, "error": "File too large."}
         try:
             content = target_path.read_text(encoding="utf-8")
             return {"success": True, "path": relative_path_str, "content": content}
-        except Exception as e:
-            logger.error(f"Could not read file preview for '{target_path}': {e}", exc_info=True)
-            return {"success": False, "path": relative_path_str, "error": f"Could not read file: {e}"}
+        except Exception as e: return {"success": False, "error": str(e)}

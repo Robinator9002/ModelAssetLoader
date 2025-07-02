@@ -1,5 +1,5 @@
 // frontend/src/components/FileManager/FileManagerPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { listManagedFilesAPI, deleteManagedItemAPI, type LocalFileItem, type ViewMode } from '../../api/api';
 import { Loader2, AlertTriangle, ArrowLeft, RefreshCw, Home } from 'lucide-react';
 import FileItem from './FileItem';
@@ -8,60 +8,59 @@ import FilePreview from './FilePreview';
 import ViewModeSwitcher from './ViewModeSwitcher';
 
 const FileManagerPage: React.FC = () => {
-    // State now holds the items exactly as received from the API
     const [items, setItems] = useState<LocalFileItem[]>([]);
     const [currentPath, setCurrentPath] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>('models');
     
-    // Imperative trigger for refreshing the view
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
-
     const [itemToDelete, setItemToDelete] = useState<LocalFileItem | null>(null);
     const [itemToPreview, setItemToPreview] = useState<LocalFileItem | null>(null);
 
-    // Centralized data fetching logic in a single useEffect hook
+    // This is the core logic update.
+    const fetchFiles = useCallback(async (path: string | null, mode: ViewMode) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            // The API now returns the final path and the items at that path.
+            const response = await listManagedFilesAPI(path, mode);
+            setItems(response.items);
+            setCurrentPath(response.path); // Update path based on backend's smart response
+        } catch (err: any) {
+            setError(err.message || 'Failed to load files. Is the backend running and the base path configured?');
+            setItems([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Initial fetch and re-fetch when viewMode changes
     useEffect(() => {
-        const fetchFiles = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                // Pass the current path and view mode directly to the API
-                const fileList = await listManagedFilesAPI(currentPath, viewMode);
-                setItems(fileList);
-            } catch (err: any) {
-                setError(err.message || 'Failed to load files. Is the backend running and the base path configured?');
-                setItems([]); // Clear items on error
-            } finally {
-                setIsLoading(false);
-            }
-        };
+        // When the component loads or viewMode changes, start the smart search from the root.
+        fetchFiles(null, viewMode);
+    }, [viewMode, fetchFiles]);
 
-        fetchFiles();
-    }, [currentPath, viewMode, refreshTrigger]); // Re-fetches when path, mode, or trigger changes
-
-    // Navigation functions now just update the path, triggering the effect
+    // Navigation now just calls fetchFiles with the new path
     const handleNavigate = (item: LocalFileItem) => {
         if (item.type === 'directory') {
-            setCurrentPath(item.path);
+            fetchFiles(item.path, viewMode);
         } else {
             setItemToPreview(item);
         }
     };
-
+    
     const navigateUp = () => {
         if (!currentPath) return;
         const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-        setCurrentPath(parentPath || null);
+        fetchFiles(parentPath || null, viewMode);
     };
 
     const navigateHome = () => {
-        setCurrentPath(null);
+        fetchFiles(null, viewMode);
     };
     
     const handleRefresh = () => {
-        setRefreshTrigger(c => c + 1);
+        fetchFiles(currentPath, viewMode);
     };
 
     const handleDeleteRequest = (item: LocalFileItem) => {
@@ -70,12 +69,10 @@ const FileManagerPage: React.FC = () => {
 
     const handleConfirmDelete = async () => {
         if (!itemToDelete) return;
-        
         try {
             await deleteManagedItemAPI(itemToDelete.path);
-            handleRefresh(); // Trigger a refresh after successful deletion
+            handleRefresh();
         } catch (err: any) {
-            console.error("Delete failed:", err);
             setError(`Failed to delete ${itemToDelete.name}: ${err.message}`);
         } finally {
             setItemToDelete(null);
@@ -84,7 +81,7 @@ const FileManagerPage: React.FC = () => {
 
     const renderContent = () => {
         if (isLoading) {
-            return <div className="loading-message"><Loader2 size={24} className="animate-spin" /><span>Loading items...</span></div>;
+            return <div className="loading-message"><Loader2 size={24} className="animate-spin" /><span>Finding models...</span></div>;
         }
         if (error) {
             return <div className="feedback-message error"><AlertTriangle size={16} /><span>{error}</span></div>;
@@ -92,7 +89,7 @@ const FileManagerPage: React.FC = () => {
         if (items.length === 0) {
             return <p className="no-results-message">
                 {viewMode === 'models'
-                    ? 'No relevant models or folders found.'
+                    ? 'No relevant models found in the configured base path.'
                     : 'This directory is empty.'
                 }
             </p>;
@@ -115,7 +112,7 @@ const FileManagerPage: React.FC = () => {
         <div className="file-manager-page">
             <div className="file-manager-header">
                 <div className="breadcrumb-bar">
-                    <button onClick={navigateHome} className="button-icon" title="Go to root" disabled={isLoading}>
+                    <button onClick={navigateHome} className="button-icon" title="Go to root" disabled={isLoading || currentPath === null}>
                         <Home size={18} />
                     </button>
                     {currentPath && (
