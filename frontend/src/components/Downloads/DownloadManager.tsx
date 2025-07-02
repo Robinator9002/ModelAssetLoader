@@ -20,27 +20,35 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
 
     const [isClosing, setIsClosing] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-    // State to track what triggered the cancel request ('x' or 'button')
     const [cancelInitiator, setCancelInitiator] = useState<'button' | 'x' | null>(null);
 
-    // This effect handles the auto-dismissal animation for completed/error toasts.
-    // I've added a condition to prevent auto-dismissal for user-cancelled items.
+    // --- UPDATED: Effect now handles 'cancelled' status ---
     useEffect(() => {
         let timer: NodeJS.Timeout;
-        if (downloadStatus === 'completed' || (downloadStatus === 'error' && !error_message?.includes('Cancelled'))) {
+        // Auto-dismiss for completed or error toasts after a normal delay
+        if (downloadStatus === 'completed' || downloadStatus === 'error') {
             timer = setTimeout(() => {
                 setIsClosing(true);
             }, 4000);
         }
+        // Auto-dismiss for 'cancelled' toasts after a very short delay
+        if (downloadStatus === 'cancelled') {
+            timer = setTimeout(() => {
+                setIsClosing(true);
+            }, 4000); // Vanishes after 4 seconds
+        }
         return () => clearTimeout(timer);
-    }, [downloadStatus, error_message]);
+    }, [downloadStatus]);
 
+    // --- UPDATED: getStatusIcon now handles 'cancelled' ---
     const getStatusIcon = () => {
         switch (downloadStatus) {
             case 'downloading':
                 return <Loader2 size={18} className="animate-spin" />;
             case 'completed':
                 return <CheckCircle2 size={18} className="text-green-500" />;
+            case 'cancelled': // New case
+                return <Ban size={18} className="text-gray-500" />;
             case 'error':
                 return <AlertTriangle size={18} className="text-red-500" />;
             default: // pending
@@ -48,32 +56,22 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
         }
     };
 
-    // This function dismisses a toast from the UI immediately.
     const handleDismissClick = () => {
         setIsClosing(true);
-        // The parent component handles the API call to permanently remove it.
         setTimeout(() => onDismiss(download_id), 300);
     };
 
-    // This function opens the confirmation modal.
     const handleRequestCancel = (initiator: 'button' | 'x') => {
         setCancelInitiator(initiator);
         setIsConfirmOpen(true);
     };
 
-    // This is the core logic passed to the confirmation modal.
     const handleConfirmCancel = async () => {
         if (!download_id) throw new Error("Download ID is missing.");
-        
-        // Call the new cancellation API.
         await cancelDownloadAPI(download_id);
-        // The backend will then send a WebSocket update which changes the item's status.
-        
-        // Based on your request, we return a message only if the 'Cancel' button was used.
         if (cancelInitiator === 'button') {
             return { message: "Download cancelled." };
         }
-        // For the 'x' button, we return nothing, so the modal closes instantly.
     };
 
     const isCancellable = downloadStatus === 'pending' || downloadStatus === 'downloading';
@@ -88,7 +86,6 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
                 <div className="download-toast-header">
                     <span className="download-toast-filename" title={filename}>{filename}</span>
                     <span className="download-toast-status-icon">{getStatusIcon()}</span>
-                    {/* The 'X' button now has dual functionality */}
                     <button 
                         onClick={isCancellable ? () => handleRequestCancel('x') : handleDismissClick} 
                         className="dismiss-button"
@@ -98,9 +95,9 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
                     </button>
                 </div>
                 <div className="download-toast-body">
-                    {downloadStatus === 'error' ? (
-                        <div className="download-toast-error-message" title={error_message || 'Unknown Error'}>
-                            {error_message || 'An unknown error has occurred.'}
+                    {downloadStatus === 'error' || downloadStatus === 'cancelled' ? (
+                        <div className="download-toast-error-message" title={error_message || 'Download was cancelled'}>
+                            {error_message || 'The download was cancelled by the user.'}
                         </div>
                     ) : (
                         <>
@@ -116,7 +113,6 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
                         </>
                     )}
                 </div>
-                {/* The new, dedicated cancel button */}
                 {isCancellable && (
                     <div className="download-toast-actions">
                         <button className="button button-danger button-small" onClick={() => handleRequestCancel('button')}>
@@ -127,7 +123,6 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
                 )}
             </div>
 
-            {/* The confirmation modal, rendered conditionally */}
             <ConfirmModal
                 isOpen={isConfirmOpen}
                 title="Cancel Download?"

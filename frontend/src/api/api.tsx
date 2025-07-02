@@ -116,7 +116,7 @@ export interface DownloadStatus {
     download_id: string;
     filename: string;
     repo_id: string;
-    status: "pending" | "downloading" | "completed" | "error";
+    status: "pending" | "downloading" | "completed" | "error" | "cancelled";
     progress: number; // 0.0 to 100.0
     total_size_bytes: number;
     downloaded_bytes: number;

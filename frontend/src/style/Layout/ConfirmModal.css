@@ -6,7 +6,6 @@
  * from global.css and Modals.css for a consistent look.
 */
 
-/* --- THE FIX: Overlay Correction --- */
 /* This rule targets the specific overlay for the ConfirmModal */
 .modal-overlay.confirm-modal-overlay {
     /* Ensure it's on top of everything, including toasts */
@@ -61,8 +60,11 @@
 
 /* --- Feedback View (for after confirmation) --- */
 .confirm-feedback-view {
-    /* Uses .modal-body as its base */
-    justify-content: center; /* Center content vertically */
+    /* This is the corrected block */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* This was missing! */
     min-height: 220px; /* Give it a fixed height to prevent layout shifts */
     gap: calc(var(--spacing-unit) * 2);
     animation: fadeIn 0.3s ease-in-out;

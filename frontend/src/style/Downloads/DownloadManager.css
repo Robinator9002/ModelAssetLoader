@@ -52,6 +52,11 @@
 .download-item-toast.completed {
 	border-left-color: var(--color-success);
 }
+/* --- NEW: Style for cancelled toasts --- */
+.download-item-toast.cancelled {
+    border-left-color: var(--color-text-secondary);
+}
+
 .download-toast-header {
 	display: flex;
 	justify-content: space-between;
@@ -68,6 +73,9 @@
 }
 .download-toast-status-icon .text-red-500 { color: var(--color-error); }
 .download-toast-status-icon .text-green-500 { color: var(--color-success); }
+/* --- NEW: Style for cancelled icon --- */
+.download-toast-status-icon .text-gray-500 { color: var(--color-text-secondary); }
+
 .dismiss-button {
     /* Uses .button-icon styles */
     background: none; border: none; padding: 4px; border-radius: 50%;
@@ -127,17 +135,22 @@
 }
 .download-toast-error-message {
 	font-size: 0.9rem;
-	color: var(--color-error);
+	color: var(--color-text-secondary); /* Changed from error to secondary for cancelled messages */
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
     font-weight: 500;
 }
+/* Make explicit error messages red again */
+.download-item-toast.error .download-toast-error-message {
+    color: var(--color-error);
+}
+
 
 .download-item-toast.closing {
     opacity: 0;
-    transform: translateY(-20px);
-    transition: opacity 1s ease, transform 1s ease;
+    transform: translateY(-20px) scale(0.9);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 /* NEW STYLES for the cancel button area */
