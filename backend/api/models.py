@@ -15,7 +15,7 @@ class ModelFile(BaseModel):
 class ModelListItem(BaseModel):
     """Represents a model item in a list (e.g., search results)."""
     id: str = Field(..., description="The unique identifier of the model (e.g., 'author/model_name').")
-    source: str = Field(..., description="The source of the model (e.g., 'huggingface').") # REFACTOR: Added source
+    source: str = Field(..., description="The source of the model (e.g., 'huggingface').") # Added source
     author: Optional[str] = Field(None, description="The author or organization of the model.")
     model_name: str = Field(..., description="The name of the model, typically derived from the ID.")
     lastModified: Optional[datetime] = Field(None, description="Timestamp of the last modification.")
@@ -79,7 +79,7 @@ class PathConfigurationResponse(BaseModel):
 # --- Models for File Download ---
 class FileDownloadRequest(BaseModel):
     """Request model for downloading a model file."""
-    source: str = Field(..., description="The source of the model (e.g., 'huggingface').") # REFACTOR: Added source
+    source: str = Field(..., description="The source of the model (e.g., 'huggingface').") # Added source
     repo_id: str = Field(..., description="The repository ID (e.g., 'author/model_name').")
     filename: str = Field(..., description="The name of the file to download.")
     model_type: ModelTypePydantic

@@ -56,12 +56,12 @@ function App() {
   const [specificFileForDownload, setSpecificFileForDownload] =
     useState<ModelFile | null>(null);
 
-  // --- REFACTOR: State for Download Tracking via WebSocket ---
+  // --- State for Download Tracking via WebSocket ---
   const [activeDownloads, setActiveDownloads] = useState<
     Map<string, DownloadStatus>
   >(new Map());
 
-  // REFACTOR: Use a ref to hold the WebSocket instance to prevent re-creation
+  // Use a ref to hold the WebSocket instance to prevent re-creation
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -192,7 +192,7 @@ function App() {
     if (selectedModel) {
       return (
         <ModelDetailsPage
-          selectedModel={selectedModel} // REFACTOR: Pass the whole model item
+          selectedModel={selectedModel} // Pass the whole model item
           onBack={handleBackToSearch}
           openDownloadModal={openDownloadModal}
         />

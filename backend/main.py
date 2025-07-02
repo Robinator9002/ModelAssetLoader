@@ -110,7 +110,7 @@ async def websocket_endpoint(websocket: WebSocket):
     description="Searches for models from a specified source (e.g., 'huggingface') with filters and pagination."
 )
 async def search_models(
-    # REFACTOR: Add 'source' parameter to select the API source.
+    # Add 'source' parameter to select the API source.
     source: str = Query('huggingface', description="The API source to search (e.g., 'huggingface')."),
     search: Optional[str] = Query(None, description="Search term to query model names, descriptions, etc."),
     author: Optional[str] = Query(None, description="Filter models by a specific author or organization."),
@@ -126,7 +126,7 @@ async def search_models(
         
         logger.info(f"Searching models via SourceManager: source='{source}', query='{search}', tags='{unique_tags}'")
 
-        # REFACTOR: Use source_manager instead of model_loader
+        # Use source_manager instead of model_loader
         models_data, has_more_results = source_manager.search_models(
             source=source,
             search_query=search, author=author, tags=unique_tags,
@@ -142,7 +142,7 @@ async def search_models(
         logger.error(f"Error in search_models endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred while searching for models.")
 
-# REFACTOR: Changed path to be more RESTful and generic for multiple sources.
+# Changed path to be more RESTful and generic for multiple sources.
 @app.get(
     "/api/models/{source}/{model_id:path}",
     response_model=HFModelDetails,
@@ -153,7 +153,7 @@ async def search_models(
 async def get_model_details(source: str, model_id: str):
     logger.info(f"Fetching details for model '{model_id}' from source '{source}'")
     try:
-        # REFACTOR: Use source_manager to get details.
+        # Use source_manager to get details.
         details_data = source_manager.get_model_details(model_id=model_id, source=source)
         if not details_data:
             logger.warning(f"Model '{model_id}' not found by source_manager for source '{source}'.")
@@ -221,7 +221,7 @@ async def download_model_file_endpoint(download_request: FileDownloadRequest):
     if not file_manager.config.base_path:
         raise HTTPException(status_code=400, detail="Base path not configured.")
 
-    # FIXED: Call start_download_model_file without the background_tasks argument
+    # Call start_download_model_file without the background_tasks argument
     result = file_manager.start_download_model_file(
         source=download_request.source,
         repo_id=download_request.repo_id,

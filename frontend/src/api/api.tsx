@@ -11,7 +11,7 @@ const apiClient: AxiosInstance = axios.create({
     },
 });
 
-// --- Generic Model Interfaces (REFACTOR) ---
+// --- Generic Model Interfaces ---
 // Note: Renamed from HFModel... to Model... and added 'source' field.
 
 export interface ModelFile {
@@ -139,13 +139,13 @@ export interface ScanHostDirectoriesResponse {
     data?: HostDirectoryItem[] | null;
 }
 
-// --- API Functions (REFACTOR) ---
+// --- API Functions ---
 
 export const searchModels = async (
     params: SearchModelParams
 ): Promise<PaginatedModelListResponse> => {
     try {
-        // REFACTOR: The 'source' is now part of the params object.
+        // The 'source' is now part of the params object.
         const response = await apiClient.get<PaginatedModelListResponse>(
             "/models", // Endpoint is now singular '/models'
             { params }
@@ -163,7 +163,7 @@ export const getModelDetails = async (
     modelId: string
 ): Promise<ModelDetails> => {
     try {
-        // REFACTOR: The endpoint now includes the source and the full modelId.
+        // The endpoint now includes the source and the full modelId.
         const response = await apiClient.get<ModelDetails>(
             `/models/${encodeURIComponent(source)}/${encodeURIComponent(
                 modelId
@@ -180,7 +180,7 @@ export const downloadFileAPI = async (
     request: FileDownloadRequest
 ): Promise<FileDownloadResponse> => {
     try {
-        // REFACTOR: The request payload now includes the source.
+        // The request payload now includes the source.
         const response = await apiClient.post<FileDownloadResponse>(
             "/filemanager/download",
             request
@@ -299,7 +299,7 @@ export const connectToDownloadTracker = (
         console.error("WebSocket error observed:", event);
     };
 
-    // REFACTOR: Add detailed close event logging
+    // Add detailed close event logging
     ws.onclose = (event) => {
         console.log(
             `WebSocket connection closed. Code: ${event.code}, Reason: '${event.reason}', Was clean: ${event.wasClean}`
