@@ -292,22 +292,17 @@ async def scan_host_directories_endpoint(
         raise HTTPException(status_code=500, detail="An internal error occurred while scanning host directories.")
 
 
-# === Local File Management Endpoints ===
-@app.get(
-    "/api/filemanager/files",
-    response_model=List[LocalFileItem],
-    tags=["FileManager"],
-    summary="List Files in a Managed Directory"
-)
-async def list_managed_files_endpoint(path: Optional[str] = Query(None, description="Relative path from the base directory. If empty, lists the root.")):
-    """
-    Lists files and directories within the configured `base_path`.
-    This is the primary endpoint for the local file browser UI.
-    """
+# --- Local File Management Endpoint ---
+@app.get("/api/filemanager/files", response_model=List[LocalFileItem], tags=["FileManager"])
+async def list_managed_files_endpoint(
+    path: Optional[str] = Query(None, description="Relative path from the base directory."),
+    mode: str = Query('explorer', enum=['explorer', 'models'], description="View mode for filtering.")
+):
+    """Lists files and directories within the configured `base_path`."""
     if not file_manager.base_path:
         raise HTTPException(status_code=400, detail="Base path is not configured.")
     
-    items = file_manager.list_managed_files(relative_path_str=path)
+    items = file_manager.list_managed_files(relative_path_str=path, mode=mode)
     return items
 
 @app.delete(

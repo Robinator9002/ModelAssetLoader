@@ -13,7 +13,7 @@ from .file_management.path_resolver import PathResolver
 from .file_management.model_downloader import ModelDownloader
 from .file_management.host_scanner import HostScanner
 from .file_management.download_tracker import download_tracker
-from .file_management.constants import ModelType, UiProfileType, ColorThemeType
+from .file_management.constants import ModelType, UiProfileType, ColorThemeType, MODEL_FILE_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -113,44 +113,75 @@ class FileManager:
     def list_host_directories(self, path_to_scan_str: Optional[str] = None, max_depth: int = 1) -> Dict[str, Any]:
         return self.scanner.list_host_directories(path_to_scan_str, max_depth)
 
-    # --- Local File Management Methods (Unchanged) ---
+    # --- Local File Management Methods (UPDATED) ---
+
     def _resolve_and_validate_path(self, relative_path_str: Optional[str]) -> Optional[pathlib.Path]:
-        if not self.base_path:
-            logger.error("Security check failed: base_path is not configured.")
-            return None
-        if not relative_path_str:
-            return self.base_path
+        # This security helper is unchanged but crucial.
+        if not self.base_path: return None
+        if not relative_path_str: return self.base_path
         clean_path_str = os.path.normpath(relative_path_str.strip())
-        if os.path.isabs(clean_path_str) or ".." in clean_path_str.split(os.sep):
-            logger.warning(f"Security violation: Attempted access to invalid path '{relative_path_str}'.")
-            return None
+        if os.path.isabs(clean_path_str) or ".." in clean_path_str.split(os.sep): return None
         try:
             absolute_path = (self.base_path / clean_path_str).resolve()
-            if self.base_path.resolve() not in absolute_path.parents and absolute_path != self.base_path.resolve():
-                 logger.warning(f"Security violation: Path '{absolute_path}' is outside of base path '{self.base_path.resolve()}'.")
-                 return None
+            if self.base_path.resolve() not in absolute_path.parents and absolute_path != self.base_path.resolve(): return None
             return absolute_path
-        except Exception as e:
-            logger.error(f"Error resolving path '{relative_path_str}': {e}", exc_info=True)
-            return None
+        except Exception: return None
 
-    def list_managed_files(self, relative_path_str: Optional[str]) -> List[Dict[str, Any]]:
+    # --- NEW: Recursive helper for 'models' view ---
+    def _has_models_recursive(self, directory: pathlib.Path) -> bool:
+        """Checks if a directory or any of its subdirectories contain a model file."""
+        try:
+            for entry in os.scandir(directory):
+                # Check if file is a model file
+                if entry.is_file(follow_symlinks=False):
+                    if any(entry.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
+                        return True
+                # If it's a directory, recurse into it
+                elif entry.is_dir(follow_symlinks=False):
+                    if self._has_models_recursive(pathlib.Path(entry.path)):
+                        return True
+        except (PermissionError, FileNotFoundError):
+            return False
+        return False
+
+    # --- UPDATED: Main listing method now has a 'mode' ---
+    def list_managed_files(self, relative_path_str: Optional[str], mode: str = 'explorer') -> List[Dict[str, Any]]:
+        """
+        Lists files and directories.
+        In 'models' mode, it only shows model files and directories containing them.
+        In 'explorer' mode, it shows everything.
+        """
         target_path = self._resolve_and_validate_path(relative_path_str)
         if not target_path or not target_path.is_dir():
             return []
+
         items = []
         for p in target_path.iterdir():
             try:
-                item_type = "directory" if p.is_dir() else "file"
-                items.append({
+                is_dir = p.is_dir()
+                item_data = {
                     "name": p.name,
                     "path": str(p.relative_to(self.base_path)),
-                    "item_type": item_type,
-                    "size": p.stat().st_size if item_type == "file" else None,
+                    "item_type": "directory" if is_dir else "file",
+                    "size": p.stat().st_size if not is_dir else None,
                     "last_modified": p.stat().st_mtime
-                })
+                }
+
+                if mode == 'models':
+                    if is_dir:
+                        # For directories, only include them if they contain models
+                        if self._has_models_recursive(p):
+                            items.append(item_data)
+                    else:
+                        # For files, only include them if they are model files
+                        if any(p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
+                            items.append(item_data)
+                else: # explorer mode
+                    items.append(item_data)
+
             except (FileNotFoundError, PermissionError) as e:
                 logger.warning(f"Could not access item {p}: {e}")
+        
         items.sort(key=lambda x: (x['item_type'] != 'directory', x['name'].lower()))
         return items
 

@@ -15,6 +15,9 @@ CONFIG_FILE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent.parent /
 CONFIG_FILE_NAME = "mal_settings.json"
 CONFIG_FILE_PATH = CONFIG_FILE_DIR / CONFIG_FILE_NAME
 
+# --- NEW: Model File Extensions ---
+MODEL_FILE_EXTENSIONS = ('.safetensors', '.ckpt', '.pt', '.bin', '.pth', '.onnx')
+
 # --- UI Profile Definitions ---
 KNOWN_UI_PROFILES: Dict[UiProfileType, Dict[str, str]] = {
     "ComfyUI": {
