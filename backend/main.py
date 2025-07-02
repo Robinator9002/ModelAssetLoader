@@ -241,7 +241,7 @@ async def download_model_file_endpoint(download_request: FileDownloadRequest):
     logger.info(f"Download successfully queued: {result.get('message')}")
     return FileDownloadResponse(**result)
 
-# --- NEW: Cancel Endpoint ---
+# --- Cancel Endpoint ---
 @app.post(
     "/api/filemanager/downloads/{download_id}/cancel",
     status_code=status.HTTP_202_ACCEPTED,
@@ -253,7 +253,7 @@ async def cancel_download_endpoint(download_id: str):
     await file_manager.cancel_download(download_id)
     return {"message": "Cancellation request accepted."}
 
-# --- UPDATED: Dismiss Endpoint ---
+# --- Dismiss Endpoint ---
 @app.delete(
     "/api/filemanager/downloads/{download_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -292,8 +292,7 @@ async def scan_host_directories_endpoint(
         raise HTTPException(status_code=500, detail="An internal error occurred while scanning host directories.")
 
 
-# === NEW: Local File Management Endpoints ===
-
+# === Local File Management Endpoints ===
 @app.get(
     "/api/filemanager/files",
     response_model=List[LocalFileItem],

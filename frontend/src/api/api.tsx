@@ -137,13 +137,13 @@ export interface ScanHostDirectoriesResponse {
     data?: HostDirectoryItem[] | null;
 }
 
-// --- NEU: Schnittstellen für die lokale Dateiverwaltung ---
+// --- NEW: Interfaces for Local File Management ---
 
 export interface LocalFileItem {
     name: string;
-    path: string; // Relativer Pfad vom base_path
+    path: string; // Relative path from the base_path
     type: "file" | "directory";
-    size: number | null; // Größe in Bytes, null für Verzeichnisse
+    size: number | null; // Size in bytes, null for directories
     last_modified: string; // ISO Date String
 }
 
@@ -281,17 +281,17 @@ export const scanHostDirectoriesAPI = async (
         }
         return {
             success: false,
-            error: "Fehler beim Scannen der Host-Verzeichnisse.",
+            error: "Error scanning host directories.",
             data: null,
         };
     }
 };
 
-// --- NEU: API-Funktionen für die lokale Dateiverwaltung ---
+// --- NEW: API Functions for Local File Management ---
 
 /**
- * Listet Dateien und Verzeichnisse unter einem bestimmten relativen Pfad auf.
- * @param relativePath Der relative Pfad vom base_path. Bei null wird das Root-Verzeichnis gelistet.
+ * Lists files and directories under a specific relative path.
+ * @param relativePath The relative path from the base_path. If null, the root directory is listed.
  */
 export const listManagedFilesAPI = async (relativePath: string | null): Promise<LocalFileItem[]> => {
     try {
@@ -301,18 +301,18 @@ export const listManagedFilesAPI = async (relativePath: string | null): Promise<
         return response.data;
     } catch (error) {
         console.error('Error listing managed files:', error);
-        throw error; // Lässt die aufrufende Komponente den Fehler behandeln
+        throw error; // Lets the calling component handle the error
     }
 };
 
 /**
- * Löscht eine Datei oder ein Verzeichnis unter einem bestimmten relativen Pfad.
- * @param relativePath Der relative Pfad des zu löschenden Elements.
+ * Deletes a file or directory at a specific relative path.
+ * @param relativePath The relative path of the item to be deleted.
  */
 export const deleteManagedItemAPI = async (relativePath: string): Promise<{ success: boolean; message: string }> => {
     try {
         const response = await apiClient.delete<{ success: boolean; message: string }>('/filemanager/files', {
-            data: { path: relativePath } // DELETE-Requests mit Body verwenden das 'data'-Feld in Axios
+            data: { path: relativePath } // DELETE requests with a body use the 'data' field in Axios
         });
         return response.data;
     } catch (error) {
@@ -326,8 +326,8 @@ export const deleteManagedItemAPI = async (relativePath: string): Promise<{ succ
 };
 
 /**
- * Holt eine Vorschau des Inhalts einer Textdatei.
- * @param relativePath Der relative Pfad zur Datei.
+ * Gets a preview of a text file's content.
+ * @param relativePath The relative path to the file.
  */
 export const getFilePreviewAPI = async (relativePath: string): Promise<FilePreviewResponse> => {
     try {
