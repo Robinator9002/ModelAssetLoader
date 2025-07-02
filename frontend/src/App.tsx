@@ -8,6 +8,7 @@ import ModelDetailsPage from "./components/ModelLoader/ModelDetailsPage";
 import ConfigurationsPage from "./components/Files/ConfigurationsPage";
 import DownloadModal from "./components/Downloads/DownloadModal";
 import DownloadManager from "./components/Downloads/DownloadManager";
+import FileManagerPage from "./components/FileManager/FileManagerPage"; // <-- ADDED
 
 import {
     // API and WebSocket functions
@@ -244,6 +245,8 @@ function App() {
                         isConfigurationDone={!!pathConfig?.basePath}
                     />
                 );
+            case "files": // <-- ADDED
+                return <FileManagerPage />;
             case "configuration":
                 return (
                     <ConfigurationsPage

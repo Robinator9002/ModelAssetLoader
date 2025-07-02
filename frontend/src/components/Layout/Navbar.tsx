@@ -1,9 +1,9 @@
 // frontend/src/components/Layout/Navbar.tsx
 import React from "react";
-import { Search, Settings } from "lucide-react";
+import { Search, Settings, FolderKanban } from "lucide-react";
 
 // The type definition for the available tabs in the application.
-export type MalTabKey = "search" | "configuration";
+export type MalTabKey = "search" | "files" | "configuration";
 
 interface NavbarProps {
 	activeTab: MalTabKey;
@@ -13,7 +13,7 @@ interface NavbarProps {
 interface NavItemConfig {
 	key: MalTabKey;
 	label: string;
-	icon: React.ReactNode; // Now expecting a JSX Element directly
+	icon: React.ReactNode;
 }
 
 // Configuration for the navigation items, now using Lucide icons.
@@ -23,6 +23,11 @@ const navItems: NavItemConfig[] = [
 		label: "Model Search",
 		icon: <Search size={18} />,
 	},
+    {
+        key: "files",
+        label: "File Manager",
+        icon: <FolderKanban size={18} />
+    },
 	{
 		key: "configuration",
 		label: "Configuration",

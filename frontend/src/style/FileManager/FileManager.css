@@ -1,0 +1,60 @@
+/* frontend/src/components/FileManager/FileManager.css */
+
+.file-manager-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 2);
+    gap: var(--spacing-unit);
+}
+
+.file-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5); /* Adjusted padding */
+    background-color: var(--color-surface);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.breadcrumb-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+    font-family: var(--font-monospace);
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    flex-shrink: 1;
+    min-width: 0; /* Allow breadcrumb to shrink */
+}
+
+.current-path-display {
+    background-color: var(--color-background);
+    padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+    border-radius: var(--border-radius-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* NEW: Container for the right-side actions */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 2);
+    flex-shrink: 0; /* Prevent actions from shrinking */
+}
+
+.file-manager-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: var(--spacing-unit);
+}
+
+.file-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: calc(var(--spacing-unit) * 2);
+}

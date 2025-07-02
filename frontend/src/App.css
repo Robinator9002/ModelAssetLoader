@@ -13,10 +13,15 @@
 /* Note: The order can be important for CSS specificity. */
 @import url("./style/Layout/Navbar.css");
 @import url("./style/Layout/Modals.css");
-@import url("./style/Layout/ConfirmModal.css"); /* Unified Modal styles */
+@import url("./style/Layout/ConfirmModal.css");
 
-@import url("./style/Files/FolderSelector.css"); /* Unified Modal styles */
+@import url("./style/Files/FolderSelector.css");
 @import url("./style/Files/ConfigurationsPage.css");
+
+@import url("./style/FileManager/FileItem.css");
+@import url("./style/FileManager/FileManager.css");
+@import url("./style/FileManager/FilePreview.css");
+@import url("./style/FileManager/ViewModeSwitcher.css");
 
 @import url("./style/Downloads/DownloadManager.css");
 @import url("./style/Downloads/DownloadModal.css");

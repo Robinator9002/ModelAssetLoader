@@ -1,0 +1,74 @@
+/* frontend/src/components/FileManager/FileItem.css */
+
+.file-item-card {
+    background-color: var(--color-surface);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-unit);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: transform var(--transition-speed-fast), box-shadow var(--transition-speed-fast);
+    overflow: hidden;
+}
+
+.file-item-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--color-primary);
+}
+
+.file-item-icon-wrapper {
+    padding: calc(var(--spacing-unit) * 2);
+}
+
+.file-item-icon {
+    color: var(--color-text-secondary);
+}
+
+.file-item-icon.type-directory {
+    color: var(--color-primary);
+}
+
+.file-item-details {
+    padding: var(--spacing-unit);
+    width: 100%;
+}
+
+.file-item-name {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+}
+
+.file-item-meta {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    margin: calc(var(--spacing-unit) * 0.5) 0 0 0;
+}
+
+.file-item-actions {
+    position: absolute;
+    top: var(--spacing-unit);
+    right: var(--spacing-unit);
+    opacity: 0;
+    transition: opacity var(--transition-speed-fast);
+}
+
+.file-item-card:hover .file-item-actions {
+    opacity: 1;
+}
+
+.file-item-actions .delete-button {
+    color: var(--color-text-secondary);
+}
+.file-item-actions .delete-button:hover {
+    color: var(--color-error);
+    background-color: rgba(var(--color-error-rgb), 0.1);
+}
