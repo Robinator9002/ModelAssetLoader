@@ -180,7 +180,7 @@
 	font-size: 1rem;
     /* FIX: Ensure the button has generous padding for a large click area */
     padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
-	z-index: calc(var(--z-index-toast) + 2);
+	z-index: calc(var(--z-index-toast));
     position: relative; /* Needed for z-index to work */
 }
 

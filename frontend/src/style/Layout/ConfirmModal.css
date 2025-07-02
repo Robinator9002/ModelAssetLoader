@@ -1,0 +1,72 @@
+/*
+ * =================================================================
+ * M.A.L. - ConfirmModal Specific Styles (Overhauled)
+ * =================================================================
+ * This file styles the confirmation dialog, inheriting heavily
+ * from global.css and Modals.css for a consistent look.
+*/
+
+/* --- Main Layout & Sizing --- */
+.confirm-modal-body {
+    /* Inherits .modal-body from Modals.css */
+    padding: calc(var(--spacing-unit) * 4) calc(var(--spacing-unit) * 3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--spacing-unit);
+}
+
+/* --- Icon Styling --- */
+.confirm-icon-wrapper {
+    margin-bottom: calc(var(--spacing-unit) * 2);
+}
+
+.confirm-icon.icon-danger {
+    color: var(--color-error);
+}
+.confirm-icon.icon-primary {
+    color: var(--color-primary);
+}
+.confirm-icon.icon-success {
+    color: var(--color-success);
+}
+
+/* --- Text Styling --- */
+.confirm-title {
+    /* Inherits h3 styles */
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    line-height: 1.3;
+}
+
+.confirm-message {
+    /* Inherits p styles */
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    max-width: 90%; /* Prevent text from touching the edges */
+    margin-top: calc(var(--spacing-unit) * 0.5);
+}
+
+/* --- Feedback View (for after confirmation) --- */
+.confirm-feedback-view {
+    /* Uses .modal-body as its base */
+    justify-content: center; /* Center content vertically */
+    min-height: 220px; /* Give it a fixed height to prevent layout shifts */
+    gap: calc(var(--spacing-unit) * 2);
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.confirm-feedback-view p {
+    font-size: 1.1rem;
+    color: var(--color-text-primary);
+    font-weight: 500;
+    margin: 0;
+}

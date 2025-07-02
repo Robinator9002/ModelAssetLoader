@@ -7,7 +7,6 @@
 	position: fixed;
 	bottom: calc(var(--spacing-unit) * 2);
 	right: calc(var(--spacing-unit) * 2);
-	z-index: calc(var(--z-index-toast) + 1);
 }
 .theme-switcher-button {
 	background-color: var(--color-surface);
@@ -23,6 +22,7 @@
 	padding: 0;
 	box-shadow: var(--shadow-lg);
 	transition: all var(--transition-speed-fast) ease;
+	z-index: calc(var(--z-index-toast) + 1);
 }
 .theme-switcher-button:hover {
 	transform: translateY(-2px) scale(1.05);

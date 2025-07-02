@@ -12,7 +12,8 @@
 /* 2. Import component-specific styles */
 /* Note: The order can be important for CSS specificity. */
 @import url("./style/Layout/Navbar.css");
-@import url("./style/Layout/Modals.css"); /* Unified Modal styles */
+@import url("./style/Layout/Modals.css");
+@import url("./style/Layout/ConfirmModal.css"); /* Unified Modal styles */
 
 @import url("./style/Files/FolderSelector.css"); /* Unified Modal styles */
 @import url("./style/Files/ConfigurationsPage.css");

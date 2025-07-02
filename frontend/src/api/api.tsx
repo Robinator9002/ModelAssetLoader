@@ -196,6 +196,22 @@ export const downloadFileAPI = async (
     }
 };
 
+// NEW: Function to cancel an ongoing download
+export const cancelDownloadAPI = async (downloadId: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+        const response = await apiClient.post(`/filemanager/downloads/${downloadId}/cancel`);
+        return { success: true, ...response.data };
+    } catch (error) {
+        console.error(`Failed to cancel download ${downloadId}:`, error);
+        const axiosError = error as any;
+        // Rethrow with a more specific error message if possible
+        if (axiosError.response && axiosError.response.data && axiosError.response.data.detail) {
+             throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
 // Function to permanently dismiss a download from the tracker
 export const dismissDownloadAPI = async (downloadId: string): Promise<void> => {
     try {

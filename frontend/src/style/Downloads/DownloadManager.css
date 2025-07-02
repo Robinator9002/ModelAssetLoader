@@ -1,3 +1,5 @@
+/* frontend/src/components/Downloads/DownloadManager.css */
+
 /*
  * =================================================================
  * M.A.L. - DownloadManager Styles (Purple Contrast Theme)
@@ -7,7 +9,7 @@
 	position: fixed;
 	bottom: calc(var(--spacing-unit) * 2);
 	right: calc(var(--spacing-unit) * 2);
-	z-index: var(--z-index-toast);
+	z-index: calc(var(--z-index-toast) + 1);
 	width: 100%;
 	max-width: 400px;
 	display: flex;
@@ -80,6 +82,8 @@
 	display: flex;
 	align-items: center;
 	gap: var(--spacing-unit);
+    /* Add a small margin if there are actions below */
+    margin-bottom: 5px;
 }
 .progress-bar-container {
 	flex-grow: 1;
@@ -134,4 +138,19 @@
     opacity: 0;
     transform: translateY(-20px);
     transition: opacity 1s ease, transform 1s ease;
+}
+
+/* NEW STYLES for the cancel button area */
+.download-toast-actions {
+    margin-top: calc(var(--spacing-unit) * 1.5);
+    padding-top: var(--spacing-unit);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.button.button-small {
+    padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+    font-size: 0.85rem;
+    border-radius: var(--border-radius-sm);
 }

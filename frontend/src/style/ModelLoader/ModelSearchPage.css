@@ -172,7 +172,7 @@
 	bottom: calc(var(--spacing-unit) * 2);
 	right: calc(var(--spacing-unit) * 2);
     /* Ensure it's on top of content but below modals */
-	z-index: calc(var(--z-index-toast) + 2);
+	z-index: var(--z-index-toast);
 
     /* Visibility transitions */
     opacity: 0;
