@@ -6,6 +6,15 @@
  * from global.css and Modals.css for a consistent look.
 */
 
+/* --- THE FIX: Overlay Correction --- */
+/* This rule targets the specific overlay for the ConfirmModal */
+.modal-overlay.confirm-modal-overlay {
+    /* Ensure it's on top of everything, including toasts */
+    z-index: calc(var(--z-index-toast) + 10); 
+    /* This is the crucial part: it makes the overlay clickable */
+    pointer-events: auto;
+}
+
 /* --- Main Layout & Sizing --- */
 .confirm-modal-body {
     /* Inherits .modal-body from Modals.css */
