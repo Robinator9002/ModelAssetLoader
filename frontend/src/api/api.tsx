@@ -12,8 +12,6 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 // --- Generic Model Interfaces ---
-// Note: Renamed from HFModel... to Model... and added 'source' field.
-
 export interface ModelFile {
     rfilename: string;
     size?: number | null;
@@ -21,7 +19,7 @@ export interface ModelFile {
 
 export interface ModelListItem {
     id: string;
-    source: string; // <-- ADDED: The source of the model (e.g., 'huggingface')
+    source: string;
     author?: string | null;
     model_name: string;
     lastModified?: string | null; // ISO Date String
@@ -48,7 +46,7 @@ export interface ModelDetails extends ModelListItem {
 }
 
 export interface SearchModelParams {
-    source?: string; // <-- ADDED: The source to search in
+    source?: string;
     search?: string;
     author?: string;
     tags?: string[];
@@ -96,7 +94,7 @@ export interface PathConfigurationResponse {
 }
 
 export interface FileDownloadRequest {
-    source: string; // <-- ADDED: The source of the model
+    source: string;
     repo_id: string;
     filename: string;
     model_type: ModelType;
@@ -108,7 +106,7 @@ export interface FileDownloadResponse {
     success: boolean;
     message?: string | null;
     error?: string | null;
-    download_id?: string | null; // <-- ADDED: The tracker ID
+    download_id?: string | null;
 }
 
 // --- Download Tracker WebSocket Interface ---
@@ -117,14 +115,14 @@ export interface DownloadStatus {
     filename: string;
     repo_id: string;
     status: "pending" | "downloading" | "completed" | "error" | "cancelled";
-    progress: number; // 0.0 to 100.0
+    progress: number;
     total_size_bytes: number;
     downloaded_bytes: number;
     error_message?: string | null;
     target_path?: string | null;
 }
 
-// --- Interfaces for Host Directory Scanning ---
+// --- Host Directory Scanning Interfaces ---
 export interface HostDirectoryItem {
     name: string;
     path: string;
@@ -139,18 +137,31 @@ export interface ScanHostDirectoriesResponse {
     data?: HostDirectoryItem[] | null;
 }
 
-// --- API Functions ---
+// --- NEU: Schnittstellen für die lokale Dateiverwaltung ---
+
+export interface LocalFileItem {
+    name: string;
+    path: string; // Relativer Pfad vom base_path
+    type: "file" | "directory";
+    size: number | null; // Größe in Bytes, null für Verzeichnisse
+    last_modified: string; // ISO Date String
+}
+
+export interface FilePreviewResponse {
+    success: boolean;
+    path: string;
+    content?: string | null;
+    error?: string | null;
+}
+
+
+// --- API Functions (Existing) ---
 
 export const searchModels = async (
     params: SearchModelParams
 ): Promise<PaginatedModelListResponse> => {
     try {
-        // The 'source' is now part of the params object.
-        const response = await apiClient.get<PaginatedModelListResponse>(
-            "/models", // Endpoint is now singular '/models'
-            { params }
-        );
-        console.log("searchModels response:", response.data);
+        const response = await apiClient.get<PaginatedModelListResponse>("/models", { params });
         return response.data;
     } catch (error) {
         console.error("Error in searchModels:", error);
@@ -163,11 +174,8 @@ export const getModelDetails = async (
     modelId: string
 ): Promise<ModelDetails> => {
     try {
-        // The endpoint now includes the source and the full modelId.
         const response = await apiClient.get<ModelDetails>(
-            `/models/${encodeURIComponent(source)}/${encodeURIComponent(
-                modelId
-            )}`
+            `/models/${encodeURIComponent(source)}/${encodeURIComponent(modelId)}`
         );
         return response.data;
     } catch (error) {
@@ -180,11 +188,7 @@ export const downloadFileAPI = async (
     request: FileDownloadRequest
 ): Promise<FileDownloadResponse> => {
     try {
-        // The request payload now includes the source.
-        const response = await apiClient.post<FileDownloadResponse>(
-            "/filemanager/download",
-            request
-        );
+        const response = await apiClient.post<FileDownloadResponse>("/filemanager/download", request);
         return response.data;
     } catch (error) {
         console.error("Error in downloadFileAPI:", error);
@@ -196,7 +200,6 @@ export const downloadFileAPI = async (
     }
 };
 
-// NEW: Function to cancel an ongoing download
 export const cancelDownloadAPI = async (downloadId: string): Promise<{ success: boolean; message?: string }> => {
     try {
         const response = await apiClient.post(`/filemanager/downloads/${downloadId}/cancel`);
@@ -204,21 +207,18 @@ export const cancelDownloadAPI = async (downloadId: string): Promise<{ success: 
     } catch (error) {
         console.error(`Failed to cancel download ${downloadId}:`, error);
         const axiosError = error as any;
-        // Rethrow with a more specific error message if possible
-        if (axiosError.response && axiosError.response.data && axiosError.response.data.detail) {
+        if (axiosError.response?.data?.detail) {
              throw new Error(axiosError.response.data.detail);
         }
         throw error;
     }
 };
 
-// Function to permanently dismiss a download from the tracker
 export const dismissDownloadAPI = async (downloadId: string): Promise<void> => {
     try {
         await apiClient.delete(`/filemanager/downloads/${downloadId}`);
     } catch (error) {
         console.error(`Failed to dismiss download ${downloadId}:`, error);
-        // Optionally re-throw or handle the error in the UI
         throw error;
     }
 };
@@ -227,10 +227,7 @@ export const configurePathsAPI = async (
     config: PathConfigurationRequest
 ): Promise<PathConfigurationResponse> => {
     try {
-        const response = await apiClient.post<PathConfigurationResponse>(
-            "/filemanager/configure",
-            config
-        );
+        const response = await apiClient.post<PathConfigurationResponse>("/filemanager/configure", config);
         return response.data;
     } catch (error) {
         console.error("Error in configurePathsAPI:", error);
@@ -245,13 +242,10 @@ export const configurePathsAPI = async (
 export const getCurrentConfigurationAPI =
     async (): Promise<MalFullConfiguration> => {
         try {
-            const response = await apiClient.get<MalFullConfiguration>(
-                "/filemanager/configuration"
-            );
+            const response = await apiClient.get<MalFullConfiguration>("/filemanager/configuration");
             return {
                 ...response.data,
-                custom_model_type_paths:
-                    response.data.custom_model_type_paths || {},
+                custom_model_type_paths: response.data.custom_model_type_paths || {},
                 color_theme: response.data.color_theme || "dark",
             };
         } catch (error) {
@@ -293,7 +287,66 @@ export const scanHostDirectoriesAPI = async (
     }
 };
 
-// --- WebSocket Connection ---
+// --- NEU: API-Funktionen für die lokale Dateiverwaltung ---
+
+/**
+ * Listet Dateien und Verzeichnisse unter einem bestimmten relativen Pfad auf.
+ * @param relativePath Der relative Pfad vom base_path. Bei null wird das Root-Verzeichnis gelistet.
+ */
+export const listManagedFilesAPI = async (relativePath: string | null): Promise<LocalFileItem[]> => {
+    try {
+        const response = await apiClient.get<LocalFileItem[]>('/filemanager/files', {
+            params: { path: relativePath }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error listing managed files:', error);
+        throw error; // Lässt die aufrufende Komponente den Fehler behandeln
+    }
+};
+
+/**
+ * Löscht eine Datei oder ein Verzeichnis unter einem bestimmten relativen Pfad.
+ * @param relativePath Der relative Pfad des zu löschenden Elements.
+ */
+export const deleteManagedItemAPI = async (relativePath: string): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.delete<{ success: boolean; message: string }>('/filemanager/files', {
+            data: { path: relativePath } // DELETE-Requests mit Body verwenden das 'data'-Feld in Axios
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Error deleting item at ${relativePath}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+/**
+ * Holt eine Vorschau des Inhalts einer Textdatei.
+ * @param relativePath Der relative Pfad zur Datei.
+ */
+export const getFilePreviewAPI = async (relativePath: string): Promise<FilePreviewResponse> => {
+    try {
+        const response = await apiClient.get<FilePreviewResponse>('/filemanager/files/preview', {
+            params: { path: relativePath }
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Error getting preview for ${relativePath}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data) {
+            return { success: false, path: relativePath, error: axiosError.response.data.detail };
+        }
+        throw error;
+    }
+};
+
+
+// --- WebSocket Connection (Unchanged) ---
 export const connectToDownloadTracker = (
     onMessage: (data: any) => void
 ): WebSocket => {
@@ -315,7 +368,6 @@ export const connectToDownloadTracker = (
         console.error("WebSocket error observed:", event);
     };
 
-    // Add detailed close event logging
     ws.onclose = (event) => {
         console.log(
             `WebSocket connection closed. Code: ${event.code}, Reason: '${event.reason}', Was clean: ${event.wasClean}`
