@@ -154,9 +154,9 @@ export interface FilePreviewResponse {
     error?: string | null;
 }
 
+export type ViewMode = 'models' | 'explorer';
 
 // --- API Functions (Existing) ---
-
 export const searchModels = async (
     params: SearchModelParams
 ): Promise<PaginatedModelListResponse> => {
@@ -293,15 +293,18 @@ export const scanHostDirectoriesAPI = async (
  * Lists files and directories under a specific relative path.
  * @param relativePath The relative path from the base_path. If null, the root directory is listed.
  */
-export const listManagedFilesAPI = async (relativePath: string | null): Promise<LocalFileItem[]> => {
+export const listManagedFilesAPI = async (relativePath: string | null, mode: ViewMode): Promise<LocalFileItem[]> => {
     try {
         const response = await apiClient.get<LocalFileItem[]>('/filemanager/files', {
-            params: { path: relativePath }
+            params: { 
+                path: relativePath,
+                mode: mode // Pass the mode to the backend
+            }
         });
         return response.data;
     } catch (error) {
         console.error('Error listing managed files:', error);
-        throw error; // Lets the calling component handle the error
+        throw error;
     }
 };
 
