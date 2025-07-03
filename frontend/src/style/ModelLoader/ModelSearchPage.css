@@ -154,7 +154,7 @@
 	bottom: calc(var(--spacing-unit) * 2);
 	right: calc(var(--spacing-unit) * 2);
     /* Ensure it's on top of content but below modals */
-	z-index: var(--z-index-toast);
+	z-index: var(--z-index-button);
 
     /* Visibility transitions */
     opacity: 0;

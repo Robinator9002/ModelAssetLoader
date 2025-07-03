@@ -40,6 +40,7 @@
 	/* Z-Indexes */
 	--z-index-navbar: 100;
 	--z-index-modal: 1000;
+	--z-index-button: 1500;
 	--z-index-toast: 2000;
 
 	/* --------------------------------- */

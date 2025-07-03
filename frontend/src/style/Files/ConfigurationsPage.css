@@ -132,7 +132,7 @@
 
 .custom-path-entry {
 	display: grid;
-	grid-template-columns: 140px 1fr;
+	grid-template-columns: calc(var(--spacing-unit) * 17.5) 1fr;
 	align-items: center;
 	gap: calc(var(--spacing-unit) * 2);
 }
@@ -180,6 +180,4 @@
 	font-size: 1rem;
     /* Ensure the button has generous padding for a large click area */
     padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
-	z-index: calc(var(--z-index-toast));
-    position: relative; /* Needed for z-index to work */
 }

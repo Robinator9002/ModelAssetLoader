@@ -9,7 +9,7 @@
 /* This rule targets the specific overlay for the ConfirmModal */
 .modal-overlay.confirm-modal-overlay {
     /* Ensure it's on top of everything, including toasts */
-    z-index: calc(var(--z-index-toast) + 10); 
+    z-index: var(--z-index-modal); 
     /* This is the crucial part: it makes the overlay clickable */
     pointer-events: auto;
 }

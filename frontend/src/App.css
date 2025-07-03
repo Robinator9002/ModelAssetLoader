@@ -79,12 +79,12 @@
     position: fixed;
     bottom: calc(var(--spacing-unit) * 2);
     left: calc(var(--spacing-unit) * 2);
-    z-index: var(--z-index-toast); /* Ensure it's above most content */
+	z-index: var(--z-index-button);
 }
 
 .theme-switcher-button {
-    width: 48px;
-    height: 48px;
+    width: calc(var(--spacing-unit) * 6);
+    height: calc(var(--spacing-unit) * 6);
     border-radius: 50%;
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);

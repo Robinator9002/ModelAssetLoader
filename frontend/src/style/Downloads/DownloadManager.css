@@ -9,13 +9,13 @@
 	position: fixed;
 	bottom: calc(var(--spacing-unit) * 2);
 	right: calc(var(--spacing-unit) * 2);
-	z-index: calc(var(--z-index-toast) + 1);
 	width: 100%;
 	max-width: 400px;
 	display: flex;
 	flex-direction: column;
 	gap: calc(var(--spacing-unit) * 1.5);
 	pointer-events: none;
+	z-index: var(--z-index-toast);
 }
 .download-item-toast {
 	background-color: var(--color-surface);
@@ -98,7 +98,7 @@
 	background-color: var(--color-background);
 	border-radius: 100px;
 	overflow: hidden;
-	height: 10px;
+	height: calc(var(--spacing-unit) * 1.25);
     box-shadow: var(--shadow-inset);
 }
 .progress-bar {
