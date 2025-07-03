@@ -121,12 +121,11 @@ class HuggingFaceSource(APISource):
             logger.error(f"[{self.name}] Unexpected error during search: {e}", exc_info=True)
             raise
 
-        # --- FIX: If the original request was for ascending sort on a descending-only field,
+        # --- If the original request was for ascending sort on a descending-only field,
         # we reverse the results of the page to simulate the expected ascending order.
         if sort_by in DESC_ONLY_SORTS and sort_direction == 1:
             logger.info(f"[{self.name}] Reversing page results for '{sort_by}' to simulate ascending order.")
             results_for_page.reverse()
-        # --- END FIX ---
 
         return results_for_page, has_more
 

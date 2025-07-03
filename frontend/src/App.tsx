@@ -69,7 +69,7 @@ function App() {
         if (!ws.current) {
             logger.info("Setting up WebSocket for download tracking...");
 
-            // --- REFACTORED: The new robust message handler ---
+            // --- The new robust message handler ---
             const handleWsMessage = (data: any) => {
                 logger.info("WebSocket message received:", data);
                 switch (data.type) {

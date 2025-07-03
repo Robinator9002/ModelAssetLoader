@@ -22,7 +22,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [cancelInitiator, setCancelInitiator] = useState<'button' | 'x' | null>(null);
 
-    // --- UPDATED: Effect now handles 'cancelled' status ---
+    // --- Effect now handles 'cancelled' status ---
     useEffect(() => {
         let timer: NodeJS.Timeout;
         // Auto-dismiss for completed or error toasts after a normal delay
@@ -40,14 +40,14 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
         return () => clearTimeout(timer);
     }, [downloadStatus]);
 
-    // --- UPDATED: getStatusIcon now handles 'cancelled' ---
+    // --- getStatusIcon now handles 'cancelled' ---
     const getStatusIcon = () => {
         switch (downloadStatus) {
             case 'downloading':
                 return <Loader2 size={18} className="animate-spin" />;
             case 'completed':
                 return <CheckCircle2 size={18} className="text-green-500" />;
-            case 'cancelled': // New case
+            case 'cancelled':
                 return <Ban size={18} className="text-gray-500" />;
             case 'error':
                 return <AlertTriangle size={18} className="text-red-500" />;

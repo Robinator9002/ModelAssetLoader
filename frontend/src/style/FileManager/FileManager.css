@@ -39,7 +39,7 @@
     text-overflow: ellipsis;
 }
 
-/* NEW: Container for the right-side actions */
+/* Container for the right-side actions */
 .header-actions {
     display: flex;
     align-items: center;

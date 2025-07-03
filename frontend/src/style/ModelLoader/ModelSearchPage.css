@@ -4,7 +4,7 @@
  * =================================================================
 */
 
-/* New layout: Make the page a flex column that fills the height */
+/* Make the page a flex column that fills the height */
 .model-search-page {
 	display: flex;
 	flex-direction: column;
@@ -49,7 +49,7 @@
     letter-spacing: 0.05em;
 }
 
-/* New layout: This container will now scroll */
+/* This container will now scroll */
 .search-results-container {
     flex-grow: 1; /* Allow this to take up remaining space */
     overflow-y: auto; /* Enable vertical scrolling */
@@ -133,7 +133,7 @@
     flex-shrink: 0; /* Prevent shrinking */
 }
 
-/* New Scroll-to-Top Button */
+/* Scroll-to-Top Button */
 .scroll-to-top-button {
     /* Uses .button-icon styles as a base */
     display: inline-flex;
@@ -148,8 +148,7 @@
     cursor: pointer;
     box-shadow: var(--shadow-lg);
 
-    /* --- FIX --- */
-    /* Positioning is now 'fixed' to anchor it to the viewport */
+    /* Positioning is 'fixed' to anchor it to the viewport */
     position: fixed; 
     /* Positioned to avoid the theme switcher */
 	bottom: calc(var(--spacing-unit) * 2);

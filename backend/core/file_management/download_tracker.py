@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-# --- NEW: Define a strict type for download states ---
+# --- Define a strict type for download states ---
 DownloadState = Literal["pending", "downloading", "completed", "error", "cancelled"]
 
 # Define a type for the async callback function that broadcasts updates
@@ -19,7 +19,7 @@ class DownloadStatus:
     download_id: str
     filename: str
     repo_id: str
-    # --- UPDATED: Use the strict DownloadState type ---
+    # --- Use the strict DownloadState type ---
     status: DownloadState = "pending"
     progress: float = 0.0
     total_size_bytes: int = 0

@@ -92,7 +92,7 @@ class FileDownloadResponse(BaseModel):
     error: Optional[str] = None
     download_id: Optional[str] = Field(None, description="The unique ID for tracking the download.")
 
-# --- Models for Local File Management (NEW) ---
+# --- Models for Local File Management ---
 
 class LocalFileItem(BaseModel):
     """Represents a file or directory within the managed base_path."""

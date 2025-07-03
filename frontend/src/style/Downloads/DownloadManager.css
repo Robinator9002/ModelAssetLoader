@@ -52,7 +52,7 @@
 .download-item-toast.completed {
 	border-left-color: var(--color-success);
 }
-/* --- NEW: Style for cancelled toasts --- */
+/* --- Style for cancelled toasts --- */
 .download-item-toast.cancelled {
     border-left-color: var(--color-text-secondary);
 }
@@ -73,7 +73,7 @@
 }
 .download-toast-status-icon .text-red-500 { color: var(--color-error); }
 .download-toast-status-icon .text-green-500 { color: var(--color-success); }
-/* --- NEW: Style for cancelled icon --- */
+/* --- Style for cancelled icon --- */
 .download-toast-status-icon .text-gray-500 { color: var(--color-text-secondary); }
 
 .dismiss-button {
@@ -153,7 +153,7 @@
     transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-/* NEW STYLES for the cancel button area */
+/* STYLES for the cancel button area */
 .download-toast-actions {
     margin-top: calc(var(--spacing-unit) * 1.5);
     padding-top: var(--spacing-unit);

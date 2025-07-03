@@ -4,7 +4,7 @@
  * =================================================================
 */
 
-/* New layout: Make the page a flex column that fills the available height */
+/* Make the page a flex column that fills the available height */
 .model-details-page {
 	display: flex;
 	flex-direction: column;
@@ -31,7 +31,7 @@
     margin-top: var(--spacing-unit);
 }
 
-/* New layout: This wrapper is now a flex row that grows and allows internal scrolling */
+/* This wrapper is now a flex row that grows and allows internal scrolling */
 .details-content-wrapper {
 	display: flex;
 	gap: calc(var(--spacing-unit) * 3);
@@ -40,7 +40,7 @@
     overflow: hidden; 
 }
 
-/* New layout: Sections are now flex columns */
+/* Sections are now flex columns */
 .details-section {
     background-color: var(--color-surface);
     border-radius: var(--border-radius-lg);
@@ -83,7 +83,7 @@
 }
 
 
-/* New layout: The list itself will scroll */
+/* The list itself will scroll */
 .files-list {
 	display: flex;
 	flex-direction: column;
@@ -126,7 +126,7 @@
 }
 
 
-/* New layout: The readme content will scroll */
+/* The readme content will scroll */
 .readme-content {
 	font-size: 1rem;
     line-height: 1.7;

@@ -295,7 +295,7 @@ async def scan_host_directories_endpoint(
 # --- Local File Management Endpoint ---
 @app.get(
     "/api/filemanager/files",
-    response_model=FileManagerListResponse, # <-- Use the new response model
+    response_model=FileManagerListResponse,
     tags=["FileManager"],
     summary="List Files with Smart Navigation"
 )

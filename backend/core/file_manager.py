@@ -95,14 +95,14 @@ class FileManager:
         logger.info(f"Queued download {download_id} for '{filename}' -> '{final_save_path}' as a background task.")
         return {"success": True, "message": "Download started.", "download_id": download_id}
 
-    # --- NEW: Explicit cancel method ---
+    # --- Explicit cancel method ---
     async def cancel_download(self, download_id: str):
         """Requests cancellation of a running download task."""
         logger.info(f"Cancel request received for download {download_id}.")
         # This single tracker method handles cancelling the task if it's running.
         await download_tracker.cancel_and_remove(download_id)
 
-    # --- UPDATED: Dismiss now only handles removal from tracker ---
+    # --- Dismiss now only handles removal from tracker ---
     async def dismiss_download(self, download_id: str):
         """Removes a finished (completed/error/cancelled) download from the tracker."""
         logger.info(f"Dismiss request received for download {download_id}.")

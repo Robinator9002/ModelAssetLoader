@@ -24,7 +24,7 @@
     margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
-/* New two-column layout for the main settings */
+/* Two-column layout for the main settings */
 .config-main-content {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -162,7 +162,7 @@
     min-height: 54px; /* Ensure footer has height for centered message */
 }
 
-/* FIX: Center the feedback message and take it out of the flex flow */
+/* Center the feedback message and take it out of the flex flow */
 .config-footer .feedback-message {
     position: absolute;
     left: 50%;
@@ -178,7 +178,7 @@
 .save-config-button {
     min-width: 220px;
 	font-size: 1rem;
-    /* FIX: Ensure the button has generous padding for a large click area */
+    /* Ensure the button has generous padding for a large click area */
     padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
 	z-index: calc(var(--z-index-toast));
     position: relative; /* Needed for z-index to work */

@@ -10,7 +10,7 @@
 	flex-shrink: 0;
 	z-index: var(--z-index-navbar);
     
-    /* New layout properties */
+    /* Layout Properties */
     display: flex;
     align-items: center;
     justify-content: space-between;

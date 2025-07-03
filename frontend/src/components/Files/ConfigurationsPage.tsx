@@ -77,11 +77,10 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                 const newConfig = response.current_config;
                 setFeedback({ type: "success", message: response.message || "Configuration saved successfully!" });
                 
-                // --- FIX: Update local state directly after successful save ---
+                // --- Update local state directly after successful save ---
                 setBasePath(newConfig.base_path || null);
                 setSelectedProfile(newConfig.profile || "ComfyUI");
                 setCustomPaths(newConfig.custom_model_type_paths || {});
-                // --- End of FIX ---
 
                 // Propagate the changes to the parent component
                 onConfigurationSave(

@@ -190,7 +190,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
             nodes.forEach((apiNode) => {
                 const mappedNode = mapApiNodeToMappedNode(apiNode);
                 map.set(apiNode.path, mappedNode);
-                // FIX: Check if children exist and is an array before recursing
+                // Check if children exist and is an array before recursing
                 if (apiNode.children && Array.isArray(apiNode.children)) {
                     processAndStoreNodesRecursively(apiNode.children, map);
                 }
@@ -211,7 +211,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                     targetPath || undefined,
                     API_SCAN_DEPTH
                 );
-                // FIX: Ensure response.data is a non-empty array before processing
+                // Ensure response.data is a non-empty array before processing
                 if (
                     response?.success &&
                     response.data &&
@@ -238,7 +238,7 @@ const FolderSelector: React.FC<FolderSelectorProps> = ({
                                         mapApiNodeToMappedNode(
                                             parentNodeFromApi
                                         );
-                                    // FIX: Check if children exist before processing
+                                    // Check if children exist before processing
                                     if (
                                         parentNodeFromApi.children &&
                                         Array.isArray(
