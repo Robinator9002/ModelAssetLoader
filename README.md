@@ -29,7 +29,7 @@ Phase 1: Polish the Core (Now Underway)
 
     [x] Complete a full UI/CSS cleanup for a polished, professional feel.
 
-    [ ] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
+    [x] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
 
 Phase 2: Environment Management
 
