@@ -161,20 +161,3 @@
 .feedback-container .icon-error {
     color: var(--color-error);
 }
-
-
-/* --- Custom Scrollbar for Tree --- */
-.folder-selector-tree-container::-webkit-scrollbar {
-    width: 10px;
-}
-.folder-selector-tree-container::-webkit-scrollbar-track {
-    background: transparent;
-}
-.folder-selector-tree-container::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: 10px;
-    border: 2px solid var(--color-background);
-}
-.folder-selector-tree-container::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-border-hover);
-}

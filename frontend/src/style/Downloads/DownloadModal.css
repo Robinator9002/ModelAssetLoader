@@ -163,19 +163,3 @@
     flex-basis: 200px; /* Base width */
     flex-grow: 1;
 }
-
-/* --- Custom Scrollbar for File List --- */
-.download-modal-file-list::-webkit-scrollbar {
-    width: 10px;
-}
-.download-modal-file-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-.download-modal-file-list::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: 10px;
-    border: 2px solid var(--color-background);
-}
-.download-modal-file-list::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-border-hover);
-}

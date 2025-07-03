@@ -183,19 +183,3 @@
 	z-index: calc(var(--z-index-toast));
     position: relative; /* Needed for z-index to work */
 }
-
-/* Custom Scrollbars */
-.config-card-body::-webkit-scrollbar {
-    width: 10px;
-}
-.config-card-body::-webkit-scrollbar-track {
-    background: transparent;
-}
-.config-card-body::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: 10px;
-    border: 2px solid var(--color-surface);
-}
-.config-card-body::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-border-hover);
-}

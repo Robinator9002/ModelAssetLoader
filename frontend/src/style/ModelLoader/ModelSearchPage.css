@@ -61,23 +61,6 @@
     margin: calc(var(--spacing-unit) * -1); /* Counteract parent padding */
 }
 
-/* Custom scrollbar for the results list */
-.search-results-container::-webkit-scrollbar {
-    width: 10px;
-}
-.search-results-container::-webkit-scrollbar-track {
-    background: transparent;
-}
-.search-results-container::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: 10px;
-    border: 2px solid var(--color-background);
-}
-.search-results-container::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-border-hover);
-}
-
-
 .result-item {
 	display: flex;
 	align-items: center;
