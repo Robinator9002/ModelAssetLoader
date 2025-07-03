@@ -3,6 +3,7 @@
  * M.A.L. - DownloadModal Specific Styles (IMPROVED)
  * =================================================================
  * Note: General modal layout is inherited from Modals.css.
+ * Checkbox styles are now inherited from global.css.
 */
 
 /* --- Modal Header & Body --- */
@@ -52,12 +53,11 @@
     cursor: pointer;
     user-select: none;
 }
-.select-all-container input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    accent-color: var(--color-primary);
-}
+
+/*
+ * Old checkbox styles removed from here.
+ * The new global style for `label[for]` will apply.
+*/
 
 .selection-count {
     font-size: 0.9rem;
@@ -111,13 +111,10 @@
 	gap: calc(var(--spacing-unit) * 1.5);
 }
 
-.file-item-main-info input[type="checkbox"] {
-	width: 20px;
-	height: 20px;
-	accent-color: var(--color-primary);
-	flex-shrink: 0;
-    cursor: pointer;
-}
+/*
+ * Old checkbox styles removed from here.
+ * The new global style for `label[for]` will apply.
+*/
 
 .file-name-label {
 	font-family: var(--font-monospace);

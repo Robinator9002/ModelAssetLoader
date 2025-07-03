@@ -256,6 +256,95 @@ input:disabled, select:disabled, .config-input:disabled, .config-select:disabled
     background-size: 1em 1em;
 }
 
+/*
+ * =================================================================
+ * NEW: Custom Form Controls: Checkbox (Grid-based)
+ * =================================================================
+*/
+
+/* Hide the actual checkbox input */
+input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    z-index: -1;
+}
+
+/* The label is a grid container, aligning the custom box and the text */
+label[for] {
+    display: inline-grid;
+    grid-template-columns: 20px auto; /* Column for box, column for text */
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1.25);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* The box and the checkmark overlay each other in the same grid cell */
+label[for]::before,
+label[for]::after {
+    grid-column: 1;
+    grid-row: 1;
+    transition: all var(--transition-speed-fast) ease;
+}
+
+/* The visible box of the checkbox */
+label[for]::before {
+    content: '';
+    width: 20px;
+    height: 20px;
+    background-color: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+}
+
+/* The checkmark SVG, centered inside its pseudo-element */
+label[for]::after {
+    content: '';
+    width: 20px;
+    height: 20px;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='2 8 6 12 14 4'/%3e%3c/svg%3e");
+    background-size: 14px 14px;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform: scale(0); /* Hidden by default */
+    transition-property: transform;
+    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* --- STATES --- */
+
+/* Hover state on the box */
+input[type="checkbox"]:not(:checked) + label[for]:hover::before {
+    border-color: var(--color-primary);
+}
+
+/* Focus state for accessibility */
+input[type="checkbox"]:focus-visible + label[for]::before {
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.25);
+    border-color: var(--color-primary);
+}
+
+/* Checked state: color the box */
+input[type="checkbox"]:checked + label[for]::before {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* Checked state: show the checkmark */
+input[type="checkbox"]:checked + label[for]::after {
+    transform: scale(1);
+}
+
+/* Disabled state */
+input[type="checkbox"]:disabled + label[for] {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+
 /* --- MODAL & OVERLAY --- */
 .modal-overlay {
 	position: fixed;
