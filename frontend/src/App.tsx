@@ -8,7 +8,8 @@ import ModelDetailsPage from "./components/ModelLoader/ModelDetailsPage";
 import ConfigurationsPage from "./components/Files/ConfigurationsPage";
 import DownloadModal from "./components/Downloads/DownloadModal";
 import DownloadManager from "./components/Downloads/DownloadManager";
-import FileManagerPage from "./components/FileManager/FileManagerPage"; // <-- ADDED
+import FileManagerPage from "./components/FileManager/FileManagerPage";
+import { dismissDownloadAPI } from "./api/api";
 
 import {
     // API and WebSocket functions
@@ -221,6 +222,26 @@ function App() {
         []
     );
 
+    const handleDismissDownload = useCallback((downloadId: string) => {
+        // 1. Optimistic Update: Entferne den Toast SOFORT aus der lokalen UI.
+        setActiveDownloads((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(downloadId);
+            return newMap;
+        });
+
+        // 2. Fire-and-Forget: Sage dem Backend, es soll im Hintergrund aufräumen.
+        // Wir fangen hier Fehler ab, damit die App nicht abstürzt, falls das Backend mal nicht erreichbar ist.
+        dismissDownloadAPI(downloadId).catch((error) => {
+            logger.error(
+                `Failed to dismiss download ${downloadId} on backend:`,
+                error
+            );
+            // Optional: Man könnte hier eine Fehlerbehandlung hinzufügen,
+            // z.B. den Toast wieder einblenden, aber für einen Dismiss-Button ist das meist Overkill.
+        });
+    }, []);
+
     const renderActiveTabContent = () => {
         if (isConfigLoading) {
             return <p className="loading-message">Lade Konfiguration...</p>;
@@ -268,7 +289,7 @@ function App() {
 
     return (
         <div className="app-wrapper">
-            <DownloadManager activeDownloads={activeDownloads} />
+            <DownloadManager activeDownloads={activeDownloads} onDismiss={handleDismissDownload} />
 
             <header className="app-header-placeholder">
                 <div
