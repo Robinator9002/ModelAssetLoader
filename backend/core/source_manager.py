@@ -4,6 +4,7 @@ from typing import List, Dict, Optional, Any, Tuple
 
 from .sources.base import APISource
 from .sources.hf_source import HuggingFaceSource
+
 # To add a new source (e.g., Civitai):
 # 1. Create a `civitai_source.py` that implements `APISource`.
 # 2. Import it here: `from .sources.civitai_source import CivitaiSource`.
@@ -11,10 +12,11 @@ from .sources.hf_source import HuggingFaceSource
 
 logger = logging.getLogger(__name__)
 
+
 class SourceManager:
     """
     Manages and orchestrates multiple API sources for models.
-    
+
     This class acts as a single point of entry for searching and retrieving
     model information, abstracting away the specifics of each source API.
     """
@@ -23,7 +25,9 @@ class SourceManager:
         """Initializes the SourceManager and registers all available sources."""
         self.sources: Dict[str, APISource] = {}
         self._register_sources()
-        logger.info(f"SourceManager initialized with sources: {list(self.sources.keys())}")
+        logger.info(
+            f"SourceManager initialized with sources: {list(self.sources.keys())}"
+        )
 
     def _register_sources(self):
         """
@@ -33,15 +37,13 @@ class SourceManager:
         # Register Hugging Face source
         hf_source = HuggingFaceSource()
         self.sources[hf_source.name] = hf_source
-        
+
         # Register other sources here in the future
         # civitai_source = CivitaiSource()
         # self.sources[civitai_source.name] = civitai_source
 
     def search_models(
-        self,
-        source: Optional[str] = None,
-        **kwargs: Any
+        self, source: Optional[str] = None, **kwargs: Any
     ) -> Tuple[List[Dict[str, Any]], bool]:
         """
         Searches for models, either from a specific source or all sources.
@@ -56,11 +58,11 @@ class SourceManager:
         """
         # For now, default to 'huggingface' if no source is specified.
         # A multi-source search would require more complex logic for merging and pagination.
-        target_source_name = source or 'huggingface'
+        target_source_name = source or "huggingface"
 
         if target_source_name not in self.sources:
             raise ValueError(f"Source '{target_source_name}' is not registered.")
-            
+
         logger.info(f"Delegating search to '{target_source_name}' source.")
         target_source = self.sources[target_source_name]
         return target_source.search_models(**kwargs)
@@ -77,9 +79,11 @@ class SourceManager:
             A dictionary with detailed model information, or None if not found.
         """
         if source not in self.sources:
-            logger.error(f"Attempted to get details from unregistered source: '{source}'")
+            logger.error(
+                f"Attempted to get details from unregistered source: '{source}'"
+            )
             return None
-            
+
         logger.info(f"Delegating detail request for '{model_id}' to '{source}' source.")
         target_source = self.sources[source]
         return target_source.get_model_details(model_id=model_id)

@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, Any, Tuple
 
+
 class APISource(ABC):
     """
     Abstract Base Class for an external API source.

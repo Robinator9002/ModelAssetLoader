@@ -4,19 +4,29 @@ from typing import Literal, Dict, List
 
 # --- Type Definitions ---
 ModelType = Literal[
-    "checkpoints", "loras", "vae", "clip", "unet", "controlnet",
-    "embeddings", "hypernetworks", "diffusers", "custom"
+    "checkpoints",
+    "loras",
+    "vae",
+    "clip",
+    "unet",
+    "controlnet",
+    "embeddings",
+    "hypernetworks",
+    "diffusers",
+    "custom",
 ]
 UiProfileType = Literal["ComfyUI", "A1111", "ForgeUI", "Custom"]
 ColorThemeType = Literal["dark", "light"]
 
 # --- Configuration File Constants ---
-CONFIG_FILE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent.parent / "config"
+CONFIG_FILE_DIR = (
+    pathlib.Path(__file__).resolve().parent.parent.parent.parent / "config"
+)
 CONFIG_FILE_NAME = "mal_settings.json"
 CONFIG_FILE_PATH = CONFIG_FILE_DIR / CONFIG_FILE_NAME
 
 # --- Model File Extensions ---
-MODEL_FILE_EXTENSIONS = ('.safetensors', '.ckpt', '.pt', '.bin', '.pth', '.onnx')
+MODEL_FILE_EXTENSIONS = (".safetensors", ".ckpt", ".pt", ".bin", ".pth", ".onnx")
 
 # --- UI Profile Definitions ---
 KNOWN_UI_PROFILES: Dict[UiProfileType, Dict[str, str]] = {
@@ -46,7 +56,7 @@ KNOWN_UI_PROFILES: Dict[UiProfileType, Dict[str, str]] = {
         "embeddings": "embeddings",
         "hypernetworks": "models/hypernetworks",
         "controlnet": "models/ControlNet",
-    }
+    },
 }
 
 # --- Host Directory Scanning Constants ---
