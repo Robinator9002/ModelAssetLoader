@@ -5,9 +5,9 @@
 */
 
 .configurations-page {
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 3);
     height: 100%;
     max-height: calc(100vh - 64px - 40px); /* vh - navbar_height - parent_padding */
 }
@@ -69,19 +69,19 @@
 }
 
 .config-label {
-	font-weight: 600;
-	font-size: 0.9rem;
+    font-weight: 600;
+    font-size: 0.9rem;
     color: var(--color-text-primary);
     padding-bottom: calc(var(--spacing-unit) * 0.5);
 }
 
 .base-path-selector {
-	display: flex;
-	gap: var(--spacing-unit);
+    display: flex;
+    gap: var(--spacing-unit);
 }
 
 .path-input.config-input {
-	cursor: pointer;
+    cursor: pointer;
     background-color: var(--color-background);
     color: var(--color-text-secondary);
     border: 1px dashed var(--color-border); /* Dashed to indicate it's not a normal input */
@@ -131,22 +131,22 @@
 }
 
 .custom-path-entry {
-	display: grid;
-	grid-template-columns: calc(var(--spacing-unit) * 17.5) 1fr;
-	align-items: center;
-	gap: calc(var(--spacing-unit) * 2);
+    display: grid;
+    grid-template-columns: calc(var(--spacing-unit) * 17.5) 1fr;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 2);
 }
 
 .custom-path-label {
-	text-align: right;
-	font-weight: 500;
-	color: var(--color-text-secondary);
+    text-align: right;
+    font-weight: 500;
+    color: var(--color-text-secondary);
     font-size: 0.9rem;
     font-family: var(--font-monospace);
     text-transform: capitalize;
 }
 .custom-path-label::after {
-    content: ":";
+    content: ':';
 }
 
 /* --- Footer Actions --- */
@@ -177,7 +177,7 @@
 
 .save-config-button {
     min-width: 220px;
-	font-size: 1rem;
+    font-size: 1rem;
     /* Ensure the button has generous padding for a large click area */
     padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
 }

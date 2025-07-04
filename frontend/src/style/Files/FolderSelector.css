@@ -43,20 +43,18 @@
     background-color: var(--color-surface-hover);
 }
 
-
 /* --- Tree View Container --- */
 
 .folder-selector-tree-container {
-	height: 45vh;
-	min-height: 300px; /* Increased min-height */
-	overflow-y: auto;
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-md);
-	padding: var(--spacing-unit);
-	background-color: var(--color-background); /* Darker background for contrast */
+    height: 45vh;
+    min-height: 300px; /* Increased min-height */
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-unit);
+    background-color: var(--color-background); /* Darker background for contrast */
     box-shadow: var(--shadow-inset);
 }
-
 
 /* --- Tree Items & Hierarchy --- */
 
@@ -84,26 +82,25 @@
     background-color: rgba(var(--color-primary-rgb), 0.15);
 }
 
-
 .item-content {
-	display: flex;
-	align-items: center;
-	padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
-	border-radius: var(--border-radius-sm);
-	cursor: pointer;
-	user-select: none;
+    display: flex;
+    align-items: center;
+    padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    user-select: none;
     transition: background-color var(--transition-speed-fast), color var(--transition-speed-fast);
     position: relative;
     /* Default padding-left is handled by inline style now */
 }
 
 .item-content:hover {
-	background-color: var(--color-surface-hover);
+    background-color: var(--color-surface-hover);
 }
 
 .folder-selector-item.selected > .item-content {
-	background-color: rgba(var(--color-primary-rgb), 0.15);
-	color: var(--color-text-primary);
+    background-color: rgba(var(--color-primary-rgb), 0.15);
+    color: var(--color-text-primary);
 }
 /* Add a border to the selected item for emphasis */
 .folder-selector-item.selected > .item-content::after {
@@ -117,32 +114,30 @@
     border-radius: 3px;
 }
 
-
 .item-expand-icon,
 .item-expand-icon-placeholder {
-	color: var(--color-text-secondary);
-	margin-right: calc(var(--spacing-unit) * 0.5);
-	width: 20px; /* Fixed width for alignment */
+    color: var(--color-text-secondary);
+    margin-right: calc(var(--spacing-unit) * 0.5);
+    width: 20px; /* Fixed width for alignment */
     height: 20px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
 
 .item-icon {
-	color: var(--color-accent);
-	margin-right: var(--spacing-unit);
+    color: var(--color-accent);
+    margin-right: var(--spacing-unit);
     line-height: 0; /* Helps with vertical alignment */
 }
 
 .item-name {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 0.95rem;
 }
-
 
 /* --- Feedback States (Loading/Error) --- */
 

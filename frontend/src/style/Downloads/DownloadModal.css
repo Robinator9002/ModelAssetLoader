@@ -67,9 +67,9 @@
 
 /* --- File List --- */
 .download-modal-file-list {
-	display: flex;
-	flex-direction: column;
-	gap: var(--spacing-unit);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
     max-height: 45vh;
     overflow-y: auto;
     padding: var(--spacing-unit);
@@ -77,21 +77,21 @@
 }
 
 .download-file-item {
-	border: 1px solid transparent;
-	border-radius: var(--border-radius-md);
-	background-color: var(--color-surface);
-	display: flex;
-	flex-direction: column;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-md);
+    background-color: var(--color-surface);
+    display: flex;
+    flex-direction: column;
     padding: calc(var(--spacing-unit) * 1.5);
-	transition: background-color var(--transition-speed-fast),
-		border-color var(--transition-speed-fast);
+    transition: background-color var(--transition-speed-fast),
+        border-color var(--transition-speed-fast);
     position: relative;
-	min-height: 7rem;
+    min-height: 7rem;
     overflow: hidden;
 }
 
 .download-file-item.selected {
-	background-color: var(--color-surface-alt);
+    background-color: var(--color-surface-alt);
     border-color: var(--color-border);
 }
 /* Add a colored bar to the left of selected items for emphasis */
@@ -106,9 +106,9 @@
 }
 
 .file-item-main-info {
-	display: flex;
-	align-items: center;
-	gap: calc(var(--spacing-unit) * 1.5);
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1.5);
 }
 
 /*
@@ -117,9 +117,9 @@
 */
 
 .file-name-label {
-	font-family: var(--font-monospace);
-	font-size: 0.95rem;
-	word-break: break-all;
+    font-family: var(--font-monospace);
+    font-size: 0.95rem;
+    word-break: break-all;
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: color var(--transition-speed-fast);
@@ -136,10 +136,10 @@
     padding: var(--spacing-unit);
     margin-top: var(--spacing-unit);
     margin-left: calc(20px + var(--spacing-unit) * 1.5); /* Indent */
-	display: flex;
+    display: flex;
     flex-wrap: wrap;
-	gap: var(--spacing-unit);
-	align-items: center;
+    gap: var(--spacing-unit);
+    align-items: center;
 }
 
 @keyframes slideDown {
@@ -155,8 +155,8 @@
 
 .file-item-options .config-select,
 .file-item-options .config-input {
-	padding: calc(var(--spacing-unit) * 1.25);
-	font-size: 0.9rem;
+    padding: calc(var(--spacing-unit) * 1.25);
+    font-size: 0.9rem;
     flex-basis: 200px; /* Base width */
     flex-grow: 1;
 }

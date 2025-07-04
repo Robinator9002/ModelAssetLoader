@@ -7,16 +7,16 @@
 
 /* --- Generic Modal Structure --- */
 .modal-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 3);
-	border-bottom: 1px solid var(--color-border);
-	flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 3);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
 }
 .modal-header h3 {
-	margin: 0;
-	font-size: 1.4rem;
+    margin: 0;
+    font-size: 1.4rem;
     font-weight: 600;
     color: var(--color-text-primary);
     padding-right: var(--spacing-unit);
@@ -29,38 +29,50 @@
    Specific modals should now manage their own padding,
    usually within a .modal-body container. */
 .modal-body {
-	overflow-y: auto;
-	flex-grow: 1;
+    overflow-y: auto;
+    flex-grow: 1;
 }
 
 .modal-actions {
-	display: flex;
-	justify-content: flex-end;
-	gap: calc(var(--spacing-unit) * 1.5);
-	padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
-	border-top: 1px solid var(--color-border);
-	background-color: var(--color-surface-alt);
-	flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: calc(var(--spacing-unit) * 1.5);
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-surface-alt);
+    flex-shrink: 0;
     border-bottom-left-radius: var(--border-radius-lg);
     border-bottom-right-radius: var(--border-radius-lg);
 }
 .modal-actions .button {
-	min-width: 120px;
+    min-width: 120px;
 }
 
 /* --- Specific Modal Content Sizing --- */
-.download-modal-content { max-width: 800px; }
-.confirm-modal-content { max-width: 480px; }
-.folder-selector-content { max-width: 650px; }
+.download-modal-content {
+    max-width: 800px;
+}
+.confirm-modal-content {
+    max-width: 480px;
+}
+.folder-selector-content {
+    max-width: 650px;
+}
 
 /* --- CONFIRM MODAL ENHANCEMENTS --- */
 .confirm-modal-content.modal-danger .icon-primary {
     /* When modal is danger-themed, make the default icon also danger-colored */
     color: var(--color-error);
 }
-.confirm-modal-icon-area .icon-danger { color: var(--color-error); }
-.confirm-modal-icon-area .icon-primary { color: var(--color-primary); }
-.confirm-modal-icon-area .icon-success { color: var(--color-success); }
+.confirm-modal-icon-area .icon-danger {
+    color: var(--color-error);
+}
+.confirm-modal-icon-area .icon-primary {
+    color: var(--color-primary);
+}
+.confirm-modal-icon-area .icon-success {
+    color: var(--color-success);
+}
 
 /* View for showing feedback (e.g., 'Cancellation sent') inside the modal */
 .confirm-modal-feedback-view {
@@ -76,8 +88,12 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .confirm-modal-feedback-view p {

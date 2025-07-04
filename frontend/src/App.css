@@ -7,70 +7,70 @@
 */
 
 /* 1. Import the core design system */
-@import url("./style/global.css");
+@import url('./style/global.css');
 
 /* 2. Import component-specific styles */
 /* Note: The order can be important for CSS specificity. */
-@import url("./style/Layout/Navbar.css");
-@import url("./style/Layout/Modals.css");
-@import url("./style/Layout/ConfirmModal.css");
+@import url('./style/Layout/Navbar.css');
+@import url('./style/Layout/Modals.css');
+@import url('./style/Layout/ConfirmModal.css');
 
-@import url("./style/Files/FolderSelector.css");
-@import url("./style/Files/ConfigurationsPage.css");
+@import url('./style/Files/FolderSelector.css');
+@import url('./style/Files/ConfigurationsPage.css');
 
-@import url("./style/FileManager/FileItem.css");
-@import url("./style/FileManager/FileManager.css");
-@import url("./style/FileManager/FilePreview.css");
-@import url("./style/FileManager/ViewModeSwitcher.css");
+@import url('./style/FileManager/FileItem.css');
+@import url('./style/FileManager/FileManager.css');
+@import url('./style/FileManager/FilePreview.css');
+@import url('./style/FileManager/ViewModeSwitcher.css');
 
-@import url("./style/Downloads/DownloadManager.css");
-@import url("./style/Downloads/DownloadModal.css");
+@import url('./style/Downloads/DownloadManager.css');
+@import url('./style/Downloads/DownloadModal.css');
 
-@import url("./style/ModelLoader/ModelSearchPage.css");
-@import url("./style/ModelLoader/ModelDetailsPage.css");
+@import url('./style/ModelLoader/ModelSearchPage.css');
+@import url('./style/ModelLoader/ModelDetailsPage.css');
 
-@import url("./style/Theme/ThemeSwitcher.css");
+@import url('./style/Theme/ThemeSwitcher.css');
 
 /* --- Main Application Layout --- */
 
 .app-wrapper {
-	display: flex;
-	flex-direction: column;
-	height: 100vh; /* Full viewport height */
-	width: 100vw;  /* Full viewport width */
-	overflow: hidden; /* Prevent body scrollbars */
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Full viewport height */
+    width: 100vw; /* Full viewport width */
+    overflow: hidden; /* Prevent body scrollbars */
     background-color: var(--color-background);
 }
 
 .app-header-placeholder {
-	display: flex;
-	align-items: center;
+    display: flex;
+    align-items: center;
     justify-content: center;
-	gap: calc(var(--spacing-unit) * 1.5);
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
-	background-color: var(--color-surface);
-	border-bottom: 1px solid var(--color-border);
-	flex-shrink: 0;
-	user-select: none;
+    gap: calc(var(--spacing-unit) * 1.5);
+    padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+    user-select: none;
     text-align: center;
 }
 .app-header-placeholder img {
-	width: 2.25rem; /* Slightly larger icon */
-	height: auto;
+    width: 2.25rem; /* Slightly larger icon */
+    height: auto;
     filter: drop-shadow(0 0 8px rgba(var(--color-primary-rgb), 0.5));
 }
 .app-header-placeholder h1 {
-	font-size: 1.75rem;
-	margin: 0;
+    font-size: 1.75rem;
+    margin: 0;
     font-weight: 800;
     color: var(--color-text-primary);
     letter-spacing: 0.05em;
 }
 
 .main-content-area {
-	flex-grow: 1;
-	overflow-y: auto; /* Allows content within the main area to scroll */
-	padding: calc(var(--spacing-unit) * 4);
+    flex-grow: 1;
+    overflow-y: auto; /* Allows content within the main area to scroll */
+    padding: calc(var(--spacing-unit) * 4);
     background-color: var(--color-background);
 }
 
@@ -79,7 +79,7 @@
     position: fixed;
     bottom: calc(var(--spacing-unit) * 2);
     left: calc(var(--spacing-unit) * 2);
-	z-index: var(--z-index-button);
+    z-index: var(--z-index-button);
 }
 
 .theme-switcher-button {
@@ -111,15 +111,15 @@
 
 /* Generic Loading/Error States for Pages */
 .page-state-container {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex-direction: column;
-	gap: var(--spacing-unit) * 2;
-	height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: var(--spacing-unit) * 2;
+    height: 100%;
     min-height: 400px; /* Ensure it has some height even if parent is small */
-	color: var(--color-text-secondary);
-	text-align: center;
+    color: var(--color-text-secondary);
+    text-align: center;
 }
 .page-state-container .icon {
     color: var(--color-primary);

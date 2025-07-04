@@ -4,12 +4,12 @@
  * =================================================================
 */
 .app-navbar {
-	background-color: var(--color-surface);
-	padding: 0 calc(var(--spacing-unit) * 3); /* Increased horizontal padding */
-	border-bottom: 1px solid var(--color-border);
-	flex-shrink: 0;
-	z-index: var(--z-index-navbar);
-    
+    background-color: var(--color-surface);
+    padding: 0 calc(var(--spacing-unit) * 3); /* Increased horizontal padding */
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+    z-index: var(--z-index-navbar);
+
     /* Layout Properties */
     display: flex;
     align-items: center;
@@ -37,7 +37,7 @@
 }
 
 .navbar-tabs-list {
-	display: flex;
+    display: flex;
     align-items: center;
     height: 100%;
 }
@@ -47,20 +47,20 @@
 }
 
 .navbar-tab-button {
-	background-color: transparent;
-	color: var(--color-text-secondary);
-	border: none;
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5);
-	cursor: pointer;
-	font-weight: 600;
-	font-size: 0.95rem;
-	display: inline-flex;
-	align-items: center;
-	gap: var(--spacing-unit);
-	position: relative;
+    background-color: transparent;
+    color: var(--color-text-secondary);
+    border: none;
+    padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+    position: relative;
     border-radius: var(--border-radius-md);
-	transition: color var(--transition-speed-fast) ease,
-		background-color var(--transition-speed-fast) ease;
+    transition: color var(--transition-speed-fast) ease,
+        background-color var(--transition-speed-fast) ease;
 }
 
 /* The animated underline effect */
@@ -78,12 +78,12 @@
 }
 
 .navbar-tab-button:hover:not(.active) {
-	color: var(--color-text-primary);
+    color: var(--color-text-primary);
     background-color: var(--color-surface-hover);
 }
 
 .navbar-tab-button.active {
-	color: var(--color-primary);
+    color: var(--color-primary);
 }
 
 /* Animate the underline to full width on the active tab */
@@ -97,6 +97,6 @@
 }
 
 .navbar-tab-icon {
-	line-height: 0; /* Ensures perfect vertical alignment of SVG */
+    line-height: 0; /* Ensures perfect vertical alignment of SVG */
     transition: filter var(--transition-speed-fast) ease;
 }

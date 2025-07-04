@@ -6,18 +6,18 @@
 
 /* Make the page a flex column that fills the available height */
 .model-details-page {
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 3);
-    height: 100%; 
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 3);
+    height: 100%;
     max-height: calc(100vh - 64px - 40px); /* vh - navbar_height - parent_padding */
 }
 
 .details-page-header {
     flex-shrink: 0; /* Prevent header from shrinking */
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 2);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 2);
 }
 
 .details-main-header h1 {
@@ -33,11 +33,11 @@
 
 /* This wrapper is now a flex row that grows and allows internal scrolling */
 .details-content-wrapper {
-	display: flex;
-	gap: calc(var(--spacing-unit) * 3);
+    display: flex;
+    gap: calc(var(--spacing-unit) * 3);
     flex-grow: 1;
     /* This is crucial: it prevents children from overflowing the page */
-    overflow: hidden; 
+    overflow: hidden;
 }
 
 /* Sections are now flex columns */
@@ -82,12 +82,11 @@
     font-size: 0.85rem;
 }
 
-
 /* The list itself will scroll */
 .files-list {
-	display: flex;
-	flex-direction: column;
-	gap: var(--spacing-unit);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
     overflow-y: auto;
     flex-grow: 1; /* Make it fill the available space in the section */
     padding-right: var(--spacing-unit); /* Space for scrollbar */
@@ -95,15 +94,15 @@
 }
 
 .files-list .file-item {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: calc(var(--spacing-unit) * 1.5);
-	border-radius: var(--border-radius-md);
-	transition: background-color var(--transition-speed-fast);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: calc(var(--spacing-unit) * 1.5);
+    border-radius: var(--border-radius-md);
+    transition: background-color var(--transition-speed-fast);
 }
 .files-list .file-item:hover {
-	background-color: var(--color-surface-hover);
+    background-color: var(--color-surface-hover);
 }
 
 .file-item-info {
@@ -115,9 +114,9 @@
 }
 
 .file-item-name {
-	font-size: 0.9rem;
-	font-family: var(--font-monospace);
-	word-break: break-all;
+    font-size: 0.9rem;
+    font-family: var(--font-monospace);
+    word-break: break-all;
     color: var(--color-text-primary);
 }
 .file-item-size {
@@ -125,10 +124,9 @@
     color: var(--color-text-secondary);
 }
 
-
 /* The readme content will scroll */
 .readme-content {
-	font-size: 1rem;
+    font-size: 1rem;
     line-height: 1.7;
     overflow-y: auto; /* Enable scrolling */
     flex-grow: 1; /* Make it fill the available space */
@@ -136,55 +134,67 @@
 }
 
 /* --- Readme Content Formatting --- */
-.readme-content > *:first-child { margin-top: 0; }
-.readme-content > *:last-child { margin-bottom: 0; }
+.readme-content > *:first-child {
+    margin-top: 0;
+}
+.readme-content > *:last-child {
+    margin-bottom: 0;
+}
 
-.readme-content h1, .readme-content h2, .readme-content h3 {
-	border-bottom: 1px solid var(--color-border);
-	padding-bottom: var(--spacing-unit);
-	margin-top: calc(var(--spacing-unit) * 3);
+.readme-content h1,
+.readme-content h2,
+.readme-content h3 {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--spacing-unit);
+    margin-top: calc(var(--spacing-unit) * 3);
     margin-bottom: calc(var(--spacing-unit) * 2);
 }
-.readme-content h1 { font-size: 1.75rem; }
-.readme-content h2 { font-size: 1.4rem; }
-.readme-content h3 { font-size: 1.2rem; }
+.readme-content h1 {
+    font-size: 1.75rem;
+}
+.readme-content h2 {
+    font-size: 1.4rem;
+}
+.readme-content h3 {
+    font-size: 1.2rem;
+}
 
 .readme-content code {
-	background-color: var(--color-surface-alt);
+    background-color: var(--color-surface-alt);
     border: 1px solid var(--color-border);
-	padding: 0.2em 0.5em;
-	font-size: 90%;
-	border-radius: var(--border-radius-sm);
-	font-family: var(--font-monospace);
+    padding: 0.2em 0.5em;
+    font-size: 90%;
+    border-radius: var(--border-radius-sm);
+    font-family: var(--font-monospace);
     color: var(--color-text-primary);
 }
 .readme-content pre {
-	background-color: var(--color-background);
-	padding: calc(var(--spacing-unit) * 2);
-	border-radius: var(--border-radius-md);
-	border: 1px solid var(--color-border);
-	overflow-x: auto;
+    background-color: var(--color-background);
+    padding: calc(var(--spacing-unit) * 2);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--color-border);
+    overflow-x: auto;
     box-shadow: var(--shadow-inset);
 }
 .readme-content pre code {
-	background: none;
-	padding: 0;
+    background: none;
+    padding: 0;
     border: none;
     font-size: 100%;
 }
 .readme-content blockquote {
-	border-left: 4px solid var(--color-primary);
-	padding-left: calc(var(--spacing-unit) * 2);
-	margin: 0 0 var(--spacing-unit) 0;
-	color: var(--color-text-secondary);
+    border-left: 4px solid var(--color-primary);
+    padding-left: calc(var(--spacing-unit) * 2);
+    margin: 0 0 var(--spacing-unit) 0;
+    color: var(--color-text-secondary);
     background-color: rgba(var(--color-primary-rgb), 0.05);
 }
 
 /* Responsive adjustment */
 @media (max-width: 1000px) {
-	.details-content-wrapper {
-		flex-direction: column;
-	}
+    .details-content-wrapper {
+        flex-direction: column;
+    }
     .files-section {
         flex-basis: auto; /* Reset base width */
         max-height: 40vh; /* Give a max height on smaller screens */

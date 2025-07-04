@@ -6,28 +6,28 @@
  * =================================================================
 */
 .download-manager-container {
-	position: fixed;
-	bottom: calc(var(--spacing-unit) * 2);
-	right: calc(var(--spacing-unit) * 2);
-	width: 100%;
-	max-width: 400px;
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 1.5);
-	pointer-events: none;
-	z-index: var(--z-index-toast);
+    position: fixed;
+    bottom: calc(var(--spacing-unit) * 2);
+    right: calc(var(--spacing-unit) * 2);
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 1.5);
+    pointer-events: none;
+    z-index: var(--z-index-toast);
 }
 .download-item-toast {
-	background-color: var(--color-surface);
-	border-radius: var(--border-radius-md);
-	padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
-	box-shadow: var(--shadow-lg);
-	border-left: 5px solid var(--color-primary);
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing-unit) * 1.25);
-	pointer-events: all;
-	animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    background-color: var(--color-surface);
+    border-radius: var(--border-radius-md);
+    padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+    box-shadow: var(--shadow-lg);
+    border-left: 5px solid var(--color-primary);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 1.25);
+    pointer-events: all;
+    animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     border: 1px solid var(--color-border);
     transition: transform 0.2s ease, opacity 0.2s ease;
 }
@@ -36,21 +36,21 @@
 }
 
 @keyframes slideInUp {
-	from {
-		opacity: 0;
-		transform: translateY(25px) scale(0.95);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0) scale(1);
-	}
+    from {
+        opacity: 0;
+        transform: translateY(25px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .download-item-toast.error {
-	border-left-color: var(--color-error);
+    border-left-color: var(--color-error);
 }
 .download-item-toast.completed {
-	border-left-color: var(--color-success);
+    border-left-color: var(--color-success);
 }
 /* --- Style for cancelled toasts --- */
 .download-item-toast.cancelled {
@@ -58,28 +58,39 @@
 }
 
 .download-toast-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: var(--spacing-unit);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-unit);
 }
 .download-toast-filename {
-	font-weight: 600;
-	font-size: 0.95rem;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--color-text-primary);
 }
-.download-toast-status-icon .text-red-500 { color: var(--color-error); }
-.download-toast-status-icon .text-green-500 { color: var(--color-success); }
+.download-toast-status-icon .text-red-500 {
+    color: var(--color-error);
+}
+.download-toast-status-icon .text-green-500 {
+    color: var(--color-success);
+}
 /* --- Style for cancelled icon --- */
-.download-toast-status-icon .text-gray-500 { color: var(--color-text-secondary); }
+.download-toast-status-icon .text-gray-500 {
+    color: var(--color-text-secondary);
+}
 
 .dismiss-button {
     /* Uses .button-icon styles */
-    background: none; border: none; padding: 4px; border-radius: 50%;
-    color: var(--color-text-secondary); cursor: pointer; line-height: 0;
+    background: none;
+    border: none;
+    padding: 4px;
+    border-radius: 50%;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    line-height: 0;
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 .dismiss-button:hover {
@@ -87,31 +98,34 @@
     color: var(--color-text-primary);
 }
 .download-toast-body {
-	display: flex;
-	align-items: center;
-	gap: var(--spacing-unit);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
     /* Add a small margin if there are actions below */
     margin-bottom: 5px;
 }
 .progress-bar-container {
-	flex-grow: 1;
-	background-color: var(--color-background);
-	border-radius: 100px;
-	overflow: hidden;
-	height: calc(var(--spacing-unit) * 1.25);
+    flex-grow: 1;
+    background-color: var(--color-background);
+    border-radius: 100px;
+    overflow: hidden;
+    height: calc(var(--spacing-unit) * 1.25);
     box-shadow: var(--shadow-inset);
 }
 .progress-bar {
-	height: 100%;
-	background-color: var(--color-primary);
-	width: 0%;
-	border-radius: inherit;
-	transition: width 0.2s linear;
+    height: 100%;
+    background-color: var(--color-primary);
+    width: 0%;
+    border-radius: inherit;
+    transition: width 0.2s linear;
     background-image: linear-gradient(
-        45deg, 
-        rgba(255,255,255,0.15) 25%, transparent 25%, 
-        transparent 50%, rgba(255,255,255,0.15) 50%, 
-        rgba(255,255,255,0.15) 75%, transparent 75%,
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
         transparent
     );
     background-size: 20px 20px;
@@ -119,33 +133,36 @@
 }
 
 @keyframes progressBarStripes {
-    from { background-position: 20px 0; }
-    to { background-position: 0 0; }
+    from {
+        background-position: 20px 0;
+    }
+    to {
+        background-position: 0 0;
+    }
 }
 
 .progress-bar.completed {
-	background-color: var(--color-success);
+    background-color: var(--color-success);
     animation: none;
 }
 .progress-text {
-	font-size: 0.8rem;
-	font-variant-numeric: tabular-nums;
-	color: var(--color-text-secondary);
-	font-weight: 600;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+    font-weight: 600;
 }
 .download-toast-error-message {
-	font-size: 0.9rem;
-	color: var(--color-text-secondary); /* Changed from error to secondary for cancelled messages */
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary); /* Changed from error to secondary for cancelled messages */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: 500;
 }
 /* Make explicit error messages red again */
 .download-item-toast.error .download-toast-error-message {
     color: var(--color-error);
 }
-
 
 .download-item-toast.closing {
     opacity: 0;
