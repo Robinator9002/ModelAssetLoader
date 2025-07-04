@@ -1,6 +1,11 @@
 // frontend/src/components/FileManager/FileManagerPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { listManagedFilesAPI, deleteManagedItemAPI, type LocalFileItem, type ViewMode } from '../../api/api';
+import {
+    listManagedFilesAPI,
+    deleteManagedItemAPI,
+    type LocalFileItem,
+    type ViewMode,
+} from '../../api/api';
 import { Loader2, AlertTriangle, ArrowLeft, RefreshCw, Home } from 'lucide-react';
 import FileItem from './FileItem';
 import ConfirmModal from '../Layout/ConfirmModal';
@@ -13,7 +18,7 @@ const FileManagerPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>('models');
-    
+
     const [itemToDelete, setItemToDelete] = useState<LocalFileItem | null>(null);
     const [itemToPreview, setItemToPreview] = useState<LocalFileItem | null>(null);
 
@@ -27,7 +32,10 @@ const FileManagerPage: React.FC = () => {
             setItems(response.items);
             setCurrentPath(response.path); // Update path based on backend's smart response
         } catch (err: any) {
-            setError(err.message || 'Failed to load files. Is the backend running and the base path configured?');
+            setError(
+                err.message ||
+                    'Failed to load files. Is the backend running and the base path configured?',
+            );
             setItems([]);
         } finally {
             setIsLoading(false);
@@ -48,7 +56,7 @@ const FileManagerPage: React.FC = () => {
             setItemToPreview(item);
         }
     };
-    
+
     const navigateUp = () => {
         if (!currentPath) return;
         const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
@@ -58,7 +66,7 @@ const FileManagerPage: React.FC = () => {
     const navigateHome = () => {
         fetchFiles(null, viewMode);
     };
-    
+
     const handleRefresh = () => {
         fetchFiles(currentPath, viewMode);
     };
@@ -81,25 +89,36 @@ const FileManagerPage: React.FC = () => {
 
     const renderContent = () => {
         if (isLoading) {
-            return <div className="loading-message"><Loader2 size={24} className="animate-spin" /><span>Finding models...</span></div>;
+            return (
+                <div className="loading-message">
+                    <Loader2 size={24} className="animate-spin" />
+                    <span>Finding models...</span>
+                </div>
+            );
         }
         if (error) {
-            return <div className="feedback-message error"><AlertTriangle size={16} /><span>{error}</span></div>;
+            return (
+                <div className="feedback-message error">
+                    <AlertTriangle size={16} />
+                    <span>{error}</span>
+                </div>
+            );
         }
         if (items.length === 0) {
-            return <p className="no-results-message">
-                {viewMode === 'models'
-                    ? 'No relevant models found in the configured base path.'
-                    : 'This directory is empty.'
-                }
-            </p>;
+            return (
+                <p className="no-results-message">
+                    {viewMode === 'models'
+                        ? 'No relevant models found in the configured base path.'
+                        : 'This directory is empty.'}
+                </p>
+            );
         }
         return (
             <div className="file-list-grid">
-                {items.map(item => (
-                    <FileItem 
-                        key={item.path} 
-                        item={item} 
+                {items.map((item) => (
+                    <FileItem
+                        key={item.path}
+                        item={item}
                         onNavigate={handleNavigate}
                         onDelete={handleDeleteRequest}
                     />
@@ -112,11 +131,21 @@ const FileManagerPage: React.FC = () => {
         <div className="file-manager-page">
             <div className="file-manager-header">
                 <div className="breadcrumb-bar">
-                    <button onClick={navigateHome} className="button-icon" title="Go to root" disabled={isLoading || currentPath === null}>
+                    <button
+                        onClick={navigateHome}
+                        className="button-icon"
+                        title="Go to root"
+                        disabled={isLoading || currentPath === null}
+                    >
                         <Home size={18} />
                     </button>
                     {currentPath && (
-                        <button onClick={navigateUp} className="button-icon" title="Go up one level" disabled={isLoading}>
+                        <button
+                            onClick={navigateUp}
+                            className="button-icon"
+                            title="Go up one level"
+                            disabled={isLoading}
+                        >
                             <ArrowLeft size={18} />
                         </button>
                     )}
@@ -124,21 +153,29 @@ const FileManagerPage: React.FC = () => {
                 </div>
                 <div className="header-actions">
                     <ViewModeSwitcher currentMode={viewMode} onModeChange={setViewMode} />
-                    <button onClick={handleRefresh} className="button-icon" title="Refresh" disabled={isLoading}>
+                    <button
+                        onClick={handleRefresh}
+                        className="button-icon"
+                        title="Refresh"
+                        disabled={isLoading}
+                    >
                         <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                     </button>
                 </div>
             </div>
 
-            <div className="file-manager-content">
-                {renderContent()}
-            </div>
+            <div className="file-manager-content">{renderContent()}</div>
 
             {itemToDelete && (
                 <ConfirmModal
                     isOpen={!!itemToDelete}
                     title={`Delete ${itemToDelete.type}`}
-                    message={<span>Are you sure you want to permanently delete <strong>{itemToDelete.name}</strong>? This action cannot be undone.</span>}
+                    message={
+                        <span>
+                            Are you sure you want to permanently delete{' '}
+                            <strong>{itemToDelete.name}</strong>? This action cannot be undone.
+                        </span>
+                    }
                     onConfirm={handleConfirmDelete}
                     onCancel={() => setItemToDelete(null)}
                     confirmText="Yes, Delete"
@@ -147,10 +184,7 @@ const FileManagerPage: React.FC = () => {
             )}
 
             {itemToPreview && (
-                <FilePreview
-                    item={itemToPreview}
-                    onClose={() => setItemToPreview(null)}
-                />
+                <FilePreview item={itemToPreview} onClose={() => setItemToPreview(null)} />
             )}
         </div>
     );

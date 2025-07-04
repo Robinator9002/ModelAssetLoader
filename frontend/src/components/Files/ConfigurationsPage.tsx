@@ -1,22 +1,19 @@
 // frontend/src/components/Files/ConfigurationsPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     configurePathsAPI,
     type PathConfigurationRequest,
     type UiProfileType,
     type ModelType,
     type ColorThemeType,
-} from "../../api/api";
-import type { AppPathConfig } from "../../App";
-import FolderSelector from "./FolderSelector";
-import { Folder, Settings, Save, AlertTriangle } from "lucide-react";
+} from '../../api/api';
+import type { AppPathConfig } from '../../App';
+import FolderSelector from './FolderSelector';
+import { Folder, Settings, Save, AlertTriangle } from 'lucide-react';
 
 interface ConfigurationsPageProps {
     initialPathConfig: AppPathConfig | null;
-    onConfigurationSave: (
-        savedConfig: AppPathConfig,
-        savedTheme: ColorThemeType
-    ) => void;
+    onConfigurationSave: (savedConfig: AppPathConfig, savedTheme: ColorThemeType) => void;
     currentGlobalTheme: ColorThemeType;
 }
 
@@ -26,16 +23,18 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
     currentGlobalTheme,
 }) => {
     const [basePath, setBasePath] = useState<string | null>(null);
-    const [selectedProfile, setSelectedProfile] = useState<UiProfileType>("ComfyUI");
+    const [selectedProfile, setSelectedProfile] = useState<UiProfileType>('ComfyUI');
     const [customPaths, setCustomPaths] = useState<Partial<Record<ModelType, string>>>({});
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
+        null,
+    );
     const [isFolderSelectorOpen, setIsFolderSelectorOpen] = useState(false);
 
     useEffect(() => {
         if (initialPathConfig) {
             setBasePath(initialPathConfig.basePath || null);
-            setSelectedProfile(initialPathConfig.uiProfile || "ComfyUI");
+            setSelectedProfile(initialPathConfig.uiProfile || 'ComfyUI');
             setCustomPaths(initialPathConfig.customPaths || {});
         }
     }, [initialPathConfig]);
@@ -60,7 +59,7 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
 
     const handleSaveConfiguration = useCallback(async () => {
         if (!basePath) {
-            setFeedback({ type: "error", message: "Please select a base path first." });
+            setFeedback({ type: 'error', message: 'Please select a base path first.' });
             return;
         }
         setIsLoading(true);
@@ -69,17 +68,21 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
             const configToSave: PathConfigurationRequest = {
                 base_path: basePath,
                 profile: selectedProfile,
-                custom_model_type_paths: selectedProfile === "Custom" ? (customPaths as Record<string, string>) : {},
+                custom_model_type_paths:
+                    selectedProfile === 'Custom' ? (customPaths as Record<string, string>) : {},
                 color_theme: currentGlobalTheme,
             };
             const response = await configurePathsAPI(configToSave);
             if (response.success && response.current_config) {
                 const newConfig = response.current_config;
-                setFeedback({ type: "success", message: response.message || "Configuration saved successfully!" });
-                
+                setFeedback({
+                    type: 'success',
+                    message: response.message || 'Configuration saved successfully!',
+                });
+
                 // --- Update local state directly after successful save ---
                 setBasePath(newConfig.base_path || null);
-                setSelectedProfile(newConfig.profile || "ComfyUI");
+                setSelectedProfile(newConfig.profile || 'ComfyUI');
                 setCustomPaths(newConfig.custom_model_type_paths || {});
 
                 // Propagate the changes to the parent component
@@ -89,21 +92,31 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                         uiProfile: newConfig.profile,
                         customPaths: newConfig.custom_model_type_paths || {},
                     },
-                    newConfig.color_theme || currentGlobalTheme
+                    newConfig.color_theme || currentGlobalTheme,
                 );
             } else {
-                throw new Error(response.error || "Failed to save configuration.");
+                throw new Error(response.error || 'Failed to save configuration.');
             }
         } catch (err: any) {
-            setFeedback({ type: "error", message: err.message || "An unknown API error occurred." });
+            setFeedback({
+                type: 'error',
+                message: err.message || 'An unknown API error occurred.',
+            });
         } finally {
             setIsLoading(false);
         }
     }, [basePath, selectedProfile, customPaths, currentGlobalTheme, onConfigurationSave]);
 
     const modelTypesForCustomPaths: ModelType[] = [
-        "checkpoints", "loras", "vae", "embeddings", "controlnet", 
-        "diffusers", "clip", "unet", "hypernetworks"
+        'checkpoints',
+        'loras',
+        'vae',
+        'embeddings',
+        'controlnet',
+        'diffusers',
+        'clip',
+        'unet',
+        'hypernetworks',
     ].sort() as ModelType[];
 
     return (
@@ -128,18 +141,20 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                                 <input
                                     type="text"
                                     id="basePathDisplay"
-                                    value={basePath || "Not set"}
+                                    value={basePath || 'Not set'}
                                     readOnly
                                     className="config-input path-input"
                                     onClick={handleSelectBasePathClick}
-                                    title={basePath || "Click to select base folder"}
+                                    title={basePath || 'Click to select base folder'}
                                 />
                                 <button onClick={handleSelectBasePathClick} className="button">
                                     Browse...
                                 </button>
                             </div>
                             {!basePath && (
-                                <p className="config-hint error-hint">A base folder must be selected.</p>
+                                <p className="config-hint error-hint">
+                                    A base folder must be selected.
+                                </p>
                             )}
                         </section>
 
@@ -149,8 +164,10 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                             </label>
                             <select
                                 id="uiProfileSelect"
-                                value={selectedProfile || ""}
-                                onChange={(e) => handleProfileChange(e.target.value as UiProfileType)}
+                                value={selectedProfile || ''}
+                                onChange={(e) =>
+                                    handleProfileChange(e.target.value as UiProfileType)
+                                }
                                 className="config-select"
                                 disabled={!basePath}
                             >
@@ -165,25 +182,36 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                     </div>
                 </div>
 
-                <div className={`config-card custom-paths-card ${selectedProfile === "Custom" && basePath ? 'visible' : ''}`}>
+                <div
+                    className={`config-card custom-paths-card ${
+                        selectedProfile === 'Custom' && basePath ? 'visible' : ''
+                    }`}
+                >
                     <h2 className="config-card-header">
                         <Settings size={20} />
                         Advanced: Custom Paths
                     </h2>
                     <div className="config-card-body custom-paths-body">
-                         <p className="config-hint">Paths are relative to your base folder: <code>{basePath}</code></p>
-                         <div className="custom-paths-list">
+                        <p className="config-hint">
+                            Paths are relative to your base folder: <code>{basePath}</code>
+                        </p>
+                        <div className="custom-paths-list">
                             {modelTypesForCustomPaths.map((mType) => (
                                 <div key={mType} className="custom-path-entry">
-                                    <label htmlFor={`customPath-${mType}`} className="custom-path-label">
+                                    <label
+                                        htmlFor={`customPath-${mType}`}
+                                        className="custom-path-label"
+                                    >
                                         {mType}
                                     </label>
                                     <input
                                         type="text"
                                         id={`customPath-${mType}`}
-                                        value={customPaths[mType] || ""}
+                                        value={customPaths[mType] || ''}
                                         placeholder={`e.g., models/${mType}`}
-                                        onChange={(e) => handleCustomPathChange(mType, e.target.value)}
+                                        onChange={(e) =>
+                                            handleCustomPathChange(mType, e.target.value)
+                                        }
                                         className="config-input"
                                     />
                                 </div>
@@ -192,9 +220,9 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                     </div>
                 </div>
             </div>
-            
+
             <div className="config-footer">
-                 {feedback && (
+                {feedback && (
                     <div className={`feedback-message ${feedback.type}`}>
                         <AlertTriangle size={16} />
                         <span>{feedback.message}</span>
@@ -204,10 +232,10 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                     onClick={handleSaveConfiguration}
                     disabled={isLoading || !basePath}
                     className="button button-primary save-config-button"
-                    title={!basePath ? "Please select a base folder first" : "Save configuration"}
+                    title={!basePath ? 'Please select a base folder first' : 'Save configuration'}
                 >
                     <Save size={18} />
-                    {isLoading ? "Saving..." : "Save Configuration"}
+                    {isLoading ? 'Saving...' : 'Save Configuration'}
                 </button>
             </div>
 

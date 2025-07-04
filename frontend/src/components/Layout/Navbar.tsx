@@ -1,56 +1,56 @@
 // frontend/src/components/Layout/Navbar.tsx
-import React from "react";
-import { Search, Settings, FolderKanban } from "lucide-react";
+import React from 'react';
+import { Search, Settings, FolderKanban } from 'lucide-react';
 
 // The type definition for the available tabs in the application.
-export type MalTabKey = "search" | "files" | "configuration";
+export type MalTabKey = 'search' | 'files' | 'configuration';
 
 interface NavbarProps {
-	activeTab: MalTabKey;
-	onTabChange: (tab: MalTabKey) => void;
+    activeTab: MalTabKey;
+    onTabChange: (tab: MalTabKey) => void;
 }
 
 interface NavItemConfig {
-	key: MalTabKey;
-	label: string;
-	icon: React.ReactNode;
+    key: MalTabKey;
+    label: string;
+    icon: React.ReactNode;
 }
 
 // Configuration for the navigation items, now using Lucide icons.
 const navItems: NavItemConfig[] = [
-	{
-		key: "search",
-		label: "Model Search",
-		icon: <Search size={18} />,
-	},
     {
-        key: "files",
-        label: "File Manager",
-        icon: <FolderKanban size={18} />
+        key: 'search',
+        label: 'Model Search',
+        icon: <Search size={18} />,
     },
-	{
-		key: "configuration",
-		label: "Configuration",
-		icon: <Settings size={18} />,
-	},
+    {
+        key: 'files',
+        label: 'File Manager',
+        icon: <FolderKanban size={18} />,
+    },
+    {
+        key: 'configuration',
+        label: 'Configuration',
+        icon: <Settings size={18} />,
+    },
 ];
 
 const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
-	return (
-		<header className="app-navbar">
+    return (
+        <header className="app-navbar">
             <div className="navbar-brand">
                 <strong>M.A.L.</strong>
             </div>
-			<nav className="navbar-tabs-nav">
+            <nav className="navbar-tabs-nav">
                 <ul className="navbar-tabs-list">
                     {navItems.map((item) => (
                         <li key={item.key} className="navbar-tab-item">
                             <button
                                 className={`navbar-tab-button ${
-                                    activeTab === item.key ? "active" : ""
+                                    activeTab === item.key ? 'active' : ''
                                 }`}
                                 onClick={() => onTabChange(item.key)}
-                                aria-current={activeTab === item.key ? "page" : undefined}
+                                aria-current={activeTab === item.key ? 'page' : undefined}
                                 title={item.label}
                             >
                                 <span className="navbar-tab-icon">{item.icon}</span>
@@ -60,8 +60,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
                     ))}
                 </ul>
             </nav>
-		</header>
-	);
+        </header>
+    );
 };
 
 export default Navbar;

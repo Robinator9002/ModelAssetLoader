@@ -26,10 +26,10 @@ const FileItem: React.FC<FileItemProps> = ({ item, onNavigate, onDelete }) => {
         e.stopPropagation(); // Prevent navigation when clicking delete
         onDelete(item);
     };
-    
+
     const handleNavigateClick = () => {
         onNavigate(item);
-    }
+    };
 
     return (
         <div className="file-item-card" onClick={handleNavigateClick} title={item.name}>
@@ -39,12 +39,14 @@ const FileItem: React.FC<FileItemProps> = ({ item, onNavigate, onDelete }) => {
             <div className="file-item-details">
                 <p className="file-item-name">{item.name}</p>
                 <p className="file-item-meta">
-                    {item.type === 'file' && item.size !== null ? formatBytes(item.size) : 'Directory'}
+                    {item.type === 'file' && item.size !== null
+                        ? formatBytes(item.size)
+                        : 'Directory'}
                 </p>
             </div>
             <div className="file-item-actions">
-                <button 
-                    className="button-icon delete-button" 
+                <button
+                    className="button-icon delete-button"
                     title="Delete"
                     onClick={handleDeleteClick}
                 >

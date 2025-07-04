@@ -11,13 +11,7 @@ interface DownloadItemProps {
 }
 
 const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
-    const {
-        download_id,
-        filename,
-        status: downloadStatus,
-        progress,
-        error_message,
-    } = status;
+    const { download_id, filename, status: downloadStatus, progress, error_message } = status;
 
     const [isClosing, setIsClosing] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -40,7 +34,6 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
         }
     }, [isClosing, download_id, onDismiss]);
 
-
     // ====================================================================
     // ===== EFFEKT FÜR DAS AUTOMATISCHE SCHLIESSEN (DER TRIGGER) =====
     // ====================================================================
@@ -48,27 +41,34 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
     useEffect(() => {
         let autoDismissTimer: NodeJS.Timeout | undefined;
 
-        if (downloadStatus === 'completed' || downloadStatus === 'error' || downloadStatus === 'cancelled') {
+        if (
+            downloadStatus === 'completed' ||
+            downloadStatus === 'error' ||
+            downloadStatus === 'cancelled'
+        ) {
             autoDismissTimer = setTimeout(() => {
                 setIsClosing(true); // Triggert den obigen "Gatekeeper"-Effekt
             }, 4000); // 4 Sekunden Wartezeit
         }
-        
+
         // Löscht den Timer, wenn sich der Status ändert, bevor die 4s um sind.
         return () => clearTimeout(autoDismissTimer);
-
     }, [downloadStatus]);
-
 
     // --- Unveränderte Logik ---
 
     const getStatusIcon = () => {
         switch (downloadStatus) {
-            case 'downloading': return <Loader2 size={18} className="animate-spin" />;
-            case 'completed': return <CheckCircle2 size={18} className="text-green-500" />;
-            case 'cancelled': return <Ban size={18} className="text-gray-500" />;
-            case 'error': return <AlertTriangle size={18} className="text-red-500" />;
-            default: return <Loader2 size={18} className="animate-spin text-gray-400" />;
+            case 'downloading':
+                return <Loader2 size={18} className="animate-spin" />;
+            case 'completed':
+                return <CheckCircle2 size={18} className="text-green-500" />;
+            case 'cancelled':
+                return <Ban size={18} className="text-gray-500" />;
+            case 'error':
+                return <AlertTriangle size={18} className="text-red-500" />;
+            default:
+                return <Loader2 size={18} className="animate-spin text-gray-400" />;
         }
     };
 
@@ -96,25 +96,33 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
                 role="alert"
             >
                 <div className="download-toast-header">
-                    <span className="download-toast-filename" title={filename}>{filename}</span>
+                    <span className="download-toast-filename" title={filename}>
+                        {filename}
+                    </span>
                     <span className="download-toast-status-icon">{getStatusIcon()}</span>
-                    <button 
-                        onClick={isCancellable ? handleRequestCancel : handleManualDismiss} 
+                    <button
+                        onClick={isCancellable ? handleRequestCancel : handleManualDismiss}
                         className="dismiss-button"
-                        aria-label={isCancellable ? "Request cancellation" : "Dismiss notification"}
+                        aria-label={isCancellable ? 'Request cancellation' : 'Dismiss notification'}
                     >
                         <X size={16} />
                     </button>
                 </div>
                 <div className="download-toast-body">
                     {downloadStatus === 'error' || downloadStatus === 'cancelled' ? (
-                        <div className="download-toast-error-message" title={error_message || 'Download was cancelled'}>
+                        <div
+                            className="download-toast-error-message"
+                            title={error_message || 'Download was cancelled'}
+                        >
                             {error_message || 'The download was cancelled by the user.'}
                         </div>
                     ) : (
                         <>
                             <div className="progress-bar-container">
-                                <div className={`progress-bar ${downloadStatus}`} style={{ width: `${progress}%` }}/>
+                                <div
+                                    className={`progress-bar ${downloadStatus}`}
+                                    style={{ width: `${progress}%` }}
+                                />
                             </div>
                             <span className="progress-text">{progress?.toFixed(1) || '0.0'}%</span>
                         </>
@@ -122,7 +130,10 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
                 </div>
                 {isCancellable && (
                     <div className="download-toast-actions">
-                        <button className="button button-danger button-small" onClick={handleRequestCancel}>
+                        <button
+                            className="button button-danger button-small"
+                            onClick={handleRequestCancel}
+                        >
                             <Ban size={14} />
                             <span>Cancel Download</span>
                         </button>
@@ -143,7 +154,6 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ status, onDismiss }) => {
     );
 };
 
-
 interface DownloadManagerProps {
     activeDownloads: Map<string, DownloadStatus>;
     onDismiss: (downloadId: string) => void;
@@ -157,12 +167,8 @@ const DownloadManager: React.FC<DownloadManagerProps> = ({ activeDownloads, onDi
     const downloadArray = Array.from(activeDownloads.values());
     return (
         <div className="download-manager-container">
-            {downloadArray.map(status => (
-                <DownloadItem
-                    key={status.download_id}
-                    status={status}
-                    onDismiss={onDismiss}
-                />
+            {downloadArray.map((status) => (
+                <DownloadItem key={status.download_id} status={status} onDismiss={onDismiss} />
             ))}
         </div>
     );

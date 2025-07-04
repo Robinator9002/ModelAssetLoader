@@ -1,13 +1,13 @@
 // frontend/src/api/api.tsx
-import axios, { type AxiosInstance } from "axios";
+import axios, { type AxiosInstance } from 'axios';
 
-const API_BASE_URL = "http://localhost:8000/api";
-const WS_BASE_URL = "ws://localhost:8000";
+const API_BASE_URL = 'http://localhost:8000/api';
+const WS_BASE_URL = 'ws://localhost:8000';
 
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
     },
 });
 
@@ -50,26 +50,26 @@ export interface SearchModelParams {
     search?: string;
     author?: string;
     tags?: string[];
-    sort?: "lastModified" | "downloads" | "likes" | "author" | "id";
+    sort?: 'lastModified' | 'downloads' | 'likes' | 'author' | 'id';
     direction?: -1 | 1;
     limit?: number;
     page?: number;
 }
 
 // --- FileManager & Download Interfaces ---
-export type UiProfileType = "ComfyUI" | "A1111" | "ForgeUI" | "Custom";
-export type ColorThemeType = "dark" | "light";
+export type UiProfileType = 'ComfyUI' | 'A1111' | 'ForgeUI' | 'Custom';
+export type ColorThemeType = 'dark' | 'light';
 export type ModelType =
-    | "checkpoints"
-    | "loras"
-    | "vae"
-    | "clip"
-    | "unet"
-    | "controlnet"
-    | "embeddings"
-    | "hypernetworks"
-    | "diffusers"
-    | "custom";
+    | 'checkpoints'
+    | 'loras'
+    | 'vae'
+    | 'clip'
+    | 'unet'
+    | 'controlnet'
+    | 'embeddings'
+    | 'hypernetworks'
+    | 'diffusers'
+    | 'custom';
 
 export interface PathConfigurationRequest {
     base_path?: string | null;
@@ -114,7 +114,7 @@ export interface DownloadStatus {
     download_id: string;
     filename: string;
     repo_id: string;
-    status: "pending" | "downloading" | "completed" | "error" | "cancelled";
+    status: 'pending' | 'downloading' | 'completed' | 'error' | 'cancelled';
     progress: number;
     total_size_bytes: number;
     downloaded_bytes: number;
@@ -126,7 +126,7 @@ export interface DownloadStatus {
 export interface HostDirectoryItem {
     name: string;
     path: string;
-    type: "directory";
+    type: 'directory';
     children?: HostDirectoryItem[] | null;
 }
 
@@ -141,7 +141,7 @@ export interface ScanHostDirectoriesResponse {
 export interface LocalFileItem {
     name: string;
     path: string; // Relative path from the base_path
-    type: "file" | "directory";
+    type: 'file' | 'directory';
     size: number | null; // Size in bytes, null for directories
     last_modified: string; // ISO Date String
 }
@@ -162,40 +162,40 @@ export type ViewMode = 'models' | 'explorer';
 
 // --- API Functions (Existing) ---
 export const searchModels = async (
-    params: SearchModelParams
+    params: SearchModelParams,
 ): Promise<PaginatedModelListResponse> => {
     try {
-        const response = await apiClient.get<PaginatedModelListResponse>("/models", { params });
+        const response = await apiClient.get<PaginatedModelListResponse>('/models', { params });
         return response.data;
     } catch (error) {
-        console.error("Error in searchModels:", error);
+        console.error('Error in searchModels:', error);
         throw error;
     }
 };
 
-export const getModelDetails = async (
-    source: string,
-    modelId: string
-): Promise<ModelDetails> => {
+export const getModelDetails = async (source: string, modelId: string): Promise<ModelDetails> => {
     try {
         const response = await apiClient.get<ModelDetails>(
-            `/models/${encodeURIComponent(source)}/${encodeURIComponent(modelId)}`
+            `/models/${encodeURIComponent(source)}/${encodeURIComponent(modelId)}`,
         );
         return response.data;
     } catch (error) {
-        console.error("Error in getModelDetails:", error);
+        console.error('Error in getModelDetails:', error);
         throw error;
     }
 };
 
 export const downloadFileAPI = async (
-    request: FileDownloadRequest
+    request: FileDownloadRequest,
 ): Promise<FileDownloadResponse> => {
     try {
-        const response = await apiClient.post<FileDownloadResponse>("/filemanager/download", request);
+        const response = await apiClient.post<FileDownloadResponse>(
+            '/filemanager/download',
+            request,
+        );
         return response.data;
     } catch (error) {
-        console.error("Error in downloadFileAPI:", error);
+        console.error('Error in downloadFileAPI:', error);
         const axiosError = error as any;
         if (axiosError.response && axiosError.response.data) {
             return axiosError.response.data;
@@ -204,7 +204,9 @@ export const downloadFileAPI = async (
     }
 };
 
-export const cancelDownloadAPI = async (downloadId: string): Promise<{ success: boolean; message?: string }> => {
+export const cancelDownloadAPI = async (
+    downloadId: string,
+): Promise<{ success: boolean; message?: string }> => {
     try {
         const response = await apiClient.post(`/filemanager/downloads/${downloadId}/cancel`);
         return { success: true, ...response.data };
@@ -212,7 +214,7 @@ export const cancelDownloadAPI = async (downloadId: string): Promise<{ success: 
         console.error(`Failed to cancel download ${downloadId}:`, error);
         const axiosError = error as any;
         if (axiosError.response?.data?.detail) {
-             throw new Error(axiosError.response.data.detail);
+            throw new Error(axiosError.response.data.detail);
         }
         throw error;
     }
@@ -228,13 +230,16 @@ export const dismissDownloadAPI = async (downloadId: string): Promise<void> => {
 };
 
 export const configurePathsAPI = async (
-    config: PathConfigurationRequest
+    config: PathConfigurationRequest,
 ): Promise<PathConfigurationResponse> => {
     try {
-        const response = await apiClient.post<PathConfigurationResponse>("/filemanager/configure", config);
+        const response = await apiClient.post<PathConfigurationResponse>(
+            '/filemanager/configure',
+            config,
+        );
         return response.data;
     } catch (error) {
-        console.error("Error in configurePathsAPI:", error);
+        console.error('Error in configurePathsAPI:', error);
         const axiosError = error as any;
         if (axiosError.response && axiosError.response.data) {
             return axiosError.response.data;
@@ -243,29 +248,28 @@ export const configurePathsAPI = async (
     }
 };
 
-export const getCurrentConfigurationAPI =
-    async (): Promise<MalFullConfiguration> => {
-        try {
-            const response = await apiClient.get<MalFullConfiguration>("/filemanager/configuration");
-            return {
-                ...response.data,
-                custom_model_type_paths: response.data.custom_model_type_paths || {},
-                color_theme: response.data.color_theme || "dark",
-            };
-        } catch (error) {
-            console.error("Error fetching current configuration:", error);
-            return {
-                base_path: null,
-                profile: null,
-                custom_model_type_paths: {},
-                color_theme: "dark",
-            };
-        }
-    };
+export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration> => {
+    try {
+        const response = await apiClient.get<MalFullConfiguration>('/filemanager/configuration');
+        return {
+            ...response.data,
+            custom_model_type_paths: response.data.custom_model_type_paths || {},
+            color_theme: response.data.color_theme || 'dark',
+        };
+    } catch (error) {
+        console.error('Error fetching current configuration:', error);
+        return {
+            base_path: null,
+            profile: null,
+            custom_model_type_paths: {},
+            color_theme: 'dark',
+        };
+    }
+};
 
 export const scanHostDirectoriesAPI = async (
     path?: string,
-    depth: number = 1
+    depth: number = 1,
 ): Promise<ScanHostDirectoriesResponse> => {
     try {
         const params: Record<string, any> = { max_depth: depth };
@@ -273,19 +277,19 @@ export const scanHostDirectoriesAPI = async (
             params.path = path;
         }
         const response = await apiClient.get<ScanHostDirectoriesResponse>(
-            "/filemanager/scan-host-directories",
-            { params }
+            '/filemanager/scan-host-directories',
+            { params },
         );
         return response.data;
     } catch (error) {
-        console.error("Error in scanHostDirectoriesAPI:", error);
+        console.error('Error in scanHostDirectoriesAPI:', error);
         const axiosError = error as any;
         if (axiosError.response && axiosError.response.data) {
             return axiosError.response.data;
         }
         return {
             success: false,
-            error: "Error scanning host directories.",
+            error: 'Error scanning host directories.',
             data: null,
         };
     }
@@ -298,14 +302,17 @@ export const scanHostDirectoriesAPI = async (
  * @param relativePath The relative path from the base_path. If null, the root is listed.
  * @param mode The view mode ('models' or 'explorer') to request from the backend.
  */
-export const listManagedFilesAPI = async (relativePath: string | null, mode: ViewMode): Promise<FileManagerListResponse> => {
+export const listManagedFilesAPI = async (
+    relativePath: string | null,
+    mode: ViewMode,
+): Promise<FileManagerListResponse> => {
     try {
         // The generic type here now correctly expects the new response shape
         const response = await apiClient.get<FileManagerListResponse>('/filemanager/files', {
-            params: { 
+            params: {
                 path: relativePath,
-                mode: mode
-            }
+                mode: mode,
+            },
         });
         return response.data;
     } catch (error) {
@@ -318,11 +325,16 @@ export const listManagedFilesAPI = async (relativePath: string | null, mode: Vie
  * Deletes a file or directory at a specific relative path.
  * @param relativePath The relative path of the item to be deleted.
  */
-export const deleteManagedItemAPI = async (relativePath: string): Promise<{ success: boolean; message: string }> => {
+export const deleteManagedItemAPI = async (
+    relativePath: string,
+): Promise<{ success: boolean; message: string }> => {
     try {
-        const response = await apiClient.delete<{ success: boolean; message: string }>('/filemanager/files', {
-            data: { path: relativePath } // DELETE requests with a body use the 'data' field in Axios
-        });
+        const response = await apiClient.delete<{ success: boolean; message: string }>(
+            '/filemanager/files',
+            {
+                data: { path: relativePath }, // DELETE requests with a body use the 'data' field in Axios
+            },
+        );
         return response.data;
     } catch (error) {
         console.error(`Error deleting item at ${relativePath}:`, error);
@@ -341,7 +353,7 @@ export const deleteManagedItemAPI = async (relativePath: string): Promise<{ succ
 export const getFilePreviewAPI = async (relativePath: string): Promise<FilePreviewResponse> => {
     try {
         const response = await apiClient.get<FilePreviewResponse>('/filemanager/files/preview', {
-            params: { path: relativePath }
+            params: { path: relativePath },
         });
         return response.data;
     } catch (error) {
@@ -354,32 +366,29 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
     }
 };
 
-
 // --- WebSocket Connection (Unchanged) ---
-export const connectToDownloadTracker = (
-    onMessage: (data: any) => void
-): WebSocket => {
+export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSocket => {
     const wsUrl = `${WS_BASE_URL}/ws/downloads`;
     const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => console.log("WebSocket connection established.");
+    ws.onopen = () => console.log('WebSocket connection established.');
 
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
             onMessage(data);
         } catch (e) {
-            console.error("Error parsing WebSocket message:", e);
+            console.error('Error parsing WebSocket message:', e);
         }
     };
 
     ws.onerror = (event) => {
-        console.error("WebSocket error observed:", event);
+        console.error('WebSocket error observed:', event);
     };
 
     ws.onclose = (event) => {
         console.log(
-            `WebSocket connection closed. Code: ${event.code}, Reason: '${event.reason}', Was clean: ${event.wasClean}`
+            `WebSocket connection closed. Code: ${event.code}, Reason: '${event.reason}', Was clean: ${event.wasClean}`,
         );
     };
 

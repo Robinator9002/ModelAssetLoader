@@ -37,28 +37,45 @@ const FilePreview: React.FC<FilePreviewProps> = ({ item, onClose }) => {
 
     const renderContent = () => {
         if (isLoading) {
-            return <div className="preview-feedback"><Loader2 className="animate-spin" /><span>Loading preview...</span></div>;
+            return (
+                <div className="preview-feedback">
+                    <Loader2 className="animate-spin" />
+                    <span>Loading preview...</span>
+                </div>
+            );
         }
         if (error) {
-            return <div className="preview-feedback error"><AlertTriangle /><span>{error}</span></div>;
+            return (
+                <div className="preview-feedback error">
+                    <AlertTriangle />
+                    <span>{error}</span>
+                </div>
+            );
         }
         // Use ReactMarkdown for .md files, otherwise render as plain text
         if (item.name.toLowerCase().endsWith('.md')) {
-            return <div className="markdown-content"><ReactMarkdown>{content}</ReactMarkdown></div>;
+            return (
+                <div className="markdown-content">
+                    <ReactMarkdown>{content}</ReactMarkdown>
+                </div>
+            );
         }
         return <pre className="plaintext-content">{content}</pre>;
     };
 
     return (
         <div className="modal-overlay file-preview-overlay active">
-            <div className="modal-content file-preview-content" onClick={(e) => e.stopPropagation()}>
+            <div
+                className="modal-content file-preview-content"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="modal-header">
                     <h3>Preview: {item.name}</h3>
-                    <button onClick={onClose} className="button-icon close-button"><X size={20} /></button>
+                    <button onClick={onClose} className="button-icon close-button">
+                        <X size={20} />
+                    </button>
                 </div>
-                <div className="modal-body file-preview-body">
-                    {renderContent()}
-                </div>
+                <div className="modal-body file-preview-body">{renderContent()}</div>
             </div>
         </div>
     );

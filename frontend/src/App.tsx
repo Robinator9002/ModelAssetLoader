@@ -1,15 +1,15 @@
 // frontend/src/App.tsx
-import { useState, useEffect, useCallback, useRef } from "react";
-import "./App.css";
-import Navbar, { type MalTabKey } from "./components/Layout/Navbar";
-import ThemeSwitcher from "./components/Theme/ThemeSwitcher";
-import ModelSearchPage from "./components/ModelLoader/ModelSearchPage";
-import ModelDetailsPage from "./components/ModelLoader/ModelDetailsPage";
-import ConfigurationsPage from "./components/Files/ConfigurationsPage";
-import DownloadModal from "./components/Downloads/DownloadModal";
-import DownloadManager from "./components/Downloads/DownloadManager";
-import FileManagerPage from "./components/FileManager/FileManagerPage";
-import { dismissDownloadAPI } from "./api/api";
+import { useState, useEffect, useCallback, useRef } from 'react';
+import './App.css';
+import Navbar, { type MalTabKey } from './components/Layout/Navbar';
+import ThemeSwitcher from './components/Theme/ThemeSwitcher';
+import ModelSearchPage from './components/ModelLoader/ModelSearchPage';
+import ModelDetailsPage from './components/ModelLoader/ModelDetailsPage';
+import ConfigurationsPage from './components/Files/ConfigurationsPage';
+import DownloadModal from './components/Downloads/DownloadModal';
+import DownloadManager from './components/Downloads/DownloadManager';
+import FileManagerPage from './components/FileManager/FileManagerPage';
+import { dismissDownloadAPI } from './api/api';
 
 import {
     // API and WebSocket functions
@@ -24,43 +24,36 @@ import {
     type ModelDetails,
     type ModelFile,
     type DownloadStatus,
-} from "./api/api";
-import appIcon from "/icon.png";
+} from './api/api';
+import appIcon from '/icon.png';
 
 const logger = {
-    info: (...args: any[]) => console.log("[App]", ...args),
-    error: (...args: any[]) => console.error("[App]", ...args),
+    info: (...args: any[]) => console.log('[App]', ...args),
+    error: (...args: any[]) => console.error('[App]', ...args),
 };
 
 export interface AppPathConfig {
     basePath: string | null;
-    uiProfile: MalFullConfiguration["profile"];
-    customPaths: MalFullConfiguration["custom_model_type_paths"];
+    uiProfile: MalFullConfiguration['profile'];
+    customPaths: MalFullConfiguration['custom_model_type_paths'];
 }
 
 function App() {
     const [pathConfig, setPathConfig] = useState<AppPathConfig | null>(null);
-    const [theme, setTheme] = useState<ColorThemeType>("dark");
-    const [activeTab, setActiveTab] = useState<MalTabKey>("search");
+    const [theme, setTheme] = useState<ColorThemeType>('dark');
+    const [activeTab, setActiveTab] = useState<MalTabKey>('search');
     const [isConfigLoading, setIsConfigLoading] = useState<boolean>(true);
 
     // --- State for Views ---
-    const [selectedModel, setSelectedModel] = useState<ModelListItem | null>(
-        null
-    );
+    const [selectedModel, setSelectedModel] = useState<ModelListItem | null>(null);
 
     // --- State for Download Modal ---
-    const [isDownloadModalOpen, setIsDownloadModalOpen] =
-        useState<boolean>(false);
-    const [modelForDownload, setModelForDownload] =
-        useState<ModelDetails | null>(null);
-    const [specificFileForDownload, setSpecificFileForDownload] =
-        useState<ModelFile | null>(null);
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
+    const [modelForDownload, setModelForDownload] = useState<ModelDetails | null>(null);
+    const [specificFileForDownload, setSpecificFileForDownload] = useState<ModelFile | null>(null);
 
     // --- State for Download Tracking via WebSocket ---
-    const [activeDownloads, setActiveDownloads] = useState<
-        Map<string, DownloadStatus>
-    >(new Map());
+    const [activeDownloads, setActiveDownloads] = useState<Map<string, DownloadStatus>>(new Map());
 
     // Use a ref to hold the WebSocket instance to prevent re-creation
     const ws = useRef<WebSocket | null>(null);
@@ -68,13 +61,13 @@ function App() {
     useEffect(() => {
         // Only establish connection if it doesn't exist
         if (!ws.current) {
-            logger.info("Setting up WebSocket for download tracking...");
+            logger.info('Setting up WebSocket for download tracking...');
 
             // --- The new robust message handler ---
             const handleWsMessage = (data: any) => {
-                logger.info("WebSocket message received:", data);
+                logger.info('WebSocket message received:', data);
                 switch (data.type) {
-                    case "initial_state": {
+                    case 'initial_state': {
                         const initialMap = new Map<string, DownloadStatus>();
                         if (data.downloads && Array.isArray(data.downloads)) {
                             data.downloads.forEach((status: DownloadStatus) => {
@@ -82,27 +75,21 @@ function App() {
                             });
                         }
                         setActiveDownloads(initialMap);
-                        logger.info(
-                            "Download tracker initial state processed:",
-                            initialMap
-                        );
+                        logger.info('Download tracker initial state processed:', initialMap);
                         break;
                     }
-                    case "update": {
+                    case 'update': {
                         const status: DownloadStatus = data.data;
                         if (status && status.download_id) {
                             setActiveDownloads((prev) =>
-                                new Map(prev).set(status.download_id, status)
+                                new Map(prev).set(status.download_id, status),
                             );
                         } else {
-                            logger.error(
-                                "Received malformed 'update' message:",
-                                data
-                            );
+                            logger.error("Received malformed 'update' message:", data);
                         }
                         break;
                     }
-                    case "remove": {
+                    case 'remove': {
                         const { download_id } = data;
                         if (download_id) {
                             setActiveDownloads((prev) => {
@@ -111,18 +98,12 @@ function App() {
                                 return newMap;
                             });
                         } else {
-                            logger.error(
-                                "Received malformed 'remove' message:",
-                                data
-                            );
+                            logger.error("Received malformed 'remove' message:", data);
                         }
                         break;
                     }
                     default:
-                        logger.error(
-                            "Received unknown WebSocket message type:",
-                            data
-                        );
+                        logger.error('Received unknown WebSocket message type:', data);
                 }
             };
 
@@ -133,7 +114,7 @@ function App() {
         // Cleanup function will be called on component unmount
         return () => {
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-                logger.info("Closing WebSocket connection on cleanup.");
+                logger.info('Closing WebSocket connection on cleanup.');
                 ws.current.close();
             }
             ws.current = null;
@@ -143,16 +124,16 @@ function App() {
     const openDownloadModal = useCallback(
         (modelDetails: ModelDetails, specificFile?: ModelFile) => {
             logger.info(
-                "Opening DownloadModal for:",
+                'Opening DownloadModal for:',
                 modelDetails.id,
-                "Specific file:",
-                specificFile?.rfilename
+                'Specific file:',
+                specificFile?.rfilename,
             );
             setModelForDownload(modelDetails);
             setSpecificFileForDownload(specificFile || null);
             setIsDownloadModalOpen(true);
         },
-        []
+        [],
     );
 
     const closeDownloadModal = useCallback(() => {
@@ -171,11 +152,11 @@ function App() {
                 customPaths: config.custom_model_type_paths || {},
             };
             setPathConfig(newPathConfig);
-            setTheme(config.color_theme || "dark");
+            setTheme(config.color_theme || 'dark');
         } catch (error) {
-            logger.error("Failed to load initial config from backend:", error);
+            logger.error('Failed to load initial config from backend:', error);
             setPathConfig(null);
-            setTheme("dark");
+            setTheme('dark');
         } finally {
             setIsConfigLoading(false);
         }
@@ -186,11 +167,11 @@ function App() {
     }, [loadInitialConfig]);
 
     useEffect(() => {
-        document.body.className = theme === "light" ? "light-theme" : "";
+        document.body.className = theme === 'light' ? 'light-theme' : '';
     }, [theme]);
 
     const handleThemeToggleAndSave = useCallback(async () => {
-        const newTheme = theme === "light" ? "dark" : "light";
+        const newTheme = theme === 'light' ? 'dark' : 'light';
         setTheme(newTheme);
         try {
             const configRequest: PathConfigurationRequest = {
@@ -200,7 +181,7 @@ function App() {
             };
             await configurePathsAPI(configRequest);
         } catch (error) {
-            logger.error("Failed to save theme to backend:", error);
+            logger.error('Failed to save theme to backend:', error);
         }
     }, [theme, pathConfig]);
 
@@ -219,7 +200,7 @@ function App() {
                 setTheme(updatedTheme);
             }
         },
-        []
+        [],
     );
 
     const handleDismissDownload = useCallback((downloadId: string) => {
@@ -233,10 +214,7 @@ function App() {
         // 2. Fire-and-Forget: Sage dem Backend, es soll im Hintergrund aufräumen.
         // Wir fangen hier Fehler ab, damit die App nicht abstürzt, falls das Backend mal nicht erreichbar ist.
         dismissDownloadAPI(downloadId).catch((error) => {
-            logger.error(
-                `Failed to dismiss download ${downloadId} on backend:`,
-                error
-            );
+            logger.error(`Failed to dismiss download ${downloadId} on backend:`, error);
             // Optional: Man könnte hier eine Fehlerbehandlung hinzufügen,
             // z.B. den Toast wieder einblenden, aber für einen Dismiss-Button ist das meist Overkill.
         });
@@ -258,7 +236,7 @@ function App() {
         }
 
         switch (activeTab) {
-            case "search":
+            case 'search':
                 return (
                     <ModelSearchPage
                         onModelSelect={handleModelSelect}
@@ -266,9 +244,9 @@ function App() {
                         isConfigurationDone={!!pathConfig?.basePath}
                     />
                 );
-            case "files": // <-- ADDED
+            case 'files': // <-- ADDED
                 return <FileManagerPage />;
-            case "configuration":
+            case 'configuration':
                 return (
                     <ConfigurationsPage
                         initialPathConfig={pathConfig}
@@ -294,15 +272,15 @@ function App() {
             <header className="app-header-placeholder">
                 <div
                     style={{
-                        gap: "1rem",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        gap: '1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                 >
                     <img
                         src={appIcon}
-                        style={{ width: "2rem", height: "auto" }}
+                        style={{ width: '2rem', height: 'auto' }}
                         alt="M.A.L. Icon"
                     />
                     <h1>M.A.L.</h1>
@@ -317,15 +295,10 @@ function App() {
                 }}
             />
 
-            <main className="main-content-area">
-                {renderActiveTabContent()}
-            </main>
+            <main className="main-content-area">{renderActiveTabContent()}</main>
 
             <div className="theme-switcher-container">
-                <ThemeSwitcher
-                    currentTheme={theme}
-                    onToggleTheme={handleThemeToggleAndSave}
-                />
+                <ThemeSwitcher currentTheme={theme} onToggleTheme={handleThemeToggleAndSave} />
             </div>
 
             <DownloadModal
