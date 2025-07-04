@@ -1,0 +1,14 @@
+# pyproject.toml
+[tool.black]
+line-length = 100 # Match Prettier
+target-version = ['py311'] # The Projects Version
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.git
+  | \.venv
+  | \.mypy_cache
+  | \.__pycache__
+  | \.vscode
+)/
+'''
