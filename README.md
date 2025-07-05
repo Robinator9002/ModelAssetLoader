@@ -23,15 +23,15 @@ This project is under active development. I'm building this in the open and ship
 
 M.A.L. is more than just a downloader. My goal is for it to be the central hub for your entire local AI ecosystem. Here's where I'm headed:
 
-Phase 1: Polish the Core (Now Underway)
+[x] Phase 1: Polish the Core (Now Underway)
 
     [x] Re-implement advanced search sorting and filtering.
 
     [x] Complete a full UI/CSS cleanup for a polished, professional feel.
 
-    [ ] Add an Download Sidebar, replacing the old Toasts, for better visibility and workflow
+    [x] Add an Download Sidebar, replacing the old Toasts, for better visibility and workflow
 
-Phase 2: Environment Management
+[ ] Phase 2: Environment Management
 
     [x] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
 
@@ -39,7 +39,7 @@ Phase 2: Environment Management
 
     [ ] Integrate more model sources, with CivitAI as the next major target.
 
-Phase 3: The Platform
+[ ] Phase 3: The Platform
 
     [ ] Expand support to a wider range of applications, including LLM chat interfaces.
 
