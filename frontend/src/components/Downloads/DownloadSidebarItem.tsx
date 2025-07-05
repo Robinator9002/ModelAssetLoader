@@ -14,6 +14,9 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
 
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
+    // Prüft, ob der Download aktiv läuft und somit abgebrochen werden kann.
+    const isCancellable = downloadStatus === 'pending' || downloadStatus === 'downloading';
+
     const getStatusIcon = () => {
         switch (downloadStatus) {
             case 'downloading':
@@ -29,10 +32,6 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
         }
     };
 
-    const handleManualDismiss = () => {
-        onDismiss(download_id);
-    };
-
     const handleRequestCancel = () => {
         setIsConfirmOpen(true);
     };
@@ -42,7 +41,16 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
         setIsConfirmOpen(false);
     };
 
-    const isCancellable = downloadStatus === 'pending' || downloadStatus === 'downloading';
+    // NEU: Der intelligente Handler für den X-Button
+    const handleActionClick = () => {
+        if (isCancellable) {
+            // Wenn der Download läuft, den Abbruch-Dialog öffnen.
+            handleRequestCancel();
+        } else {
+            // Wenn der Download fertig/fehlgeschlagen/abgebrochen ist, das Item entfernen.
+            onDismiss(download_id);
+        }
+    };
 
     return (
         <>
@@ -63,7 +71,6 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                             {error_message || 'The download was cancelled by the user.'}
                         </div>
                     ) : (
-                        // NEU: Eigener Container für die Progress-Bar und den Text
                         <div className="progress-display">
                             <div className="progress-bar-container">
                                 <div
@@ -74,26 +81,17 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                             <span className="progress-text">{progress?.toFixed(1) || '0.0'}%</span>
                         </div>
                     )}
-                    {/* NEU: Expliziter Cancel-Button, der nur bei Bedarf erscheint */}
-                    {isCancellable && (
-                         <div className="download-item-cancel-action">
-                             <button
-                                 className="button button-danger button-small"
-                                 onClick={handleRequestCancel}
-                             >
-                                 <Ban size={14} />
-                                 <span>Cancel</span>
-                             </button>
-                         </div>
-                    )}
+                    {/* ENTFERNT: Der explizite Cancel-Button ist nicht mehr nötig. */}
                 </div>
 
-                {/* NEU: Der Schließen-Button ist jetzt in seinem eigenen Layout-Bereich */}
                 <div className="download-item-actions">
                     <button
-                        onClick={handleManualDismiss}
+                        // NEU: Ruft den intelligenten Handler auf.
+                        onClick={handleActionClick}
                         className="button-icon dismiss-button"
-                        aria-label={'Dismiss notification'}
+                        // NEU: Der Tooltip passt sich der Aktion an.
+                        aria-label={isCancellable ? 'Cancel download' : 'Dismiss notification'}
+                        title={isCancellable ? 'Cancel download' : 'Dismiss notification'}
                     >
                         <X size={16} />
                     </button>
