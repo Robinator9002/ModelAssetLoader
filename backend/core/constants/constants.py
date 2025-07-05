@@ -27,9 +27,7 @@ UiNameType = Literal["ComfyUI", "A1111", "ForgeUI"]
 
 
 # --- Configuration File Constants ---
-CONFIG_FILE_DIR = (
-    pathlib.Path(__file__).resolve().parent.parent.parent / "config"
-)
+CONFIG_FILE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "config"
 CONFIG_FILE_NAME = "mal_settings.json"
 CONFIG_FILE_PATH = CONFIG_FILE_DIR / CONFIG_FILE_NAME
 
