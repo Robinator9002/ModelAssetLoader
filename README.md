@@ -29,9 +29,11 @@ Phase 1: Polish the Core (Now Underway)
 
     [x] Complete a full UI/CSS cleanup for a polished, professional feel.
 
-    [x] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
+    [ ] Add an Download Sidebar, replacing the old Toasts, for better visibility and workflow
 
 Phase 2: Environment Management
+
+    [x] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
 
     [ ] Add functionality to download and manage the AI UIs themselves (ComfyUI, A1111, etc.).
 
