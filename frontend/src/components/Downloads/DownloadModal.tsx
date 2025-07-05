@@ -8,6 +8,8 @@ interface DownloadModalProps {
     onClose: () => void;
     modelDetails: ModelDetails | null;
     specificFileToDownload?: ModelFile | null;
+    // NEU: Callback, der aufgerufen wird, wenn die Downloads erfolgreich gestartet wurden.
+    onDownloadsStarted: () => void;
 }
 
 // Common model types for the dropdown selector
@@ -29,6 +31,8 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
     onClose,
     modelDetails,
     specificFileToDownload,
+    // NEU: Den neuen Prop hier entgegennehmen.
+    onDownloadsStarted,
 }) => {
     // State for the selected files including their download configuration
     const [selectedFiles, setSelectedFiles] = useState<
@@ -150,7 +154,9 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
             if (firstError) {
                 throw new Error(firstError.error || 'One or more downloads could not be started.');
             }
-            onClose();
+            // ÄNDERUNG: Statt onClose() rufen wir jetzt onDownloadsStarted() auf.
+            // Die App.tsx kümmert sich dann um das Schließen des Modals und das Öffnen der Sidebar.
+            onDownloadsStarted();
         } catch (err: any) {
             setError(err.message || 'An error occurred while starting downloads.');
         } finally {
