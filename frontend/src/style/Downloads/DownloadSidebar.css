@@ -1,0 +1,131 @@
+/*
+ * =================================================================
+ * M.A.L. - DownloadSidebar Specific Styles (IMPROVED)
+ * =================================================================
+ * Note: Contains Styling for DownloadSidebar.tsx AND DownloadSidebarItem.tsx in one.
+*/
+
+/* --- Main Sidebar Container --- */
+.download-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 420px;
+    background-color: var(--color-surface);
+    border-left: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-index-navbar); /* Sitzt unterhalb von Modals, aber über normalem Inhalt */
+
+    display: flex;
+    flex-direction: column;
+
+    /* Startposition außerhalb des Bildschirms */
+    transform: translateX(100%);
+    transition: transform var(--transition-speed-normal) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.download-sidebar.open {
+    /* Endposition, sichtbar */
+    transform: translateX(0);
+}
+
+/* --- Sidebar Header --- */
+.download-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.download-sidebar-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+/* --- List of Download Items --- */
+.download-sidebar-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: var(--spacing-unit);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
+    background-color: var(--color-background);
+}
+
+.no-downloads-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--color-text-secondary);
+}
+
+/* --- Individual Download Item Styling --- */
+
+.download-sidebar-item {
+    background-color: var(--color-surface-alt);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+    border-left: 4px solid var(--color-primary); /* Default color for pending/downloading */
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 0.5);
+    position: relative;
+}
+
+.download-sidebar-item.completed { border-left-color: var(--color-success); }
+.download-sidebar-item.error { border-left-color: var(--color-error); }
+.download-sidebar-item.cancelled { border-left-color: var(--color-text-placeholder); }
+
+.download-item-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+}
+
+.download-item-filename {
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--color-text-primary);
+    flex-grow: 1;
+}
+
+.download-item-status-icon .icon-success { color: var(--color-success); }
+.download-item-status-icon .icon-error { color: var(--color-error); }
+.download-item-status-icon .icon-cancelled { color: var(--color-text-secondary); }
+.download-item-status-icon .icon-pending { color: var(--color-text-secondary); }
+
+.download-item-body {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+}
+
+.download-item-error-message {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.download-sidebar-item.error .download-item-error-message {
+    color: var(--color-error);
+}
+
+.download-item-actions {
+    position: absolute;
+    top: calc(var(--spacing-unit) * 0.5);
+    right: calc(var(--spacing-unit) * 0.5);
+}
+
+.download-item-actions .dismiss-button {
+    padding: calc(var(--spacing-unit) * 0.75);
+}
