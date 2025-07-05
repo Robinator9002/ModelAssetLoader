@@ -19,21 +19,10 @@
     box-shadow: var(--shadow-sm);
 }
 
-.navbar-brand {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-text-primary);
-    flex-shrink: 0; /* Prevent brand from shrinking */
-}
-
-.navbar-brand strong {
-    color: var(--color-primary);
-}
-
 .navbar-tabs-nav {
     flex-grow: 1;
     display: flex;
-    justify-content: center; /* Center the tabs within the nav area */
+    justify-content: flex-start; /* Tabs linksbündig */
 }
 
 .navbar-tabs-list {
@@ -91,12 +80,66 @@
     width: calc(100% - var(--spacing-unit) * 3);
 }
 
-/* Add a subtle glow to the active icon for extra polish */
-.navbar-tab-button.active .navbar-tab-icon {
-    filter: drop-shadow(0 0 5px rgba(var(--color-primary-rgb), 0.5));
-}
-
 .navbar-tab-icon {
     line-height: 0; /* Ensures perfect vertical alignment of SVG */
     transition: filter var(--transition-speed-fast) ease;
+}
+
+/* NEU: Container für Aktionen rechts */
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+}
+
+.download-status-button {
+    /* Erbt von .navbar-tab-button, aber mit spezifischen Anpassungen */
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2);
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-speed-fast) ease;
+}
+
+.download-status-button:hover:not(:disabled) {
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
+    transform: translateY(-2px);
+}
+
+.download-status-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Status-spezifische Stile */
+.download-status-button.downloading {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 8px rgba(var(--color-primary-rgb), 0.3);
+}
+
+.download-status-button.completed {
+    color: var(--color-success);
+    border-color: var(--color-success);
+}
+
+.download-status-button.error {
+    color: var(--color-error);
+    border-color: var(--color-error);
+}
+
+.download-count-badge {
+    background-color: var(--color-primary);
+    color: var(--color-text-on-primary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: var(--spacing-unit);
 }

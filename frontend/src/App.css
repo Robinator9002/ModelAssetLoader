@@ -23,7 +23,7 @@
 @import url('./style/FileManager/FilePreview.css');
 @import url('./style/FileManager/ViewModeSwitcher.css');
 
-@import url('./style/Downloads/DownloadManager.css');
+@import url('./style/Downloads/DownloadSidebar.css');
 @import url('./style/Downloads/DownloadModal.css');
 
 @import url('./style/ModelLoader/ModelSearchPage.css');
