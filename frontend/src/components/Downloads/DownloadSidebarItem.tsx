@@ -48,11 +48,12 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
         <>
             <div className={`download-sidebar-item ${downloadStatus}`} role="alert">
                 <div className="download-item-header">
+                    <span className="download-item-status-icon">{getStatusIcon()}</span>
                     <span className="download-item-filename" title={filename}>
                         {filename}
                     </span>
-                    <span className="download-item-status-icon">{getStatusIcon()}</span>
                 </div>
+                
                 <div className="download-item-body">
                     {downloadStatus === 'error' || downloadStatus === 'cancelled' ? (
                         <div
@@ -62,7 +63,8 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                             {error_message || 'The download was cancelled by the user.'}
                         </div>
                     ) : (
-                        <>
+                        // NEU: Eigener Container für die Progress-Bar und den Text
+                        <div className="progress-display">
                             <div className="progress-bar-container">
                                 <div
                                     className={`progress-bar ${downloadStatus}`}
@@ -70,14 +72,28 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                                 />
                             </div>
                             <span className="progress-text">{progress?.toFixed(1) || '0.0'}%</span>
-                        </>
+                        </div>
+                    )}
+                    {/* NEU: Expliziter Cancel-Button, der nur bei Bedarf erscheint */}
+                    {isCancellable && (
+                         <div className="download-item-cancel-action">
+                             <button
+                                 className="button button-danger button-small"
+                                 onClick={handleRequestCancel}
+                             >
+                                 <Ban size={14} />
+                                 <span>Cancel</span>
+                             </button>
+                         </div>
                     )}
                 </div>
+
+                {/* NEU: Der Schließen-Button ist jetzt in seinem eigenen Layout-Bereich */}
                 <div className="download-item-actions">
                     <button
-                        onClick={isCancellable ? handleRequestCancel : handleManualDismiss}
+                        onClick={handleManualDismiss}
                         className="button-icon dismiss-button"
-                        aria-label={isCancellable ? 'Request cancellation' : 'Dismiss notification'}
+                        aria-label={'Dismiss notification'}
                     >
                         <X size={16} />
                     </button>
