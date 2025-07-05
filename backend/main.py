@@ -37,7 +37,6 @@ from backend.api.models import (
     FileManagerListResponse,
     ScanHostDirectoriesResponse,
     HFModelListItem,
-    LocalFileItem,
     LocalFileActionRequest,
     LocalFileContentResponse,
 )
@@ -115,9 +114,7 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
         if not manager.active_connections:
             download_tracker.set_broadcast_callback(None)
-            logger.info(
-                "Last WebSocket client disconnected, clearing broadcast callback."
-            )
+            logger.info("Last WebSocket client disconnected, clearing broadcast callback.")
 
 
 # --- API Endpoints ---
@@ -145,9 +142,7 @@ async def search_models(
     tags: Optional[List[str]] = Query(
         default_factory=list, description="List of tags to filter by."
     ),
-    sort: Optional[str] = Query(
-        "lastModified", description="Field to sort results by."
-    ),
+    sort: Optional[str] = Query("lastModified", description="Field to sort results by."),
     direction: Optional[int] = Query(
         -1,
         enum=[-1, 1],
@@ -205,13 +200,9 @@ async def get_model_details(source: str, model_id: str):
     logger.info(f"Fetching details for model '{model_id}' from source '{source}'")
     try:
         # Use source_manager to get details.
-        details_data = source_manager.get_model_details(
-            model_id=model_id, source=source
-        )
+        details_data = source_manager.get_model_details(model_id=model_id, source=source)
         if not details_data:
-            logger.warning(
-                f"Model '{model_id}' not found by source_manager for source '{source}'."
-            )
+            logger.warning(f"Model '{model_id}' not found by source_manager for source '{source}'.")
             raise HTTPException(
                 status_code=404,
                 detail=f"Model '{model_id}' not found in source '{source}'.",
@@ -249,9 +240,7 @@ async def get_file_manager_configuration():
 async def configure_file_manager_paths_endpoint(
     config_request: PathConfigurationRequest,
 ):
-    logger.info(
-        f"Received configuration request: {config_request.model_dump(exclude_none=True)}"
-    )
+    logger.info(f"Received configuration request: {config_request.model_dump(exclude_none=True)}")
     result = file_manager.configure_paths(
         base_path_str=config_request.base_path,
         profile=config_request.profile,
@@ -259,12 +248,8 @@ async def configure_file_manager_paths_endpoint(
         color_theme=config_request.color_theme,
     )
     if not result.get("success"):
-        logger.error(
-            f"Configuration failed: {result.get('error', 'Unknown configuration error.')}"
-        )
-        raise HTTPException(
-            status_code=400, detail=result.get("error", "Configuration failed.")
-        )
+        logger.error(f"Configuration failed: {result.get('error', 'Unknown configuration error.')}")
+        raise HTTPException(status_code=400, detail=result.get("error", "Configuration failed."))
 
     updated_config_dict = file_manager.get_current_configuration()
     response_data = PathConfigurationResponse(
@@ -353,9 +338,7 @@ async def scan_host_directories_endpoint(
     path_to_scan: Optional[str] = Query(None, alias="path"),
     max_depth: int = Query(2, ge=1, le=7),
 ):
-    logger.info(
-        f"Host directory scan request: path='{path_to_scan}', depth={max_depth}"
-    )
+    logger.info(f"Host directory scan request: path='{path_to_scan}', depth={max_depth}")
     try:
         scan_result = file_manager.list_host_directories(
             path_to_scan_str=path_to_scan, max_depth=max_depth
@@ -367,9 +350,7 @@ async def scan_host_directories_endpoint(
             data=scan_result.get("data", []),
         )
     except Exception as e:
-        logger.error(
-            f"Critical error in scan_host_directories_endpoint: {e}", exc_info=True
-        )
+        logger.error(f"Critical error in scan_host_directories_endpoint: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="An internal error occurred while scanning host directories.",
@@ -384,9 +365,7 @@ async def scan_host_directories_endpoint(
     summary="List Files with Smart Navigation",
 )
 async def list_managed_files_endpoint(
-    path: Optional[str] = Query(
-        None, description="Relative path from the base directory."
-    ),
+    path: Optional[str] = Query(None, description="Relative path from the base directory."),
     mode: str = Query(
         "models", enum=["explorer", "models"], description="View mode for filtering."
     ),
@@ -415,9 +394,7 @@ async def delete_managed_item_endpoint(request: LocalFileActionRequest):
 
     result = file_manager.delete_managed_item(relative_path_str=request.path)
     if not result.get("success"):
-        raise HTTPException(
-            status_code=400, detail=result.get("error", "Failed to delete item.")
-        )
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to delete item."))
 
     return result
 

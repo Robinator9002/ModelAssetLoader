@@ -11,9 +11,7 @@ from datetime import datetime
 class ModelFile(BaseModel):
     """Represents a file within a model repository."""
 
-    rfilename: str = Field(
-        ..., description="The relative name of the file in the repository."
-    )
+    rfilename: str = Field(..., description="The relative name of the file in the repository.")
     size: Optional[int] = Field(None, description="Size of the file in bytes.")
 
 
@@ -27,9 +25,7 @@ class ModelListItem(BaseModel):
     source: str = Field(
         ..., description="The source of the model (e.g., 'huggingface')."
     )  # Added source
-    author: Optional[str] = Field(
-        None, description="The author or organization of the model."
-    )
+    author: Optional[str] = Field(None, description="The author or organization of the model.")
     model_name: str = Field(
         ..., description="The name of the model, typically derived from the ID."
     )
@@ -55,24 +51,18 @@ class PaginatedModelListResponse(BaseModel):
 class ModelDetails(ModelListItem):
     """Represents detailed information for a specific model."""
 
-    sha: Optional[str] = Field(
-        None, description="The commit hash of the model's repository."
-    )
+    sha: Optional[str] = Field(None, description="The commit hash of the model's repository.")
     private: Optional[bool] = Field(
         None, description="Indicates if the model repository is private."
     )
-    gated: Optional[str] = Field(
-        None, description="Gated status (e.g., 'auto', 'manual', 'True')."
-    )
+    gated: Optional[str] = Field(None, description="Gated status (e.g., 'auto', 'manual', 'True').")
     library_name: Optional[str] = Field(
         None, description="The primary library associated with the model."
     )
     pipeline_tag: Optional[str] = Field(
         None, description="The primary pipeline tag (e.g., 'text-generation')."
     )
-    siblings: List[ModelFile] = Field(
-        ..., description="List of all files in the model repository."
-    )
+    siblings: List[ModelFile] = Field(..., description="List of all files in the model repository.")
     readme_content: Optional[str] = Field(
         None, description="The content of the model's README.md file."
     )
@@ -134,9 +124,7 @@ class FileDownloadRequest(BaseModel):
     source: str = Field(
         ..., description="The source of the model (e.g., 'huggingface')."
     )  # Added source
-    repo_id: str = Field(
-        ..., description="The repository ID (e.g., 'author/model_name')."
-    )
+    repo_id: str = Field(..., description="The repository ID (e.g., 'author/model_name').")
     filename: str = Field(..., description="The name of the file to download.")
     model_type: ModelTypePydantic
     custom_sub_path: Optional[str] = Field(None)
@@ -147,9 +135,7 @@ class FileDownloadResponse(BaseModel):
     success: bool
     message: Optional[str] = None
     error: Optional[str] = None
-    download_id: Optional[str] = Field(
-        None, description="The unique ID for tracking the download."
-    )
+    download_id: Optional[str] = Field(None, description="The unique ID for tracking the download.")
 
 
 # --- Models for Local File Management ---
@@ -241,9 +227,7 @@ class FileManagerListResponse(BaseModel):
     after any smart navigation and the items at that path.
     """
 
-    path: Optional[str] = Field(
-        description="The final relative path that is being displayed."
-    )
+    path: Optional[str] = Field(description="The final relative path that is being displayed.")
     items: List[LocalFileItem] = Field(
         description="The list of files and directories at the final path."
     )
