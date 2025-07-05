@@ -24,7 +24,7 @@ class ModelListItem(BaseModel):
     )
     source: str = Field(
         ..., description="The source of the model (e.g., 'huggingface')."
-    )  # Added source
+    )
     author: Optional[str] = Field(None, description="The author or organization of the model.")
     model_name: str = Field(
         ..., description="The name of the model, typically derived from the ID."
@@ -74,20 +74,13 @@ HFModelDetails = ModelDetails
 HFModelFile = ModelFile
 
 # --- Types for FileManager Configuration and Operations ---
-UiProfileTypePydantic = Literal["ComfyUI", "A1111", "ForgeUI", "Custom"]
-ModelTypePydantic = Literal[
-    "checkpoints",
-    "loras",
-    "vae",
-    "clip",
-    "unet",
-    "controlnet",
-    "embeddings",
-    "hypernetworks",
-    "diffusers",
-    "custom",
-]
-ColorThemeTypePydantic = Literal["dark", "light"]
+# Import from constants to ensure single source of truth
+from backend.core.constants.constants import UiNameType, ModelType, UiProfileType, ColorThemeType
+
+UiProfileTypePydantic = UiProfileType
+ModelTypePydantic = ModelType
+ColorThemeTypePydantic = ColorThemeType
+UiNameTypePydantic = UiNameType
 
 
 # --- Models for Path and File Configuration ---
@@ -123,7 +116,7 @@ class FileDownloadRequest(BaseModel):
 
     source: str = Field(
         ..., description="The source of the model (e.g., 'huggingface')."
-    )  # Added source
+    )
     repo_id: str = Field(..., description="The repository ID (e.g., 'author/model_name').")
     filename: str = Field(..., description="The name of the file to download.")
     model_type: ModelTypePydantic
@@ -231,3 +224,34 @@ class FileManagerListResponse(BaseModel):
     items: List[LocalFileItem] = Field(
         description="The list of files and directories at the final path."
     )
+
+# --- NEW: Models for UI Environment Management ---
+
+class AvailableUiItem(BaseModel):
+    """Represents a UI that is available for installation."""
+    ui_name: UiNameTypePydantic = Field(..., description="The unique name of the UI.")
+    git_url: str = Field(..., description="The Git URL of the repository.")
+    # Future fields like 'python_version' or 'description' could be added here.
+
+class ManagedUiStatus(BaseModel):
+    """Represents the status of a single managed UI environment."""
+    ui_name: UiNameTypePydantic
+    is_installed: bool = Field(..., description="Indicates if the UI environment directory exists.")
+    is_running: bool = Field(..., description="Indicates if the UI process is currently running.")
+    install_path: Optional[str] = Field(None, description="The absolute installation path on the host.")
+    running_task_id: Optional[str] = Field(None, description="The task_id if the UI is currently running.")
+
+class AllUiStatusResponse(BaseModel):
+    """Response model for a list of all managed UI statuses."""
+    items: List[ManagedUiStatus]
+
+class UiActionResponse(BaseModel):
+    """Standard response for actions that trigger a background task (install, run)."""
+    success: bool
+    message: str
+    task_id: str = Field(..., description="The unique ID for tracking the task via WebSocket.")
+
+class UiStopRequest(BaseModel):
+    """Request model for stopping a running UI process."""
+    task_id: str = Field(..., description="The task_id of the running process to be stopped.")
+
