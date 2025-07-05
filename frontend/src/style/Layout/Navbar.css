@@ -94,6 +94,9 @@
 
 .download-status-button {
     /* Erbt von .navbar-tab-button, aber mit spezifischen Anpassungen */
+    display: flex;
+    gap: 1rem;
+    font-size: var(--font-size-base);
     background-color: var(--color-surface-alt);
     border: 1px solid var(--color-border);
     color: var(--color-text-secondary);
@@ -106,6 +109,7 @@
     border-color: var(--color-border-hover);
     color: var(--color-text-primary);
     transform: translateY(-2px);
+    cursor: pointer;
 }
 
 .download-status-button:disabled {

@@ -49,6 +49,7 @@
 
 .file-manager-content {
     flex-grow: 1;
+    max-height: 70vh;
     overflow-y: auto;
     padding: var(--spacing-unit);
 }
