@@ -1,28 +1,24 @@
 /*
- * =================================================================
- * M.A.L. - Navbar Component Styles (IMPROVED)
- * =================================================================
+ * Styles for the main application Navbar.
 */
 .app-navbar {
     background-color: var(--color-surface);
-    padding: 0 calc(var(--spacing-unit) * 3); /* Increased horizontal padding */
+    padding: 0 calc(var(--spacing-unit) * 3);
     border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
     z-index: var(--z-index-navbar);
-
-    /* Layout Properties */
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: calc(var(--spacing-unit) * 4);
-    height: 64px; /* Set a fixed height for consistency */
+    height: 64px;
     box-shadow: var(--shadow-sm);
 }
 
 .navbar-tabs-nav {
     flex-grow: 1;
     display: flex;
-    justify-content: flex-start; /* Tabs linksbündig */
+    justify-content: flex-start;
 }
 
 .navbar-tabs-list {
@@ -52,11 +48,11 @@
         background-color var(--transition-speed-fast) ease;
 }
 
-/* The animated underline effect */
+/* The animated underline effect for the active tab. */
 .navbar-tab-button::before {
     content: '';
     position: absolute;
-    bottom: -1px; /* Align with the parent's border */
+    bottom: -1px; 
     left: 50%;
     transform: translateX(-50%);
     width: 0;
@@ -75,17 +71,15 @@
     color: var(--color-primary);
 }
 
-/* Animate the underline to full width on the active tab */
 .navbar-tab-button.active::before {
     width: calc(100% - var(--spacing-unit) * 3);
 }
 
 .navbar-tab-icon {
-    line-height: 0; /* Ensures perfect vertical alignment of SVG */
-    transition: filter var(--transition-speed-fast) ease;
+    line-height: 0;
 }
 
-/* NEU: Container für Aktionen rechts */
+/* Container for right-aligned actions like the downloads button. */
 .navbar-actions {
     display: flex;
     align-items: center;
@@ -93,10 +87,11 @@
 }
 
 .download-status-button {
-    /* Erbt von .navbar-tab-button, aber mit spezifischen Anpassungen */
     display: flex;
-    gap: 1rem;
-    font-size: var(--font-size-base);
+    align-items: center;
+    gap: var(--spacing-unit);
+    font-size: 0.95rem;
+    font-weight: 600;
     background-color: var(--color-surface-alt);
     border: 1px solid var(--color-border);
     color: var(--color-text-secondary);
@@ -117,7 +112,7 @@
     cursor: not-allowed;
 }
 
-/* Status-spezifische Stile */
+/* Styles for the download button based on the summary status. */
 .download-status-button.downloading {
     color: var(--color-primary);
     border-color: var(--color-primary);

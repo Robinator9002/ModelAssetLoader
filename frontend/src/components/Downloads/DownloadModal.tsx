@@ -8,11 +8,9 @@ interface DownloadModalProps {
     onClose: () => void;
     modelDetails: ModelDetails | null;
     specificFileToDownload?: ModelFile | null;
-    // NEU: Callback, der aufgerufen wird, wenn die Downloads erfolgreich gestartet wurden.
     onDownloadsStarted: () => void;
 }
 
-// Common model types for the dropdown selector
 const COMMON_MODEL_TYPES: ModelType[] = [
     'checkpoints',
     'loras',
@@ -31,10 +29,8 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
     onClose,
     modelDetails,
     specificFileToDownload,
-    // NEU: Den neuen Prop hier entgegennehmen.
     onDownloadsStarted,
 }) => {
-    // State for the selected files including their download configuration
     const [selectedFiles, setSelectedFiles] = useState<
         Record<string, { file: ModelFile; modelType: ModelType; customPath?: string }>
     >({});
@@ -42,7 +38,6 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Helper to guess the model type based on filename or path
     const guessModelTypeFromFile = (filename: string): ModelType | null => {
         const fnLower = filename.toLowerCase();
         if (
@@ -58,7 +53,6 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
         return null;
     };
 
-    // Reset state when the modal is opened
     useEffect(() => {
         if (isOpen && modelDetails) {
             const initialSelected: typeof selectedFiles = {};
@@ -154,8 +148,8 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
             if (firstError) {
                 throw new Error(firstError.error || 'One or more downloads could not be started.');
             }
-            // ÄNDERUNG: Statt onClose() rufen wir jetzt onDownloadsStarted() auf.
-            // Die App.tsx kümmert sich dann um das Schließen des Modals und das Öffnen der Sidebar.
+            // This component's responsibility ends here. It signals the App
+            // to take over, which will close this modal and open the sidebar.
             onDownloadsStarted();
         } catch (err: any) {
             setError(err.message || 'An error occurred while starting downloads.');

@@ -14,7 +14,6 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
 
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-    // Prüft, ob der Download aktiv läuft und somit abgebrochen werden kann.
     const isCancellable = downloadStatus === 'pending' || downloadStatus === 'downloading';
 
     const getStatusIcon = () => {
@@ -41,13 +40,17 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
         setIsConfirmOpen(false);
     };
 
-    // NEU: Der intelligente Handler für den X-Button
+    /**
+     * This intelligent handler for the action button (X) determines its function
+     * based on the current download state.
+     */
     const handleActionClick = () => {
         if (isCancellable) {
-            // Wenn der Download läuft, den Abbruch-Dialog öffnen.
+            // If the download is active, it initiates the cancellation process.
             handleRequestCancel();
         } else {
-            // Wenn der Download fertig/fehlgeschlagen/abgebrochen ist, das Item entfernen.
+            // If the download is in a final state (completed, error, cancelled),
+            // it dismisses the item from the UI immediately.
             onDismiss(download_id);
         }
     };
@@ -81,15 +84,12 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                             <span className="progress-text">{progress?.toFixed(1) || '0.0'}%</span>
                         </div>
                     )}
-                    {/* ENTFERNT: Der explizite Cancel-Button ist nicht mehr nötig. */}
                 </div>
 
                 <div className="download-item-actions">
                     <button
-                        // NEU: Ruft den intelligenten Handler auf.
                         onClick={handleActionClick}
                         className="button-icon dismiss-button"
-                        // NEU: Der Tooltip passt sich der Aktion an.
                         aria-label={isCancellable ? 'Cancel download' : 'Dismiss notification'}
                         title={isCancellable ? 'Cancel download' : 'Dismiss notification'}
                     >

@@ -61,9 +61,10 @@
     border-radius: var(--border-radius-md);
     padding: calc(var(--spacing-unit) * 1.5);
     border-left: 4px solid var(--color-primary);
+    /* Using Grid for a robust layout that prevents element overlap. */
     display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto 1fr;
+    grid-template-columns: 1fr auto; /* Main content | Close button */
+    grid-template-rows: auto 1fr;    /* Header | Body */
     grid-template-areas:
         "header actions"
         "body   body";
@@ -80,7 +81,7 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-unit);
-    min-width: 0;
+    min-width: 0; /* Prevents overflow with long filenames */
 }
 
 .download-item-filename {
@@ -127,17 +128,17 @@
     padding: calc(var(--spacing-unit) * 0.75);
 }
 
-/* --- NEU: HINZUGEFÜGTE STILE FÜR DIE PROGRESS-BAR --- */
+/* --- Progress Bar Styling --- */
 
 .progress-display {
     position: relative;
     width: 100%;
-    height: calc(var(--spacing-unit) * 2); /* Feste Höhe für den Container */
+    height: calc(var(--spacing-unit) * 2);
 }
 
 .progress-bar-container {
     position: absolute;
-    inset: 0; /* Füllt den .progress-display Container komplett aus */
+    inset: 0;
     background-color: var(--color-background);
     border-radius: 100px;
     overflow: hidden;
@@ -183,10 +184,10 @@
     font-weight: 700;
     color: var(--color-text-on-primary);
     text-shadow: 0 0 3px rgba(0,0,0,0.5);
-    pointer-events: none;
+    pointer-events: none; /* Allows clicks to pass through the text */
 }
 
-/* --- NEU: HINZUGEFÜGTE STILE FÜR DEN CANCEL-BUTTON --- */
+/* --- Cancel Button Styling --- */
 
 .download-item-cancel-action {
     display: flex;

@@ -3,13 +3,11 @@ import React from 'react';
 import { Search, Settings, FolderKanban, DownloadCloud, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { type DownloadSummaryStatus } from '../../App';
 
-// The type definition for the available tabs in the application.
 export type MalTabKey = 'search' | 'files' | 'configuration';
 
 interface NavbarProps {
     activeTab: MalTabKey;
     onTabChange: (tab: MalTabKey) => void;
-    // NEU: Props für den Download-Button
     onToggleDownloads: () => void;
     downloadStatus: DownloadSummaryStatus;
     downloadCount: number;
@@ -21,7 +19,6 @@ interface NavItemConfig {
     icon: React.ReactNode;
 }
 
-// Configuration for the navigation items, now using Lucide icons.
 const navItems: NavItemConfig[] = [
     {
         key: 'search',
@@ -40,6 +37,10 @@ const navItems: NavItemConfig[] = [
     },
 ];
 
+/**
+ * The main navigation bar for the application. It displays the primary navigation
+ * tabs and provides a dynamic button to manage and view the status of downloads.
+ */
 const Navbar: React.FC<NavbarProps> = ({ 
     activeTab, 
     onTabChange,
@@ -48,6 +49,10 @@ const Navbar: React.FC<NavbarProps> = ({
     downloadCount
 }) => {
 
+    /**
+     * Determines which icon to display on the downloads button based on the
+     * summarized status of all active downloads.
+     */
     const getDownloadStatusIcon = () => {
         switch (downloadStatus) {
             case 'downloading':
@@ -83,7 +88,6 @@ const Navbar: React.FC<NavbarProps> = ({
                 </ul>
             </nav>
 
-            {/* NEU: Container für Aktionen auf der rechten Seite */}
             <div className="navbar-actions">
                 <button 
                     className={`download-status-button ${downloadStatus}`}

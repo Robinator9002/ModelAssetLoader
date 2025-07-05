@@ -18,12 +18,9 @@ const DownloadSidebar: React.FC<DownloadSidebarProps> = ({
     onDismiss,
 }) => {
     const downloadArray = Array.from(activeDownloads.values());
-
-    // Bestimme, ob es überhaupt Downloads gibt, die angezeigt werden können.
     const hasDownloads = downloadArray.length > 0;
 
     return (
-        // Fügt die 'open'-Klasse hinzu, wenn die Sidebar sichtbar sein soll.
         <div className={`download-sidebar ${isOpen ? 'open' : ''}`}>
             <div className="download-sidebar-header">
                 <h3>Active Downloads</h3>

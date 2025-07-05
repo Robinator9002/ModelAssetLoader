@@ -7,17 +7,14 @@ import ModelSearchPage from './components/ModelLoader/ModelSearchPage';
 import ModelDetailsPage from './components/ModelLoader/ModelDetailsPage';
 import ConfigurationsPage from './components/Files/ConfigurationsPage';
 import DownloadModal from './components/Downloads/DownloadModal';
-// NEU: Wir importieren die neue Sidebar
 import DownloadSidebar from './components/Downloads/DownloadSidebar';
 import FileManagerPage from './components/FileManager/FileManagerPage';
 import { dismissDownloadAPI } from './api/api';
 
 import {
-    // API and WebSocket functions
     getCurrentConfigurationAPI,
     configurePathsAPI,
     connectToDownloadTracker,
-    // Types
     type PathConfigurationRequest,
     type ColorThemeType,
     type MalFullConfiguration,
@@ -39,36 +36,31 @@ export interface AppPathConfig {
     customPaths: MalFullConfiguration['custom_model_type_paths'];
 }
 
-// NEU: Ein Typ für den zusammengefassten Download-Status
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
 
 function App() {
+    // --- Core Application State ---
     const [pathConfig, setPathConfig] = useState<AppPathConfig | null>(null);
     const [theme, setTheme] = useState<ColorThemeType>('dark');
     const [activeTab, setActiveTab] = useState<MalTabKey>('search');
     const [isConfigLoading, setIsConfigLoading] = useState<boolean>(true);
 
-    // --- State for Views ---
+    // --- View & Modal States ---
     const [selectedModel, setSelectedModel] = useState<ModelListItem | null>(null);
-
-    // --- State for Download Modal ---
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
     const [modelForDownload, setModelForDownload] = useState<ModelDetails | null>(null);
     const [specificFileForDownload, setSpecificFileForDownload] = useState<ModelFile | null>(null);
 
-    // --- State for Download Tracking via WebSocket ---
+    // --- Download Management State ---
     const [activeDownloads, setActiveDownloads] = useState<Map<string, DownloadStatus>>(new Map());
-    
-    // NEU: State für die Sichtbarkeit der Sidebar
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
-
     const ws = useRef<WebSocket | null>(null);
 
+    // Effect to establish and manage the WebSocket connection for real-time download updates.
     useEffect(() => {
         if (!ws.current) {
             logger.info('Setting up WebSocket for download tracking...');
             const handleWsMessage = (data: any) => {
-                // ... (WebSocket-Logik bleibt unverändert)
                 switch (data.type) {
                     case 'initial_state': {
                         const initialMap = new Map<string, DownloadStatus>();
@@ -113,25 +105,27 @@ function App() {
         };
     }, []);
 
-    // NEU: Handler, um die Sidebar zu öffnen/schließen
+    // --- Handlers for Download Sidebar ---
     const handleToggleDownloadsSidebar = useCallback(() => {
         setDownloadsSidebarOpen(prev => !prev);
     }, []);
     
-    // NEU: Handler, um die Sidebar explizit zu schließen
     const handleCloseDownloadsSidebar = useCallback(() => {
         setDownloadsSidebarOpen(false);
     }, []);
 
-    // NEU: Handler, der nach dem Starten von Downloads aufgerufen wird
+    /**
+     * Orchestrates the UI flow when downloads are initiated from the modal.
+     * It closes the modal and opens the sidebar for a seamless transition.
+     */
     const handleDownloadsStarted = useCallback(() => {
-        // Schließe das Modal und öffne die Sidebar
         setIsDownloadModalOpen(false);
         setModelForDownload(null);
         setSpecificFileForDownload(null);
         setDownloadsSidebarOpen(true);
     }, []);
 
+    // --- Handlers for Download Modal ---
     const openDownloadModal = useCallback(
         (modelDetails: ModelDetails, specificFile?: ModelFile) => {
             setModelForDownload(modelDetails);
@@ -147,8 +141,8 @@ function App() {
         setSpecificFileForDownload(null);
     }, []);
 
+    // --- General App Logic & Handlers ---
     const loadInitialConfig = useCallback(async () => {
-        // ... (unverändert)
         setIsConfigLoading(true);
         try {
             const config = await getCurrentConfigurationAPI();
@@ -175,7 +169,6 @@ function App() {
     }, [theme]);
 
     const handleThemeToggleAndSave = useCallback(async () => {
-        // ... (unverändert)
         const newTheme = theme === 'light' ? 'dark' : 'light';
         setTheme(newTheme);
         try {
@@ -209,31 +202,32 @@ function App() {
     );
 
     const handleDismissDownload = useCallback((downloadId: string) => {
-        // ... (unverändert)
         setActiveDownloads((prev) => {
             const newMap = new Map(prev);
             newMap.delete(downloadId);
             return newMap;
         });
+        // Fire-and-forget API call to sync dismissal with the backend.
         dismissDownloadAPI(downloadId).catch((error) => {
             logger.error(`Failed to dismiss download ${downloadId} on backend:`, error);
         });
     }, []);
 
-    // NEU: Berechnet einen zusammengefassten Status für den Navbar-Button
+    /**
+     * Computes a single, summarized status from all active downloads.
+     * This is used to provide at-a-glance feedback in the Navbar.
+     */
     const downloadSummaryStatus = useMemo((): DownloadSummaryStatus => {
         const statuses = Array.from(activeDownloads.values());
         if (statuses.length === 0) return 'idle';
         if (statuses.some(s => s.status === 'error')) return 'error';
         if (statuses.some(s => s.status === 'downloading' || s.status === 'pending')) return 'downloading';
-        // Wenn kein Fehler und nichts mehr läuft, dann muss alles fertig sein
         return 'completed';
     }, [activeDownloads]);
 
     const renderActiveTabContent = () => {
-        // ... (unverändert)
         if (isConfigLoading) {
-            return <p className="loading-message">Lade Konfiguration...</p>;
+            return <p className="loading-message">Loading configuration...</p>;
         }
 
         if (selectedModel) {
@@ -277,12 +271,7 @@ function App() {
     };
 
     return (
-        // NEU: Fügt eine Klasse hinzu, wenn die Sidebar offen ist, um den Hauptinhalt zu verschieben
         <div className={`app-wrapper ${isDownloadsSidebarOpen ? 'sidebar-open' : ''}`}>
-            {/* ENTFERNT: Der alte DownloadManager ist weg */}
-            {/* <DownloadManager activeDownloads={activeDownloads} onDismiss={handleDismissDownload} /> */}
-
-            {/* NEU: Die neue DownloadSidebar wird hier gerendert */}
             <DownloadSidebar
                 isOpen={isDownloadsSidebarOpen}
                 onClose={handleCloseDownloadsSidebar}
@@ -290,7 +279,6 @@ function App() {
                 onDismiss={handleDismissDownload}
             />
 
-            {/* Der Rest der App ist in einem eigenen Container, um ihn verschieben zu können */}
             <div className="app-content-pusher">
                 <header className="app-header-placeholder">
                     <div style={{ gap: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -305,7 +293,6 @@ function App() {
                         setSelectedModel(null);
                         setActiveTab(tab);
                     }}
-                    // NEU: Props für den Download-Button
                     onToggleDownloads={handleToggleDownloadsSidebar}
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeDownloads.size}
@@ -313,7 +300,6 @@ function App() {
 
                 <main className="main-content-area">{renderActiveTabContent()}</main>
             </div>
-
 
             <div className="theme-switcher-container">
                 <ThemeSwitcher currentTheme={theme} onToggleTheme={handleThemeToggleAndSave} />
@@ -324,7 +310,6 @@ function App() {
                 onClose={closeDownloadModal}
                 modelDetails={modelForDownload}
                 specificFileToDownload={specificFileForDownload}
-                // NEU: Callback, um die Sidebar zu öffnen
                 onDownloadsStarted={handleDownloadsStarted}
             />
         </div>

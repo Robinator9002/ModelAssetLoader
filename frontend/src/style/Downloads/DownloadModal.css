@@ -1,9 +1,6 @@
 /*
- * =================================================================
- * M.A.L. - DownloadModal Specific Styles (IMPROVED)
- * =================================================================
- * Note: General modal layout is inherited from Modals.css.
- * Checkbox styles are now inherited from global.css.
+ * Styles for the Download Modal.
+ * Inherits general modal structure from Modals.css and checkboxes from global.css.
 */
 
 /* --- Modal Header & Body --- */
@@ -14,7 +11,7 @@
     margin-right: var(--spacing-unit);
 }
 .download-modal-header-text h3 {
-    font-size: 1.25rem; /* Slightly smaller to fit subtitle */
+    font-size: 1.25rem;
 }
 .download-modal-header-text span {
     font-size: 0.9rem;
@@ -29,7 +26,7 @@
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing-unit) * 2);
-    background-color: var(--color-background); /* Darker bg for contrast */
+    background-color: var(--color-background); 
 }
 
 /* --- Controls (Select All) --- */
@@ -54,11 +51,6 @@
     user-select: none;
 }
 
-/*
- * Old checkbox styles removed from here.
- * The new global style for `label[for]` will apply.
-*/
-
 .selection-count {
     font-size: 0.9rem;
     color: var(--color-text-secondary);
@@ -73,7 +65,7 @@
     max-height: 45vh;
     overflow-y: auto;
     padding: var(--spacing-unit);
-    margin: 0 calc(var(--spacing-unit) * -1); /* Extend to edges */
+    margin: 0 calc(var(--spacing-unit) * -1); /* Extend to edges for seamless scroll */
 }
 
 .download-file-item {
@@ -94,7 +86,7 @@
     background-color: var(--color-surface-alt);
     border-color: var(--color-border);
 }
-/* Add a colored bar to the left of selected items for emphasis */
+/* Visual indicator for selected items */
 .download-file-item.selected::before {
     content: '';
     position: absolute;
@@ -110,11 +102,6 @@
     align-items: center;
     gap: calc(var(--spacing-unit) * 1.5);
 }
-
-/*
- * Old checkbox styles removed from here.
- * The new global style for `label[for]` will apply.
-*/
 
 .file-name-label {
     font-family: var(--font-monospace);
@@ -135,7 +122,7 @@
     border-radius: var(--border-radius-sm);
     padding: var(--spacing-unit);
     margin-top: var(--spacing-unit);
-    margin-left: calc(20px + var(--spacing-unit) * 1.5); /* Indent */
+    margin-left: calc(20px + var(--spacing-unit) * 1.5); /* Indent to align with checkbox text */
     display: flex;
     flex-wrap: wrap;
     gap: var(--spacing-unit);
@@ -157,6 +144,6 @@
 .file-item-options .config-input {
     padding: calc(var(--spacing-unit) * 1.25);
     font-size: 0.9rem;
-    flex-basis: 200px; /* Base width */
+    flex-basis: 200px; 
     flex-grow: 1;
 }
