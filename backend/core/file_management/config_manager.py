@@ -4,7 +4,7 @@ import logging
 import pathlib
 from typing import Dict, Optional, Any
 
-from .constants import CONFIG_FILE_DIR, CONFIG_FILE_PATH, ColorThemeType, UiProfileType
+from ..constants.constants import CONFIG_FILE_DIR, CONFIG_FILE_PATH, ColorThemeType, UiProfileType
 
 logger = logging.getLogger(__name__)
 

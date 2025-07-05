@@ -13,7 +13,7 @@ from .file_management.path_resolver import PathResolver
 from .file_management.model_downloader import ModelDownloader
 from .file_management.host_scanner import HostScanner
 from .file_management.download_tracker import download_tracker
-from .file_management.constants import (
+from .constants.constants import (
     ModelType,
     UiProfileType,
     ColorThemeType,

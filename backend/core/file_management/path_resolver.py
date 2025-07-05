@@ -5,7 +5,7 @@ import pathlib
 from typing import Optional
 
 from .config_manager import ConfigManager
-from .constants import KNOWN_UI_PROFILES, ModelType
+from ..constants.constants import KNOWN_UI_PROFILES, ModelType
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ import platform
 import string
 from typing import Dict, List, Optional, Any, Set
 
-from .constants import EXCLUDED_SCAN_PREFIXES_LINUX, SHALLOW_SCAN_PATHS_LINUX
+from ..constants.constants import EXCLUDED_SCAN_PREFIXES_LINUX, SHALLOW_SCAN_PATHS_LINUX
 
 logger = logging.getLogger(__name__)
 
