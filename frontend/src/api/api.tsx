@@ -160,6 +160,33 @@ export interface FileManagerListResponse {
 
 export type ViewMode = 'models' | 'explorer';
 
+
+// --- NEW: UI Environment Management Interfaces ---
+export type UiNameType = 'ComfyUI' | 'A1111' | 'ForgeUI';
+
+export interface AvailableUiItem {
+    ui_name: UiNameType;
+    git_url: string;
+}
+
+export interface ManagedUiStatus {
+    ui_name: UiNameType;
+    is_installed: boolean;
+    is_running: boolean;
+    install_path: string | null;
+    running_task_id: string | null;
+}
+
+export interface AllUiStatusResponse {
+    items: ManagedUiStatus[];
+}
+
+export interface UiActionResponse {
+    success: boolean;
+    message: string;
+    task_id: string;
+}
+
 // --- API Functions (Existing) ---
 export const searchModels = async (
     params: SearchModelParams,
@@ -295,24 +322,13 @@ export const scanHostDirectoriesAPI = async (
     }
 };
 
-// --- API Functions for Local File Management ---
-
-/**
- * Lists files and directories, supporting different view modes.
- * @param relativePath The relative path from the base_path. If null, the root is listed.
- * @param mode The view mode ('models' or 'explorer') to request from the backend.
- */
 export const listManagedFilesAPI = async (
     relativePath: string | null,
     mode: ViewMode,
 ): Promise<FileManagerListResponse> => {
     try {
-        // The generic type here now correctly expects the new response shape
         const response = await apiClient.get<FileManagerListResponse>('/filemanager/files', {
-            params: {
-                path: relativePath,
-                mode: mode,
-            },
+            params: { path: relativePath, mode: mode },
         });
         return response.data;
     } catch (error) {
@@ -321,19 +337,13 @@ export const listManagedFilesAPI = async (
     }
 };
 
-/**
- * Deletes a file or directory at a specific relative path.
- * @param relativePath The relative path of the item to be deleted.
- */
 export const deleteManagedItemAPI = async (
     relativePath: string,
 ): Promise<{ success: boolean; message: string }> => {
     try {
         const response = await apiClient.delete<{ success: boolean; message: string }>(
             '/filemanager/files',
-            {
-                data: { path: relativePath }, // DELETE requests with a body use the 'data' field in Axios
-            },
+            { data: { path: relativePath } },
         );
         return response.data;
     } catch (error) {
@@ -346,10 +356,6 @@ export const deleteManagedItemAPI = async (
     }
 };
 
-/**
- * Gets a preview of a text file's content.
- * @param relativePath The relative path to the file.
- */
 export const getFilePreviewAPI = async (relativePath: string): Promise<FilePreviewResponse> => {
     try {
         const response = await apiClient.get<FilePreviewResponse>('/filemanager/files/preview', {
@@ -365,6 +371,87 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
         throw error;
     }
 };
+
+
+// --- NEW: API Functions for UI Environment Management ---
+
+export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
+    try {
+        const response = await apiClient.get<AvailableUiItem[]>('/uis');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching available UIs:', error);
+        throw error;
+    }
+};
+
+export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
+    try {
+        const response = await apiClient.get<AllUiStatusResponse>('/uis/status');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching UI statuses:', error);
+        // Return a default empty state on error to prevent UI crashes
+        return { items: [] };
+    }
+};
+
+export const installUiAPI = async (uiName: UiNameType): Promise<UiActionResponse> => {
+    try {
+        const response = await apiClient.post<UiActionResponse>(`/uis/${uiName}/install`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error starting installation for ${uiName}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+export const deleteUiAPI = async (uiName: UiNameType): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.delete(`/uis/${uiName}`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error deleting UI environment ${uiName}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+export const runUiAPI = async (uiName: UiNameType): Promise<UiActionResponse> => {
+    try {
+        const response = await apiClient.post<UiActionResponse>(`/uis/${uiName}/run`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error starting UI ${uiName}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.post('/uis/stop', { task_id: taskId });
+        return response.data;
+    } catch (error) {
+        console.error(`Error stopping UI task ${taskId}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
 
 // --- WebSocket Connection (Unchanged) ---
 export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSocket => {
