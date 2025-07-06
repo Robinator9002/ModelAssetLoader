@@ -2,108 +2,88 @@
 import json
 import logging
 import pathlib
-from typing import Dict, Optional, Any
+from typing import Dict, Any, Optional, Tuple, Literal
 
-from ..constants.constants import CONFIG_FILE_DIR, CONFIG_FILE_PATH, ColorThemeType, UiProfileType
+from ..constants.constants import (
+    CONFIG_FILE_PATH,
+    KNOWN_UI_PROFILES,
+    ModelType,
+    UiProfileType,
+    ColorThemeType,
+)
+
+# Define the new type for configuration mode
+ConfigurationMode = Literal["automatic", "manual"]
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
-    """Manages loading, saving, and accessing application settings."""
+    """Handles loading, saving, and managing the application's configuration file."""
 
     def __init__(self):
         self.base_path: Optional[pathlib.Path] = None
         self.ui_profile: Optional[UiProfileType] = None
-        self.custom_paths: Dict[str, str] = {}
+        self.custom_model_type_paths: Dict[str, str] = {}
         self.color_theme: ColorThemeType = "dark"
-
-        self._ensure_config_dir_exists()
+        # Add the configuration mode setting
+        self.config_mode: ConfigurationMode = "automatic"
         self._load_config()
-
-    def _ensure_config_dir_exists(self):
-        """Ensures the configuration directory exists."""
-        try:
-            CONFIG_FILE_DIR.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            logger.error(
-                f"Could not create or access config directory {CONFIG_FILE_DIR}: {e}"
-            )
 
     def _load_config(self):
         """Loads configuration from the JSON file if it exists."""
         if not CONFIG_FILE_PATH.exists():
-            logger.info(
-                f"Config file not found at {CONFIG_FILE_PATH}. Using default state."
-            )
+            logger.info("Configuration file not found. Using default settings.")
             return
 
         try:
-            with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
+            with open(CONFIG_FILE_PATH, "r") as f:
                 config_data = json.load(f)
 
-            # Validate and set base_path
             base_path_str = config_data.get("base_path")
             if base_path_str:
-                resolved_path = pathlib.Path(base_path_str).resolve()
-                if resolved_path.is_dir():
-                    self.base_path = resolved_path
-                else:
-                    logger.warning(
-                        f"Loaded base_path '{base_path_str}' is not a valid directory. Ignoring."
-                    )
+                self.base_path = pathlib.Path(base_path_str)
 
             self.ui_profile = config_data.get("ui_profile")
-            self.custom_paths = config_data.get("custom_paths", {})
+            self.custom_model_type_paths = config_data.get("custom_model_type_paths", {})
             self.color_theme = config_data.get("color_theme", "dark")
+            # Load the config mode, defaulting to 'automatic' if not present
+            self.config_mode = config_data.get("config_mode", "automatic")
+
             logger.info(f"Configuration loaded from {CONFIG_FILE_PATH}")
 
-        except (json.JSONDecodeError, Exception) as e:
-            logger.error(
-                f"Error loading config from {CONFIG_FILE_PATH}: {e}. Resetting to defaults.",
-                exc_info=True,
-            )
-            self._initialize_default_state()
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Error reading configuration file: {e}. Using defaults.")
+            self._reset_to_defaults()
 
-    def _save_config(self) -> bool:
+    def _save_config(self):
         """Saves the current configuration to the JSON file."""
-        if not CONFIG_FILE_DIR.is_dir():
-            logger.error(
-                f"Config directory {CONFIG_FILE_DIR} does not exist. Cannot save."
-            )
-            return False
+        CONFIG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        config_data = self.get_current_configuration()
 
-        config_data = {
-            "base_path": str(self.base_path) if self.base_path else None,
-            "ui_profile": self.ui_profile,
-            "custom_paths": self.custom_paths,
-            "color_theme": self.color_theme,
-        }
         try:
-            with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+            with open(CONFIG_FILE_PATH, "w") as f:
                 json.dump(config_data, f, indent=4)
             logger.info(f"Configuration saved to {CONFIG_FILE_PATH}")
-            return True
-        except Exception as e:
-            logger.error(
-                f"Error saving configuration to {CONFIG_FILE_PATH}: {e}", exc_info=True
-            )
-            return False
+        except IOError as e:
+            logger.error(f"Error saving configuration file: {e}")
 
-    def _initialize_default_state(self):
-        """Resets configuration to a default (empty) state."""
+    def _reset_to_defaults(self):
+        """Resets the configuration to a default state."""
         self.base_path = None
         self.ui_profile = None
-        self.custom_paths = {}
+        self.custom_model_type_paths = {}
         self.color_theme = "dark"
+        self.config_mode = "automatic"
 
     def get_current_configuration(self) -> Dict[str, Any]:
-        """Returns the current live configuration."""
+        """Returns the current configuration as a dictionary."""
         return {
             "base_path": str(self.base_path) if self.base_path else None,
             "ui_profile": self.ui_profile,
-            "custom_model_type_paths": self.custom_paths,
+            "custom_model_type_paths": self.custom_model_type_paths,
             "color_theme": self.color_theme,
+            "config_mode": self.config_mode,
         }
 
     def update_configuration(
@@ -112,56 +92,47 @@ class ConfigManager:
         profile: Optional[UiProfileType],
         custom_model_type_paths: Optional[Dict[str, str]],
         color_theme: Optional[ColorThemeType],
-    ) -> tuple[bool, str]:
-        """
-        Updates configuration fields and saves them.
-        Returns a tuple of (config_changed, message).
-        """
-        config_changed = False
-        message = "No changes to configuration."
+        config_mode: Optional[ConfigurationMode],  # Accept config_mode
+    ) -> Tuple[bool, str]:
+        """Updates and saves the configuration."""
+        changed = False
 
         # Update Base Path
-        if base_path_str is not None:
-            if base_path_str == "":  # Explicitly clear path
-                if self.base_path is not None:
-                    self.base_path = None
-                    config_changed = True
-            else:
-                try:
-                    p = pathlib.Path(base_path_str).resolve()
-                    if not p.is_dir():
-                        p.mkdir(parents=True, exist_ok=True)
-                    if self.base_path != p:
-                        self.base_path = p
-                        config_changed = True
-                except Exception as e:
-                    error_msg = f"Invalid base path '{base_path_str}': {e}"
-                    return False, error_msg
+        new_base_path = pathlib.Path(base_path_str) if base_path_str else None
+        if new_base_path != self.base_path:
+            if new_base_path and not new_base_path.is_dir():
+                return (
+                    False,
+                    f"Error: The provided base path '{new_base_path}' is not a valid directory.",
+                )
+            self.base_path = new_base_path
+            changed = True
 
         # Update UI Profile
-        if profile is not None and self.ui_profile != profile:
+        if profile != self.ui_profile:
             self.ui_profile = profile
-            config_changed = True
+            changed = True
 
         # Update Custom Paths
         if (
             custom_model_type_paths is not None
-            and self.custom_paths != custom_model_type_paths
+            and custom_model_type_paths != self.custom_model_type_paths
         ):
-            self.custom_paths = custom_model_type_paths
-            config_changed = True
+            self.custom_model_type_paths = custom_model_type_paths
+            changed = True
 
         # Update Color Theme
-        if color_theme is not None and self.color_theme != color_theme:
+        if color_theme and color_theme != self.color_theme:
             self.color_theme = color_theme
-            config_changed = True
+            changed = True
 
-        if config_changed:
-            if self._save_config():
-                message = "Configuration updated successfully."
-            else:
-                message = "Configuration updated in memory, but failed to save to file."
-                # The change is still technically a success in memory, but we report the save failure.
-                return True, message
+        # Update Config Mode
+        if config_mode and config_mode != self.config_mode:
+            self.config_mode = config_mode
+            changed = True
 
-        return config_changed, message
+        if changed:
+            self._save_config()
+            return True, "Configuration updated successfully."
+
+        return False, "No changes detected in configuration."
