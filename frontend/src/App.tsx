@@ -9,12 +9,23 @@ import ConfigurationsPage from './components/Files/ConfigurationsPage';
 import DownloadModal from './components/Downloads/DownloadModal';
 import DownloadSidebar from './components/Downloads/DownloadSidebar';
 import FileManagerPage from './components/FileManager/FileManagerPage';
-import { dismissDownloadAPI } from './api/api';
+// Import the new UI Management page
+import UiManagementPage from './components/Environments/UiManagementPage';
 
 import {
+    // API functions for UI management
+    listAvailableUisAPI,
+    getUiStatusesAPI,
+    installUiAPI,
+    runUiAPI,
+    stopUiAPI,
+    deleteUiAPI,
+    // Existing API functions
     getCurrentConfigurationAPI,
     configurePathsAPI,
     connectToDownloadTracker,
+    dismissDownloadAPI,
+    // Type definitions
     type PathConfigurationRequest,
     type ColorThemeType,
     type MalFullConfiguration,
@@ -22,6 +33,9 @@ import {
     type ModelDetails,
     type ModelFile,
     type DownloadStatus,
+    type AvailableUiItem,
+    type ManagedUiStatus,
+    type UiNameType,
 } from './api/api';
 import appIcon from '/icon.png';
 
@@ -55,6 +69,11 @@ function App() {
     const [activeDownloads, setActiveDownloads] = useState<Map<string, DownloadStatus>>(new Map());
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
     const ws = useRef<WebSocket | null>(null);
+
+    // --- NEW: UI Environment Management State ---
+    const [availableUis, setAvailableUis] = useState<AvailableUiItem[]>([]);
+    const [uiStatuses, setUiStatuses] = useState<ManagedUiStatus[]>([]);
+
 
     // Effect to establish and manage the WebSocket connection for real-time download updates.
     useEffect(() => {
@@ -107,9 +126,9 @@ function App() {
 
     // --- Handlers for Download Sidebar ---
     const handleToggleDownloadsSidebar = useCallback(() => {
-        setDownloadsSidebarOpen((prev) => !prev);
+        setDownloadsSidebarOpen(prev => !prev);
     }, []);
-
+    
     const handleCloseDownloadsSidebar = useCallback(() => {
         setDownloadsSidebarOpen(false);
     }, []);
@@ -141,6 +160,71 @@ function App() {
         setSpecificFileForDownload(null);
     }, []);
 
+    // --- NEW: UI Management Data Fetching & Handlers ---
+    const fetchUiData = useCallback(async () => {
+        try {
+            const [uis, statuses] = await Promise.all([
+                listAvailableUisAPI(),
+                getUiStatusesAPI(),
+            ]);
+            setAvailableUis(uis);
+            setUiStatuses(statuses.items);
+        } catch (error) {
+            logger.error('Failed to fetch UI environment data:', error);
+        }
+    }, []);
+
+    const handleInstallUi = useCallback(async (uiName: UiNameType) => {
+        try {
+            await installUiAPI(uiName);
+            // The WebSocket will handle the status update, just open the sidebar.
+            setDownloadsSidebarOpen(true);
+        } catch (error) {
+            logger.error(`Failed to start installation for ${uiName}:`, error);
+            // TODO: Add user-facing error notification
+        }
+    }, []);
+
+    const handleRunUi = useCallback(async (uiName: UiNameType) => {
+        try {
+            await runUiAPI(uiName);
+            // The WebSocket will handle the status update, just open the sidebar.
+            setDownloadsSidebarOpen(true);
+        } catch (error) {
+            logger.error(`Failed to start UI ${uiName}:`, error);
+            // TODO: Add user-facing error notification
+        }
+    }, []);
+
+    const handleStopUi = useCallback(async (taskId: string) => {
+        try {
+            await stopUiAPI(taskId);
+        } catch (error) {
+            logger.error(`Failed to stop UI task ${taskId}:`, error);
+        }
+    }, []);
+
+    const handleDeleteUi = useCallback(async (uiName: UiNameType) => {
+        try {
+            await deleteUiAPI(uiName);
+            // Refresh the statuses after deletion
+            fetchUiData();
+        } catch (error) {
+            logger.error(`Failed to delete UI ${uiName}:`, error);
+        }
+    }, [fetchUiData]);
+
+    const isUiBusy = useCallback((uiName: UiNameType): boolean => {
+        // A UI is "busy" if it's the subject of any active task in the tracker.
+        for (const download of activeDownloads.values()) {
+            if (download.filename === uiName && (download.status === 'pending' || download.status === 'downloading')) {
+                return true;
+            }
+        }
+        return false;
+    }, [activeDownloads]);
+
+
     // --- General App Logic & Handlers ---
     const loadInitialConfig = useCallback(async () => {
         setIsConfigLoading(true);
@@ -153,12 +237,14 @@ function App() {
             };
             setPathConfig(newPathConfig);
             setTheme(config.color_theme || 'dark');
+            // Also fetch UI data on initial load
+            await fetchUiData();
         } catch (error) {
             logger.error('Failed to load initial config from backend:', error);
         } finally {
             setIsConfigLoading(false);
         }
-    }, []);
+    }, [fetchUiData]);
 
     useEffect(() => {
         loadInitialConfig();
@@ -220,9 +306,8 @@ function App() {
     const downloadSummaryStatus = useMemo((): DownloadSummaryStatus => {
         const statuses = Array.from(activeDownloads.values());
         if (statuses.length === 0) return 'idle';
-        if (statuses.some((s) => s.status === 'error')) return 'error';
-        if (statuses.some((s) => s.status === 'downloading' || s.status === 'pending'))
-            return 'downloading';
+        if (statuses.some(s => s.status === 'error')) return 'error';
+        if (statuses.some(s => s.status === 'downloading' || s.status === 'pending')) return 'downloading';
         return 'completed';
     }, [activeDownloads]);
 
@@ -252,6 +337,18 @@ function App() {
                 );
             case 'files':
                 return <FileManagerPage />;
+            case 'environments': // Render the new page
+                return (
+                    <UiManagementPage
+                        availableUis={availableUis}
+                        uiStatuses={uiStatuses}
+                        onInstall={handleInstallUi}
+                        onRun={handleRunUi}
+                        onStop={handleStopUi}
+                        onDelete={handleDeleteUi}
+                        isBusy={isUiBusy}
+                    />
+                );
             case 'configuration':
                 return (
                     <ConfigurationsPage
@@ -282,19 +379,8 @@ function App() {
 
             <div className="app-content-pusher">
                 <header className="app-header-placeholder">
-                    <div
-                        style={{
-                            gap: '1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        <img
-                            src={appIcon}
-                            style={{ width: '2rem', height: 'auto' }}
-                            alt="M.A.L. Icon"
-                        />
+                    <div style={{ gap: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img src={appIcon} style={{ width: '2rem', height: 'auto' }} alt="M.A.L. Icon" />
                         <h1>M.A.L.</h1>
                     </div>
                 </header>

@@ -1,17 +1,10 @@
 // frontend/src/components/Layout/Navbar.tsx
 import React from 'react';
-import {
-    Search,
-    Settings,
-    FolderKanban,
-    DownloadCloud,
-    CheckCircle2,
-    AlertTriangle,
-    Loader2,
-} from 'lucide-react';
+import { Search, Settings, FolderKanban, DownloadCloud, CheckCircle2, AlertTriangle, Loader2, Layers } from 'lucide-react';
 import { type DownloadSummaryStatus } from '../../App';
 
-export type MalTabKey = 'search' | 'files' | 'configuration';
+// Add the new 'environments' key for the new tab.
+export type MalTabKey = 'search' | 'files' | 'configuration' | 'environments';
 
 interface NavbarProps {
     activeTab: MalTabKey;
@@ -27,6 +20,7 @@ interface NavItemConfig {
     icon: React.ReactNode;
 }
 
+// Define the configuration for all navigation items, including the new one.
 const navItems: NavItemConfig[] = [
     {
         key: 'search',
@@ -39,8 +33,13 @@ const navItems: NavItemConfig[] = [
         icon: <FolderKanban size={18} />,
     },
     {
+        key: 'environments',
+        label: 'UI Management',
+        icon: <Layers size={18} />,
+    },
+    {
         key: 'configuration',
-        label: 'Configuration',
+        label: 'Settings',
         icon: <Settings size={18} />,
     },
 ];
@@ -49,13 +48,14 @@ const navItems: NavItemConfig[] = [
  * The main navigation bar for the application. It displays the primary navigation
  * tabs and provides a dynamic button to manage and view the status of downloads.
  */
-const Navbar: React.FC<NavbarProps> = ({
-    activeTab,
+const Navbar: React.FC<NavbarProps> = ({ 
+    activeTab, 
     onTabChange,
     onToggleDownloads,
     downloadStatus,
-    downloadCount,
+    downloadCount
 }) => {
+
     /**
      * Determines which icon to display on the downloads button based on the
      * summarized status of all active downloads.
@@ -96,16 +96,18 @@ const Navbar: React.FC<NavbarProps> = ({
             </nav>
 
             <div className="navbar-actions">
-                <button
+                <button 
                     className={`download-status-button ${downloadStatus}`}
                     onClick={onToggleDownloads}
                     title="Show Downloads"
                     disabled={downloadCount === 0 && downloadStatus === 'idle'}
                 >
-                    <span className="download-status-icon">{getDownloadStatusIcon()}</span>
+                    <span className="download-status-icon">
+                        {getDownloadStatusIcon()}
+                    </span>
                     <span className="navbar-tab-label">Downloads</span>
                     {downloadCount > 0 && (
-                        <span className="download-count-badge">{downloadCount}</span>
+                         <span className="download-count-badge">{downloadCount}</span>
                     )}
                 </button>
             </div>
