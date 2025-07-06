@@ -11,7 +11,6 @@ import {
 import type { AppPathConfig } from '../../App';
 import FolderSelector from './FolderSelector';
 import { Folder, Settings, Save, AlertTriangle, Layers, Cog } from 'lucide-react';
-import './UiProfileSelector.css'; // Import the new styles
 
 interface ConfigurationsPageProps {
     initialPathConfig: AppPathConfig | null;
