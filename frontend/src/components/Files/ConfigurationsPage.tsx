@@ -6,21 +6,26 @@ import {
     type UiProfileType,
     type ModelType,
     type ColorThemeType,
+    type ManagedUiStatus, // Import the status type
 } from '../../api/api';
 import type { AppPathConfig } from '../../App';
 import FolderSelector from './FolderSelector';
-import { Folder, Settings, Save, AlertTriangle } from 'lucide-react';
+import { Folder, Settings, Save, AlertTriangle, Layers, Cog } from 'lucide-react';
+import './UiProfileSelector.css'; // Import the new styles
 
 interface ConfigurationsPageProps {
     initialPathConfig: AppPathConfig | null;
     onConfigurationSave: (savedConfig: AppPathConfig, savedTheme: ColorThemeType) => void;
     currentGlobalTheme: ColorThemeType;
+    // Add the list of UI statuses to the props
+    uiStatuses: ManagedUiStatus[];
 }
 
 const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
     initialPathConfig,
     onConfigurationSave,
     currentGlobalTheme,
+    uiStatuses, // Destructure the new prop
 }) => {
     const [basePath, setBasePath] = useState<string | null>(null);
     const [selectedProfile, setSelectedProfile] = useState<UiProfileType>('ComfyUI');
@@ -80,12 +85,10 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                     message: response.message || 'Configuration saved successfully!',
                 });
 
-                // --- Update local state directly after successful save ---
                 setBasePath(newConfig.base_path || null);
                 setSelectedProfile(newConfig.profile || 'ComfyUI');
                 setCustomPaths(newConfig.custom_model_type_paths || {});
 
-                // Propagate the changes to the parent component
                 onConfigurationSave(
                     {
                         basePath: newConfig.base_path,
@@ -106,6 +109,9 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
             setIsLoading(false);
         }
     }, [basePath, selectedProfile, customPaths, currentGlobalTheme, onConfigurationSave]);
+
+    // Filter for only installed UIs to offer them as profile options
+    const installedUis = uiStatuses.filter(status => status.is_installed);
 
     const modelTypesForCustomPaths: ModelType[] = [
         'checkpoints',
@@ -135,7 +141,7 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                     <div className="config-card-body">
                         <section className="config-section">
                             <label htmlFor="basePathDisplay" className="config-label">
-                                Base Folder for Models
+                                Base Folder for Models & UIs
                             </label>
                             <div className="base-path-selector">
                                 <input
@@ -153,31 +159,46 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                             </div>
                             {!basePath && (
                                 <p className="config-hint error-hint">
-                                    A base folder must be selected.
+                                    A base folder must be selected to continue.
                                 </p>
                             )}
                         </section>
 
                         <section className="config-section">
-                            <label htmlFor="uiProfileSelect" className="config-label">
-                                UI Profile (for relative paths)
+                            <label className="config-label">
+                                Active UI Profile
                             </label>
-                            <select
-                                id="uiProfileSelect"
-                                value={selectedProfile || ''}
-                                onChange={(e) =>
-                                    handleProfileChange(e.target.value as UiProfileType)
-                                }
-                                className="config-select"
-                                disabled={!basePath}
-                            >
-                                <option value="ComfyUI">ComfyUI</option>
-                                <option value="A1111">Automatic1111 / SD.Next / Forge</option>
-                                <option value="Custom">Custom</option>
-                            </select>
-                            {!basePath && (
-                                <p className="config-hint">Select a base folder first.</p>
-                            )}
+                            <div className="profile-selector-container">
+                               <div className="profile-selector-grid">
+                                    {installedUis.map(ui => (
+                                        <div 
+                                            key={ui.ui_name}
+                                            className={`profile-card ${selectedProfile === ui.ui_name ? 'selected' : ''}`}
+                                            onClick={() => handleProfileChange(ui.ui_name)}
+                                            tabIndex={0}
+                                            role="radio"
+                                            aria-checked={selectedProfile === ui.ui_name}
+                                        >
+                                            <span className="profile-card-icon"><Layers size={24}/></span>
+                                            <span className="profile-card-name">{ui.ui_name}</span>
+                                            <span className="profile-card-tag">Managed</span>
+                                        </div>
+                                    ))}
+                                    <div 
+                                        className={`profile-card ${selectedProfile === 'Custom' ? 'selected' : ''}`}
+                                        onClick={() => handleProfileChange('Custom')}
+                                        tabIndex={0}
+                                        role="radio"
+                                        aria-checked={selectedProfile === 'Custom'}
+                                    >
+                                        <span className="profile-card-icon"><Cog size={24}/></span>
+                                        <span className="profile-card-name">Custom</span>
+                                    </div>
+                               </div>
+                               {!basePath && (
+                                    <p className="config-hint">Select a base folder to enable profiles.</p>
+                                )}
+                            </div>
                         </section>
                     </div>
                 </div>
@@ -193,7 +214,7 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                     </h2>
                     <div className="config-card-body custom-paths-body">
                         <p className="config-hint">
-                            Paths are relative to your base folder: <code>{basePath}</code>
+                            Define paths relative to your base folder: <code>{basePath}</code>
                         </p>
                         <div className="custom-paths-list">
                             {modelTypesForCustomPaths.map((mType) => (

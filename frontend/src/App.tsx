@@ -9,7 +9,6 @@ import ConfigurationsPage from './components/Files/ConfigurationsPage';
 import DownloadModal from './components/Downloads/DownloadModal';
 import DownloadSidebar from './components/Downloads/DownloadSidebar';
 import FileManagerPage from './components/FileManager/FileManagerPage';
-// Import the new UI Management page
 import UiManagementPage from './components/Environments/UiManagementPage';
 
 import {
@@ -70,7 +69,7 @@ function App() {
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
     const ws = useRef<WebSocket | null>(null);
 
-    // --- NEW: UI Environment Management State ---
+    // --- UI Environment Management State ---
     const [availableUis, setAvailableUis] = useState<AvailableUiItem[]>([]);
     const [uiStatuses, setUiStatuses] = useState<ManagedUiStatus[]>([]);
 
@@ -160,7 +159,7 @@ function App() {
         setSpecificFileForDownload(null);
     }, []);
 
-    // --- NEW: UI Management Data Fetching & Handlers ---
+    // --- UI Management Data Fetching & Handlers ---
     const fetchUiData = useCallback(async () => {
         try {
             const [uis, statuses] = await Promise.all([
@@ -337,7 +336,7 @@ function App() {
                 );
             case 'files':
                 return <FileManagerPage />;
-            case 'environments': // Render the new page
+            case 'environments':
                 return (
                     <UiManagementPage
                         availableUis={availableUis}
@@ -355,6 +354,7 @@ function App() {
                         initialPathConfig={pathConfig}
                         onConfigurationSave={handlePathConfigurationUpdate}
                         currentGlobalTheme={theme}
+                        uiStatuses={uiStatuses}
                     />
                 );
             default:
