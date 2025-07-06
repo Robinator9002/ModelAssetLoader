@@ -20,8 +20,6 @@ import {
     SlidersHorizontal,
     Info,
 } from 'lucide-react';
-import './UiProfileSelector.css';
-import './ConfigModeSwitcher.css';
 
 // This is a frontend copy of the backend's KNOWN_UI_PROFILES for instant feedback
 const KNOWN_UI_PROFILES: Record<string, Record<string, string>> = {

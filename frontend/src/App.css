@@ -20,6 +20,7 @@
 @import url('./style/Files/FolderSelector.css');
 @import url('./style/Files/ConfigurationsPage.css');
 @import url('./style/Files/UiProfileSelector.css');
+@import url('./style/Files/ConfigModeSwitcher.css');
 
 @import url('./style/FileManager/FileItem.css');
 @import url('./style/FileManager/FileManager.css');

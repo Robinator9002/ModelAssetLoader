@@ -1,36 +1,43 @@
 /*
  * =================================================================
- * M.A.L. - ConfigurationsPage Styles (IMPROVED)
+ * M.A.L. - ConfigurationsPage Styles (Revamped for Clarity & Feel)
  * =================================================================
 */
 
 .configurations-page {
     display: flex;
     flex-direction: column;
-    gap: calc(var(--spacing-unit) * 3);
+    gap: calc(var(--spacing-unit) * 2); /* Reduced gap */
     height: 100%;
-    max-height: calc(100vh - 64px - 40px); /* vh - navbar_height - parent_padding */
 }
 
+/* --- Header & Mode Switcher --- */
 .config-header {
     flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: calc(var(--spacing-unit) * 2);
+    border-bottom: 1px solid var(--color-border);
 }
-.config-header h1 {
+.config-header-text h1 {
     font-size: 1.75rem;
+    margin: 0;
 }
-.config-header p {
+.config-header-text p {
     font-size: 1rem;
     color: var(--color-text-secondary);
     margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
-/* Two-column layout for the main settings */
+/* --- Main Content Layout --- */
 .config-main-content {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: calc(var(--spacing-unit) * 3);
     flex-grow: 1;
-    overflow: hidden; /* Prevent content from breaking layout */
+    overflow-y: auto;
+    padding-right: var(--spacing-unit); /* Space for scrollbar */
 }
 
 .config-card {
@@ -39,27 +46,25 @@
     border-radius: var(--border-radius-lg);
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Crucial for internal scrolling */
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 .config-card-header {
     display: flex;
     align-items: center;
     gap: var(--spacing-unit);
-    font-size: 1.2rem;
+    font-size: 1.1rem; /* Slightly smaller header */
     font-weight: 600;
-    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
     border-bottom: 1px solid var(--color-border);
     color: var(--color-text-primary);
 }
 
 .config-card-body {
-    padding: calc(var(--spacing-unit) * 3);
+    padding: calc(var(--spacing-unit) * 2.5);
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing-unit) * 3);
-    overflow-y: auto; /* Enable scrolling for the body */
 }
 
 .config-section {
@@ -72,7 +77,6 @@
     font-weight: 600;
     font-size: 0.9rem;
     color: var(--color-text-primary);
-    padding-bottom: calc(var(--spacing-unit) * 0.5);
 }
 
 .base-path-selector {
@@ -83,30 +87,83 @@
 .path-input.config-input {
     cursor: pointer;
     background-color: var(--color-background);
-    color: var(--color-text-secondary);
-    border: 1px dashed var(--color-border); /* Dashed to indicate it's not a normal input */
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
 }
 .path-input.config-input:hover {
-    color: var(--color-text-primary);
     border-color: var(--color-primary);
 }
 
-.config-hint {
-    font-size: 0.9rem;
-    color: var(--color-text-secondary);
-    margin-top: calc(var(--spacing-unit) * 0.5);
-}
-.config-hint.error-hint {
-    color: var(--color-error);
-    font-weight: 500;
+/* --- Profile & Path Sections --- */
+.profile-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: calc(var(--spacing-unit) * 2);
 }
 
-/* --- Custom Paths Section --- */
+.profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-unit);
+    padding: calc(var(--spacing-unit) * 2);
+    border: 2px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background-color: var(--color-surface-alt);
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    position: relative;
+    text-align: center;
+    min-height: 110px;
+}
+
+.profile-card:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-surface);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.profile-card.selected {
+    border-color: var(--color-primary);
+    background-color: rgba(var(--color-primary-rgb), 0.1);
+    box-shadow: 0 0 0 2px var(--color-primary);
+    transform: translateY(-3px);
+}
+
+.profile-card-icon {
+    color: var(--color-text-secondary);
+    transition: color 0.2s ease-in-out;
+}
+
+.profile-card.selected .profile-card-icon {
+    color: var(--color-primary);
+}
+
+.profile-card-name {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.profile-card-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-on-primary);
+    background-color: var(--color-primary);
+    padding: 2px 6px;
+    border-radius: var(--border-radius-full);
+    position: absolute;
+    top: calc(var(--spacing-unit) * 1);
+    right: calc(var(--spacing-unit) * 1);
+}
 
 .custom-paths-card {
     opacity: 0.5;
     transform: scale(0.98);
     pointer-events: none;
+    transition: all 0.3s ease;
 }
 .custom-paths-card.visible {
     opacity: 1;
@@ -114,55 +171,38 @@
     pointer-events: all;
 }
 
-.custom-paths-body .config-hint {
-    margin-bottom: var(--spacing-unit);
-}
-.custom-paths-body .config-hint code {
-    font-family: var(--font-monospace);
-    background-color: var(--color-background);
-    padding: 2px 5px;
-    border-radius: var(--border-radius-sm);
-}
-
 .custom-paths-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: calc(var(--spacing-unit) * 2);
 }
 
 .custom-path-entry {
-    display: grid;
-    grid-template-columns: calc(var(--spacing-unit) * 17.5) 1fr;
-    align-items: center;
-    gap: calc(var(--spacing-unit) * 2);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 0.5);
 }
 
 .custom-path-label {
-    text-align: right;
     font-weight: 500;
     color: var(--color-text-secondary);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-family: var(--font-monospace);
     text-transform: capitalize;
 }
-.custom-path-label::after {
-    content: ':';
-}
 
-/* --- Footer Actions --- */
-
+/* --- Footer --- */
 .config-footer {
     flex-shrink: 0;
     display: flex;
-    justify-content: flex-end; /* Aligns button to the right */
+    justify-content: flex-end;
     align-items: center;
     padding-top: calc(var(--spacing-unit) * 2);
     border-top: 1px solid var(--color-border);
-    position: relative; /* Positioning context for the feedback message */
-    min-height: 54px; /* Ensure footer has height for centered message */
+    position: relative;
+    min-height: 54px;
 }
 
-/* Center the feedback message and take it out of the flex flow */
 .config-footer .feedback-message {
     position: absolute;
     left: 50%;
@@ -172,12 +212,20 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-unit);
-    z-index: 1; /* Ensure it's on top */
 }
 
 .save-config-button {
     min-width: 220px;
     font-size: 1rem;
-    /* Ensure the button has generous padding for a large click area */
     padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
+}
+
+/* --- Feedback Message Warning Style --- */
+.feedback-message.warning {
+    background-color: rgba(234, 179, 8, 0.1);
+    border-left-color: #eab308;
+    color: #fde047;
+}
+.light-theme .feedback-message.warning {
+    color: #a16207;
 }
