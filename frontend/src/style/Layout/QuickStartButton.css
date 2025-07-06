@@ -1,0 +1,50 @@
+/*
+ * =================================================================
+ * M.A.L. - Quick Start Button Styles
+ * =================================================================
+*/
+
+.quick-start-button {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1.25);
+    padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2);
+    border-radius: var(--border-radius-md);
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all var(--transition-speed-fast) ease-in-out;
+}
+
+.quick-start-button.stopped {
+    background-color: rgba(var(--color-success-rgb), 0.1);
+    border: 1px solid rgba(var(--color-success-rgb), 0.3);
+    color: var(--color-success);
+}
+.light-theme .quick-start-button.stopped {
+    color: hsl(var(--color-success-hue), 80%, 20%);
+}
+
+.quick-start-button.stopped:hover {
+    background-color: rgba(var(--color-success-rgb), 0.2);
+    border-color: var(--color-success);
+    transform: translateY(-2px);
+    box-shadow: 0 0 10px rgba(var(--color-success-rgb), 0.3);
+}
+
+.quick-start-button.running {
+    background-color: rgba(var(--color-primary-rgb), 0.1);
+    border: 1px solid rgba(var(--color-primary-rgb), 0.3);
+    color: var(--color-primary);
+}
+
+.quick-start-button.running:hover {
+    background-color: rgba(var(--color-primary-rgb), 0.2);
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 0 10px rgba(var(--color-primary-rgb), 0.3);
+}
+
+.quick-start-label {
+    white-space: nowrap;
+}

@@ -1,9 +1,20 @@
 // frontend/src/components/Layout/Navbar.tsx
 import React from 'react';
-import { Search, Settings, FolderKanban, DownloadCloud, CheckCircle2, AlertTriangle, Loader2, Layers } from 'lucide-react';
+import {
+    Search,
+    Settings,
+    FolderKanban,
+    DownloadCloud,
+    CheckCircle2,
+    AlertTriangle,
+    Loader2,
+    Layers,
+    Play,
+    Power,
+} from 'lucide-react';
 import { type DownloadSummaryStatus } from '../../App';
+import { type UiProfileType } from '../../api/api';
 
-// Add the new 'environments' key for the new tab.
 export type MalTabKey = 'search' | 'files' | 'configuration' | 'environments';
 
 interface NavbarProps {
@@ -12,6 +23,10 @@ interface NavbarProps {
     onToggleDownloads: () => void;
     downloadStatus: DownloadSummaryStatus;
     downloadCount: number;
+    // Props for the new quick-start button
+    activeUiProfile: UiProfileType | null;
+    isUiRunning: boolean;
+    onQuickStart: () => void;
 }
 
 interface NavItemConfig {
@@ -20,7 +35,6 @@ interface NavItemConfig {
     icon: React.ReactNode;
 }
 
-// Define the configuration for all navigation items, including the new one.
 const navItems: NavItemConfig[] = [
     {
         key: 'search',
@@ -48,14 +62,16 @@ const navItems: NavItemConfig[] = [
  * The main navigation bar for the application. It displays the primary navigation
  * tabs and provides a dynamic button to manage and view the status of downloads.
  */
-const Navbar: React.FC<NavbarProps> = ({ 
-    activeTab, 
+const Navbar: React.FC<NavbarProps> = ({
+    activeTab,
     onTabChange,
     onToggleDownloads,
     downloadStatus,
-    downloadCount
+    downloadCount,
+    activeUiProfile,
+    isUiRunning,
+    onQuickStart,
 }) => {
-
     /**
      * Determines which icon to display on the downloads button based on the
      * summarized status of all active downloads.
@@ -96,18 +112,32 @@ const Navbar: React.FC<NavbarProps> = ({
             </nav>
 
             <div className="navbar-actions">
-                <button 
+                {activeUiProfile && activeUiProfile !== 'Custom' && (
+                    <button
+                        className={`quick-start-button ${isUiRunning ? 'running' : 'stopped'}`}
+                        onClick={onQuickStart}
+                        title={isUiRunning ? `Stop ${activeUiProfile}` : `Start ${activeUiProfile}`}
+                    >
+                        {isUiRunning ? (
+                            <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                            <Play size={16} />
+                        )}
+                        <span className="quick-start-label">{activeUiProfile}</span>
+                        <Power size={16} />
+                    </button>
+                )}
+
+                <button
                     className={`download-status-button ${downloadStatus}`}
                     onClick={onToggleDownloads}
                     title="Show Downloads"
                     disabled={downloadCount === 0 && downloadStatus === 'idle'}
                 >
-                    <span className="download-status-icon">
-                        {getDownloadStatusIcon()}
-                    </span>
+                    <span className="download-status-icon">{getDownloadStatusIcon()}</span>
                     <span className="navbar-tab-label">Downloads</span>
                     {downloadCount > 0 && (
-                         <span className="download-count-badge">{downloadCount}</span>
+                        <span className="download-count-badge">{downloadCount}</span>
                     )}
                 </button>
             </div>

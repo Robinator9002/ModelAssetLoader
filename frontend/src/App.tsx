@@ -73,9 +73,9 @@ function App() {
     const [availableUis, setAvailableUis] = useState<AvailableUiItem[]>([]);
     const [uiStatuses, setUiStatuses] = useState<ManagedUiStatus[]>([]);
 
-
     // Effect to establish and manage the WebSocket connection for real-time download updates.
     useEffect(() => {
+        // WebSocket connection logic remains the same...
         if (!ws.current) {
             logger.info('Setting up WebSocket for download tracking...');
             const handleWsMessage = (data: any) => {
@@ -125,17 +125,13 @@ function App() {
 
     // --- Handlers for Download Sidebar ---
     const handleToggleDownloadsSidebar = useCallback(() => {
-        setDownloadsSidebarOpen(prev => !prev);
+        setDownloadsSidebarOpen((prev) => !prev);
     }, []);
-    
+
     const handleCloseDownloadsSidebar = useCallback(() => {
         setDownloadsSidebarOpen(false);
     }, []);
 
-    /**
-     * Orchestrates the UI flow when downloads are initiated from the modal.
-     * It closes the modal and opens the sidebar for a seamless transition.
-     */
     const handleDownloadsStarted = useCallback(() => {
         setIsDownloadModalOpen(false);
         setModelForDownload(null);
@@ -162,10 +158,7 @@ function App() {
     // --- UI Management Data Fetching & Handlers ---
     const fetchUiData = useCallback(async () => {
         try {
-            const [uis, statuses] = await Promise.all([
-                listAvailableUisAPI(),
-                getUiStatusesAPI(),
-            ]);
+            const [uis, statuses] = await Promise.all([listAvailableUisAPI(), getUiStatusesAPI()]);
             setAvailableUis(uis);
             setUiStatuses(statuses.items);
         } catch (error) {
@@ -176,22 +169,18 @@ function App() {
     const handleInstallUi = useCallback(async (uiName: UiNameType) => {
         try {
             await installUiAPI(uiName);
-            // The WebSocket will handle the status update, just open the sidebar.
             setDownloadsSidebarOpen(true);
         } catch (error) {
             logger.error(`Failed to start installation for ${uiName}:`, error);
-            // TODO: Add user-facing error notification
         }
     }, []);
 
     const handleRunUi = useCallback(async (uiName: UiNameType) => {
         try {
             await runUiAPI(uiName);
-            // The WebSocket will handle the status update, just open the sidebar.
             setDownloadsSidebarOpen(true);
         } catch (error) {
             logger.error(`Failed to start UI ${uiName}:`, error);
-            // TODO: Add user-facing error notification
         }
     }, []);
 
@@ -203,26 +192,49 @@ function App() {
         }
     }, []);
 
-    const handleDeleteUi = useCallback(async (uiName: UiNameType) => {
-        try {
-            await deleteUiAPI(uiName);
-            // Refresh the statuses after deletion
-            fetchUiData();
-        } catch (error) {
-            logger.error(`Failed to delete UI ${uiName}:`, error);
-        }
-    }, [fetchUiData]);
-
-    const isUiBusy = useCallback((uiName: UiNameType): boolean => {
-        // A UI is "busy" if it's the subject of any active task in the tracker.
-        for (const download of activeDownloads.values()) {
-            if (download.filename === uiName && (download.status === 'pending' || download.status === 'downloading')) {
-                return true;
+    const handleDeleteUi = useCallback(
+        async (uiName: UiNameType) => {
+            try {
+                await deleteUiAPI(uiName);
+                fetchUiData();
+            } catch (error) {
+                logger.error(`Failed to delete UI ${uiName}:`, error);
             }
-        }
-        return false;
-    }, [activeDownloads]);
+        },
+        [fetchUiData],
+    );
 
+    const isUiBusy = useCallback(
+        (uiName: UiNameType): boolean => {
+            for (const download of activeDownloads.values()) {
+                if (
+                    download.filename === uiName &&
+                    (download.status === 'pending' || download.status === 'downloading')
+                ) {
+                    return true;
+                }
+            }
+            return false;
+        },
+        [activeDownloads],
+    );
+
+    // --- QUICK START LOGIC ---
+    const activeUiProfileForStart = useMemo(() => {
+        const profileName = pathConfig?.uiProfile;
+        if (!profileName || profileName === 'Custom') return null;
+        return uiStatuses.find((s) => s.ui_name === profileName) || null;
+    }, [pathConfig, uiStatuses]);
+
+    const handleQuickStart = useCallback(() => {
+        if (!activeUiProfileForStart) return;
+
+        if (activeUiProfileForStart.is_running && activeUiProfileForStart.running_task_id) {
+            handleStopUi(activeUiProfileForStart.running_task_id);
+        } else {
+            handleRunUi(activeUiProfileForStart.ui_name);
+        }
+    }, [activeUiProfileForStart, handleRunUi, handleStopUi]);
 
     // --- General App Logic & Handlers ---
     const loadInitialConfig = useCallback(async () => {
@@ -236,7 +248,6 @@ function App() {
             };
             setPathConfig(newPathConfig);
             setTheme(config.color_theme || 'dark');
-            // Also fetch UI data on initial load
             await fetchUiData();
         } catch (error) {
             logger.error('Failed to load initial config from backend:', error);
@@ -292,21 +303,17 @@ function App() {
             newMap.delete(downloadId);
             return newMap;
         });
-        // Fire-and-forget API call to sync dismissal with the backend.
         dismissDownloadAPI(downloadId).catch((error) => {
             logger.error(`Failed to dismiss download ${downloadId} on backend:`, error);
         });
     }, []);
 
-    /**
-     * Computes a single, summarized status from all active downloads.
-     * This is used to provide at-a-glance feedback in the Navbar.
-     */
     const downloadSummaryStatus = useMemo((): DownloadSummaryStatus => {
         const statuses = Array.from(activeDownloads.values());
         if (statuses.length === 0) return 'idle';
-        if (statuses.some(s => s.status === 'error')) return 'error';
-        if (statuses.some(s => s.status === 'downloading' || s.status === 'pending')) return 'downloading';
+        if (statuses.some((s) => s.status === 'error')) return 'error';
+        if (statuses.some((s) => s.status === 'downloading' || s.status === 'pending'))
+            return 'downloading';
         return 'completed';
     }, [activeDownloads]);
 
@@ -379,8 +386,19 @@ function App() {
 
             <div className="app-content-pusher">
                 <header className="app-header-placeholder">
-                    <div style={{ gap: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <img src={appIcon} style={{ width: '2rem', height: 'auto' }} alt="M.A.L. Icon" />
+                    <div
+                        style={{
+                            gap: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <img
+                            src={appIcon}
+                            style={{ width: '2rem', height: 'auto' }}
+                            alt="M.A.L. Icon"
+                        />
                         <h1>M.A.L.</h1>
                     </div>
                 </header>
@@ -394,6 +412,10 @@ function App() {
                     onToggleDownloads={handleToggleDownloadsSidebar}
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeDownloads.size}
+                    // Pass the new props for the quick-start button
+                    activeUiProfile={pathConfig?.uiProfile || null}
+                    isUiRunning={activeUiProfileForStart?.is_running || false}
+                    onQuickStart={handleQuickStart}
                 />
 
                 <main className="main-content-area">{renderActiveTabContent()}</main>
