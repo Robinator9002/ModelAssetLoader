@@ -70,12 +70,14 @@ export type ModelType =
     | 'hypernetworks'
     | 'diffusers'
     | 'custom';
+export type ConfigurationMode = 'automatic' | 'manual';
 
 export interface PathConfigurationRequest {
     base_path?: string | null;
     profile?: UiProfileType | null;
     custom_model_type_paths?: Record<string, string> | null;
     color_theme?: ColorThemeType | null;
+    config_mode?: ConfigurationMode | null;
 }
 
 export interface MalFullConfiguration {
@@ -83,6 +85,7 @@ export interface MalFullConfiguration {
     profile: UiProfileType | null;
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
+    config_mode: ConfigurationMode | null;
 }
 
 export interface PathConfigurationResponse {
@@ -281,6 +284,8 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
             ...response.data,
             custom_model_type_paths: response.data.custom_model_type_paths || {},
             color_theme: response.data.color_theme || 'dark',
+            config_mode: response.data.config_mode || 'automatic', // Default to automatic
+
         };
     } catch (error) {
         console.error('Error fetching current configuration:', error);
@@ -289,6 +294,7 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
             profile: null,
             custom_model_type_paths: {},
             color_theme: 'dark',
+            config_mode: 'automatic',
         };
     }
 };

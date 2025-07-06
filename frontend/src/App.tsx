@@ -35,6 +35,7 @@ import {
     type AvailableUiItem,
     type ManagedUiStatus,
     type UiNameType,
+    type ConfigurationMode,
 } from './api/api';
 import appIcon from '/icon.png';
 
@@ -47,13 +48,21 @@ export interface AppPathConfig {
     basePath: string | null;
     uiProfile: MalFullConfiguration['profile'];
     customPaths: MalFullConfiguration['custom_model_type_paths'];
+    configMode: ConfigurationMode;
 }
 
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
 
+const defaultPathConfig: AppPathConfig = {
+    basePath: null,
+    uiProfile: null,
+    customPaths: {},
+    configMode: 'automatic',
+};
+
 function App() {
     // --- Core Application State ---
-    const [pathConfig, setPathConfig] = useState<AppPathConfig | null>(null);
+    const [pathConfig, setPathConfig] = useState<AppPathConfig>(defaultPathConfig);
     const [theme, setTheme] = useState<ColorThemeType>('dark');
     const [activeTab, setActiveTab] = useState<MalTabKey>('search');
     const [isConfigLoading, setIsConfigLoading] = useState<boolean>(true);
@@ -245,6 +254,7 @@ function App() {
                 basePath: config.base_path,
                 uiProfile: config.profile,
                 customPaths: config.custom_model_type_paths || {},
+                configMode: config.config_mode || 'automatic',
             };
             setPathConfig(newPathConfig);
             setTheme(config.color_theme || 'dark');
@@ -362,8 +372,10 @@ function App() {
                         onConfigurationSave={handlePathConfigurationUpdate}
                         currentGlobalTheme={theme}
                         uiStatuses={uiStatuses}
+                        initialConfigMode={pathConfig.configMode}
                     />
                 );
+
             default:
                 return (
                     <ModelSearchPage

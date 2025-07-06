@@ -227,6 +227,7 @@ async def configure_file_manager_paths_endpoint(config_request: PathConfiguratio
         profile=config_request.profile,
         custom_model_type_paths=config_request.custom_model_type_paths,
         color_theme=config_request.color_theme,
+        config_mode=config_request.config_mode,
     )
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Configuration failed."))
@@ -293,7 +294,9 @@ async def scan_host_directories_endpoint(
     path_to_scan: Optional[str] = Query(None, alias="path"),
     max_depth: int = Query(2, ge=1, le=7),
 ):
-    scan_result = file_manager.list_host_directories(path_to_scan_str=path_to_scan, max_depth=max_depth)
+    scan_result = file_manager.list_host_directories(
+        path_to_scan_str=path_to_scan, max_depth=max_depth
+    )
     return ScanHostDirectoriesResponse(**scan_result)
 
 
@@ -339,7 +342,9 @@ async def get_managed_file_preview_endpoint(path: str = Query(...)):
         raise HTTPException(status_code=400, detail="Base path is not configured.")
     result = file_manager.get_file_preview(relative_path_str=path)
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Failed to get file preview."))
+        raise HTTPException(
+            status_code=400, detail=result.get("error", "Failed to get file preview.")
+        )
     return result
 
 
@@ -373,7 +378,7 @@ async def get_all_ui_statuses():
     # This assumes a base path is set for managing UIs.
     # For now, we'll use the file_manager's base_path as the parent for a 'managed_uis' folder.
     if not file_manager.base_path:
-        return AllUiStatusResponse(items=[]) # Return empty list if not configured
+        return AllUiStatusResponse(items=[])  # Return empty list if not configured
 
     install_dir = file_manager.base_path / "managed_uis"
     status_items = await ui_manager.get_all_statuses(install_dir)
@@ -389,7 +394,9 @@ async def get_all_ui_statuses():
 async def install_ui_environment(ui_name: UiNameTypePydantic):
     """Triggers a background task to clone and set up a UI environment."""
     if not file_manager.base_path:
-        raise HTTPException(status_code=400, detail="Base path for installations is not configured.")
+        raise HTTPException(
+            status_code=400, detail="Base path for installations is not configured."
+        )
 
     install_dir = file_manager.base_path / "managed_uis"
     task_id = str(uuid.uuid4())
@@ -420,12 +427,12 @@ async def install_ui_environment(ui_name: UiNameTypePydantic):
 async def delete_ui_environment(ui_name: UiNameTypePydantic):
     """Deletes the entire directory for an installed UI environment."""
     if not file_manager.base_path:
-        raise HTTPException(status_code=400, detail="Base path for installations is not configured.")
+        raise HTTPException(
+            status_code=400, detail="Base path for installations is not configured."
+        )
 
     install_dir = file_manager.base_path / "managed_uis"
-    success = await ui_manager.delete_environment(
-        ui_name=ui_name, base_install_path=install_dir
-    )
+    success = await ui_manager.delete_environment(ui_name=ui_name, base_install_path=install_dir)
     if not success:
         raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
     return {"success": True, "message": f"{ui_name} environment deleted successfully."}
@@ -440,7 +447,9 @@ async def delete_ui_environment(ui_name: UiNameTypePydantic):
 async def run_ui(ui_name: UiNameTypePydantic):
     """Triggers a background task to start a managed UI."""
     if not file_manager.base_path:
-        raise HTTPException(status_code=400, detail="Base path for installations is not configured.")
+        raise HTTPException(
+            status_code=400, detail="Base path for installations is not configured."
+        )
 
     install_dir = file_manager.base_path / "managed_uis"
     task_id = str(uuid.uuid4())
@@ -451,9 +460,7 @@ async def run_ui(ui_name: UiNameTypePydantic):
         repo_id=f"UI Process",
         filename=ui_name,
         task=asyncio.create_task(
-            ui_manager.run_ui(
-                ui_name=ui_name, base_install_path=install_dir, task_id=task_id
-            )
+            ui_manager.run_ui(ui_name=ui_name, base_install_path=install_dir, task_id=task_id)
         ),
     )
     return UiActionResponse(

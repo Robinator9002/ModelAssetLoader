@@ -22,9 +22,7 @@ class ModelListItem(BaseModel):
         ...,
         description="The unique identifier of the model (e.g., 'author/model_name').",
     )
-    source: str = Field(
-        ..., description="The source of the model (e.g., 'huggingface')."
-    )
+    source: str = Field(..., description="The source of the model (e.g., 'huggingface').")
     author: Optional[str] = Field(None, description="The author or organization of the model.")
     model_name: str = Field(
         ..., description="The name of the model, typically derived from the ID."
@@ -81,6 +79,7 @@ UiProfileTypePydantic = UiProfileType
 ModelTypePydantic = ModelType
 ColorThemeTypePydantic = ColorThemeType
 UiNameTypePydantic = UiNameType
+ConfigurationModePydantic = Literal["automatic", "manual"]
 
 
 # --- Models for Path and File Configuration ---
@@ -91,6 +90,7 @@ class MalFullConfiguration(BaseModel):
     ui_profile: Optional[UiProfileTypePydantic] = Field(None, alias="profile")
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
+    config_mode: Optional[ConfigurationModePydantic]
 
     class Config:
         populate_by_name = True
@@ -101,6 +101,7 @@ class PathConfigurationRequest(BaseModel):
     profile: Optional[UiProfileTypePydantic] = Field(None)
     custom_model_type_paths: Optional[Dict[str, str]] = Field(None)
     color_theme: Optional[ColorThemeTypePydantic] = Field(None)
+    config_mode: Optional[ConfigurationModePydantic] = Field(None)
 
 
 class PathConfigurationResponse(BaseModel):
@@ -114,9 +115,7 @@ class PathConfigurationResponse(BaseModel):
 class FileDownloadRequest(BaseModel):
     """Request model for downloading a model file."""
 
-    source: str = Field(
-        ..., description="The source of the model (e.g., 'huggingface')."
-    )
+    source: str = Field(..., description="The source of the model (e.g., 'huggingface').")
     repo_id: str = Field(..., description="The repository ID (e.g., 'author/model_name').")
     filename: str = Field(..., description="The name of the file to download.")
     model_type: ModelTypePydantic
@@ -225,33 +224,47 @@ class FileManagerListResponse(BaseModel):
         description="The list of files and directories at the final path."
     )
 
+
 # --- NEW: Models for UI Environment Management ---
+
 
 class AvailableUiItem(BaseModel):
     """Represents a UI that is available for installation."""
+
     ui_name: UiNameTypePydantic = Field(..., description="The unique name of the UI.")
     git_url: str = Field(..., description="The Git URL of the repository.")
     # Future fields like 'python_version' or 'description' could be added here.
 
+
 class ManagedUiStatus(BaseModel):
     """Represents the status of a single managed UI environment."""
+
     ui_name: UiNameTypePydantic
     is_installed: bool = Field(..., description="Indicates if the UI environment directory exists.")
     is_running: bool = Field(..., description="Indicates if the UI process is currently running.")
-    install_path: Optional[str] = Field(None, description="The absolute installation path on the host.")
-    running_task_id: Optional[str] = Field(None, description="The task_id if the UI is currently running.")
+    install_path: Optional[str] = Field(
+        None, description="The absolute installation path on the host."
+    )
+    running_task_id: Optional[str] = Field(
+        None, description="The task_id if the UI is currently running."
+    )
+
 
 class AllUiStatusResponse(BaseModel):
     """Response model for a list of all managed UI statuses."""
+
     items: List[ManagedUiStatus]
+
 
 class UiActionResponse(BaseModel):
     """Standard response for actions that trigger a background task (install, run)."""
+
     success: bool
     message: str
     task_id: str = Field(..., description="The unique ID for tracking the task via WebSocket.")
 
+
 class UiStopRequest(BaseModel):
     """Request model for stopping a running UI process."""
-    task_id: str = Field(..., description="The task_id of the running process to be stopped.")
 
+    task_id: str = Field(..., description="The task_id of the running process to be stopped.")

@@ -1,0 +1,44 @@
+/*
+ * =================================================================
+ * M.A.L. - ConfigModeSwitcher Styles
+ * =================================================================
+*/
+
+.config-mode-switcher {
+    display: inline-flex;
+    background-color: var(--color-background);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-unit-half);
+    border: 1px solid var(--color-border);
+    position: relative;
+    user-select: none;
+}
+
+.mode-switch-option {
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 2);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease-in-out;
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+}
+
+.mode-switch-option.active {
+    color: var(--color-text-primary);
+}
+
+.mode-switch-highlight {
+    position: absolute;
+    top: var(--spacing-unit-half);
+    bottom: var(--spacing-unit-half);
+    background-color: var(--color-surface-alt);
+    border-radius: calc(var(--border-radius-md) - 2px);
+    box-shadow: var(--shadow-sm);
+    transition: left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
+        width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    z-index: 1;
+}

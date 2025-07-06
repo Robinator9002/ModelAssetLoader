@@ -26,7 +26,7 @@ class ConfigManager:
         self.ui_profile: Optional[UiProfileType] = None
         self.custom_model_type_paths: Dict[str, str] = {}
         self.color_theme: ColorThemeType = "dark"
-        # Add the configuration mode setting
+        # NEW: Add the configuration mode setting
         self.config_mode: ConfigurationMode = "automatic"
         self._load_config()
 
@@ -47,7 +47,7 @@ class ConfigManager:
             self.ui_profile = config_data.get("ui_profile")
             self.custom_model_type_paths = config_data.get("custom_model_type_paths", {})
             self.color_theme = config_data.get("color_theme", "dark")
-            # Load the config mode, defaulting to 'automatic' if not present
+            # NEW: Load the config mode, defaulting to 'automatic' if not present
             self.config_mode = config_data.get("config_mode", "automatic")
 
             logger.info(f"Configuration loaded from {CONFIG_FILE_PATH}")
@@ -92,7 +92,7 @@ class ConfigManager:
         profile: Optional[UiProfileType],
         custom_model_type_paths: Optional[Dict[str, str]],
         color_theme: Optional[ColorThemeType],
-        config_mode: Optional[ConfigurationMode],  # Accept config_mode
+        config_mode: Optional[ConfigurationMode],  # NEW: Accept config_mode
     ) -> Tuple[bool, str]:
         """Updates and saves the configuration."""
         changed = False
@@ -126,7 +126,7 @@ class ConfigManager:
             self.color_theme = color_theme
             changed = True
 
-        # Update Config Mode
+        # NEW: Update Config Mode
         if config_mode and config_mode != self.config_mode:
             self.config_mode = config_mode
             changed = True
