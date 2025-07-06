@@ -1,10 +1,6 @@
 // frontend/src/components/Environments/UiManagementPage.tsx
 import React from 'react';
-import {
-    type AvailableUiItem,
-    type ManagedUiStatus,
-    type UiNameType,
-} from '../../api/api';
+import { type AvailableUiItem, type ManagedUiStatus, type UiNameType } from '../../api/api';
 import { Layers, Download, Settings, Play, CheckCircle, Loader2 } from 'lucide-react';
 
 /**
@@ -74,7 +70,11 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                             </h2>
                             <div className="config-card-body">
                                 <div className="ui-status-section">
-                                    <div className={`status-badge ${ui.is_installed ? 'installed' : 'not-installed'}`}>
+                                    <div
+                                        className={`status-badge ${
+                                            ui.is_installed ? 'installed' : 'not-installed'
+                                        }`}
+                                    >
                                         {ui.is_installed ? (
                                             <>
                                                 <CheckCircle size={14} /> Installed
@@ -84,10 +84,15 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                                         )}
                                     </div>
                                     {ui.is_installed && (
-                                         <div className={`status-badge ${ui.is_running ? 'running' : 'stopped'}`}>
+                                        <div
+                                            className={`status-badge ${
+                                                ui.is_running ? 'running' : 'stopped'
+                                            }`}
+                                        >
                                             {ui.is_running ? (
                                                 <>
-                                                    <Loader2 size={14} className="animate-spin" /> Running
+                                                    <Loader2 size={14} className="animate-spin" />{' '}
+                                                    Running
                                                 </>
                                             ) : (
                                                 'Stopped'
@@ -95,8 +100,14 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                                         </div>
                                     )}
                                 </div>
-                                <p className="ui-git-url" title={ui.git_url}>{ui.git_url}</p>
-                                {ui.install_path && <p className="ui-install-path" title={ui.install_path}>Path: {ui.install_path}</p>}
+                                <p className="ui-git-url" title={ui.git_url}>
+                                    {ui.git_url}
+                                </p>
+                                {ui.install_path && (
+                                    <p className="ui-install-path" title={ui.install_path}>
+                                        Path: {ui.install_path}
+                                    </p>
+                                )}
                             </div>
                             <div className="modal-actions ui-card-actions">
                                 {!ui.is_installed ? (
@@ -109,15 +120,30 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                                     </button>
                                 ) : (
                                     <>
-                                        <button className="button" onClick={() => alert("Not implemented yet!")}>
+                                        <button
+                                            className="button"
+                                            onClick={() => alert('Not implemented yet!')}
+                                        >
                                             <Settings size={18} /> Manage
                                         </button>
                                         {ui.is_running && ui.running_task_id ? (
-                                            <button className="button button-danger" onClick={() => onStop(ui.running_task_id!)} disabled={isUiBusy}>
-                                                <Play size={18} style={{transform: 'rotate(180deg)'}}/> Stop
+                                            <button
+                                                className="button button-danger"
+                                                onClick={() => onStop(ui.running_task_id!)}
+                                                disabled={isUiBusy}
+                                            >
+                                                <Play
+                                                    size={18}
+                                                    style={{ transform: 'rotate(180deg)' }}
+                                                />{' '}
+                                                Stop
                                             </button>
                                         ) : (
-                                            <button className="button button-success" onClick={() => onRun(ui.ui_name)} disabled={isUiBusy}>
+                                            <button
+                                                className="button button-success"
+                                                onClick={() => onRun(ui.ui_name)}
+                                                disabled={isUiBusy}
+                                            >
                                                 <Play size={18} /> Start
                                             </button>
                                         )}

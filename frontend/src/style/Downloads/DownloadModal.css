@@ -26,7 +26,7 @@
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing-unit) * 2);
-    background-color: var(--color-background); 
+    background-color: var(--color-background);
 }
 
 /* --- Controls (Select All) --- */
@@ -144,6 +144,6 @@
 .file-item-options .config-input {
     padding: calc(var(--spacing-unit) * 1.25);
     font-size: 0.9rem;
-    flex-basis: 200px; 
+    flex-basis: 200px;
     flex-grow: 1;
 }

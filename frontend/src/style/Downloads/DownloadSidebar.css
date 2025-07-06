@@ -64,17 +64,23 @@
     /* Using Grid for a robust layout that prevents element overlap. */
     display: grid;
     grid-template-columns: 1fr auto; /* Main content | Close button */
-    grid-template-rows: auto 1fr;    /* Header | Body */
+    grid-template-rows: auto 1fr; /* Header | Body */
     grid-template-areas:
-        "header actions"
-        "body   body";
+        'header actions'
+        'body   body';
     gap: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1.5);
     align-items: center;
 }
 
-.download-sidebar-item.completed { border-left-color: var(--color-success); }
-.download-sidebar-item.error { border-left-color: var(--color-error); }
-.download-sidebar-item.cancelled { border-left-color: var(--color-text-placeholder); }
+.download-sidebar-item.completed {
+    border-left-color: var(--color-success);
+}
+.download-sidebar-item.error {
+    border-left-color: var(--color-error);
+}
+.download-sidebar-item.cancelled {
+    border-left-color: var(--color-text-placeholder);
+}
 
 .download-item-header {
     grid-area: header;
@@ -96,10 +102,18 @@
 .download-item-status-icon {
     flex-shrink: 0;
 }
-.download-item-status-icon .icon-success { color: var(--color-success); }
-.download-item-status-icon .icon-error { color: var(--color-error); }
-.download-item-status-icon .icon-cancelled { color: var(--color-text-secondary); }
-.download-item-status-icon .icon-pending { color: var(--color-text-secondary); }
+.download-item-status-icon .icon-success {
+    color: var(--color-success);
+}
+.download-item-status-icon .icon-error {
+    color: var(--color-error);
+}
+.download-item-status-icon .icon-cancelled {
+    color: var(--color-text-secondary);
+}
+.download-item-status-icon .icon-pending {
+    color: var(--color-text-secondary);
+}
 
 .download-item-body {
     grid-area: body;
@@ -166,8 +180,12 @@
 }
 
 @keyframes progressBarStripes {
-    from { background-position: 20px 0; }
-    to { background-position: 0 0; }
+    from {
+        background-position: 20px 0;
+    }
+    to {
+        background-position: 0 0;
+    }
 }
 
 .progress-bar.completed {
@@ -183,7 +201,7 @@
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--color-text-on-primary);
-    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
     pointer-events: none; /* Allows clicks to pass through the text */
 }
 

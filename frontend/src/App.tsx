@@ -107,9 +107,9 @@ function App() {
 
     // --- Handlers for Download Sidebar ---
     const handleToggleDownloadsSidebar = useCallback(() => {
-        setDownloadsSidebarOpen(prev => !prev);
+        setDownloadsSidebarOpen((prev) => !prev);
     }, []);
-    
+
     const handleCloseDownloadsSidebar = useCallback(() => {
         setDownloadsSidebarOpen(false);
     }, []);
@@ -220,8 +220,9 @@ function App() {
     const downloadSummaryStatus = useMemo((): DownloadSummaryStatus => {
         const statuses = Array.from(activeDownloads.values());
         if (statuses.length === 0) return 'idle';
-        if (statuses.some(s => s.status === 'error')) return 'error';
-        if (statuses.some(s => s.status === 'downloading' || s.status === 'pending')) return 'downloading';
+        if (statuses.some((s) => s.status === 'error')) return 'error';
+        if (statuses.some((s) => s.status === 'downloading' || s.status === 'pending'))
+            return 'downloading';
         return 'completed';
     }, [activeDownloads]);
 
@@ -281,8 +282,19 @@ function App() {
 
             <div className="app-content-pusher">
                 <header className="app-header-placeholder">
-                    <div style={{ gap: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <img src={appIcon} style={{ width: '2rem', height: 'auto' }} alt="M.A.L. Icon" />
+                    <div
+                        style={{
+                            gap: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <img
+                            src={appIcon}
+                            style={{ width: '2rem', height: 'auto' }}
+                            alt="M.A.L. Icon"
+                        />
                         <h1>M.A.L.</h1>
                     </div>
                 </header>

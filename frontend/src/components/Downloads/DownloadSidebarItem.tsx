@@ -64,7 +64,7 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                         {filename}
                     </span>
                 </div>
-                
+
                 <div className="download-item-body">
                     {downloadStatus === 'error' || downloadStatus === 'cancelled' ? (
                         <div

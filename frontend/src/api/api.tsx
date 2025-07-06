@@ -160,7 +160,6 @@ export interface FileManagerListResponse {
 
 export type ViewMode = 'models' | 'explorer';
 
-
 // --- NEW: UI Environment Management Interfaces ---
 export type UiNameType = 'ComfyUI' | 'A1111' | 'ForgeUI';
 
@@ -372,7 +371,6 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
     }
 };
 
-
 // --- NEW: API Functions for UI Environment Management ---
 
 export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
@@ -410,7 +408,9 @@ export const installUiAPI = async (uiName: UiNameType): Promise<UiActionResponse
     }
 };
 
-export const deleteUiAPI = async (uiName: UiNameType): Promise<{ success: boolean; message: string }> => {
+export const deleteUiAPI = async (
+    uiName: UiNameType,
+): Promise<{ success: boolean; message: string }> => {
     try {
         const response = await apiClient.delete(`/uis/${uiName}`);
         return response.data;
@@ -451,7 +451,6 @@ export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; mes
         throw error;
     }
 };
-
 
 // --- WebSocket Connection (Unchanged) ---
 export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSocket => {
