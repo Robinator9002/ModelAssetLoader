@@ -19,9 +19,12 @@ import {
     Layers,
     SlidersHorizontal,
     Info,
+    CheckCircle,
+    PackageCheck,
+    MousePointerClick,
 } from 'lucide-react';
 
-// This is a frontend copy of the backend's KNOWN_UI_PROFILES for instant feedback
+// A frontend copy of the backend's known UI profiles for instant path suggestions.
 const KNOWN_UI_PROFILES: Record<string, Record<string, string>> = {
     ComfyUI: {
         checkpoints: 'models/checkpoints',
@@ -52,14 +55,19 @@ const KNOWN_UI_PROFILES: Record<string, Record<string, string>> = {
     },
 };
 
+// Defines the properties for the ConfigurationsPage component.
 interface ConfigurationsPageProps {
-    initialPathConfig: AppPathConfig; // No longer null due to App.tsx change
+    initialPathConfig: AppPathConfig;
     onConfigurationSave: (savedConfig: AppPathConfig, savedTheme: ColorThemeType) => void;
     currentGlobalTheme: ColorThemeType;
     uiStatuses: ManagedUiStatus[];
     initialConfigMode: ConfigurationMode;
 }
 
+/**
+ * A comprehensive settings page for configuring the application's core functionalities,
+ * including file paths and UI integration modes.
+ */
 const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
     initialPathConfig,
     onConfigurationSave,
@@ -67,115 +75,56 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
     uiStatuses,
     initialConfigMode,
 }) => {
+    // --- Component State ---
     const [configMode, setConfigMode] = useState<ConfigurationMode>(initialConfigMode);
-    const [basePath, setBasePath] = useState<string | null>(null);
-    const [selectedProfile, setSelectedProfile] = useState<UiProfileType | null>(null);
-    const [modelPaths, setModelPaths] = useState<Partial<Record<ModelType, string>>>({});
+    const [basePath, setBasePath] = useState<string | null>(initialPathConfig.basePath);
+    const [selectedProfile, setSelectedProfile] = useState<UiProfileType | null>(
+        initialPathConfig.uiProfile,
+    );
+    const [modelPaths, setModelPaths] = useState<Partial<Record<ModelType, string>>>(
+        initialPathConfig.customPaths,
+    );
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
         null,
     );
     const [isFolderSelectorOpen, setIsFolderSelectorOpen] = useState(false);
 
+    // --- Refs for UI Effects ---
     const modeSwitcherRef = useRef<HTMLDivElement>(null);
     const highlightRef = useRef<HTMLDivElement>(null);
 
+    // --- Effects ---
+
+    // Synchronize component state with initial props from App.tsx.
     useEffect(() => {
-        if (initialPathConfig) {
-            setBasePath(initialPathConfig.basePath || null);
-            setSelectedProfile(initialPathConfig.uiProfile || null);
-            setModelPaths(initialPathConfig.customPaths || {});
-        }
+        setBasePath(initialPathConfig.basePath || null);
+        setSelectedProfile(initialPathConfig.uiProfile || null);
+        setModelPaths(initialPathConfig.customPaths || {});
         setConfigMode(initialConfigMode);
     }, [initialPathConfig, initialConfigMode]);
 
+    // Animate the mode switcher's highlight bar when the mode changes.
     useEffect(() => {
         if (modeSwitcherRef.current && highlightRef.current) {
             const activeOption = modeSwitcherRef.current.querySelector(
                 '.mode-switch-option.active',
             ) as HTMLElement;
             if (activeOption) {
-                highlightRef.current.style.left = `${activeOption.offsetLeft}px`;
-                highlightRef.current.style.width = `${activeOption.offsetWidth}px`;
+                const highlight = highlightRef.current;
+                highlight.style.left = `${activeOption.offsetLeft}px`;
+                highlight.style.width = `${activeOption.offsetWidth}px`;
             }
         }
     }, [configMode]);
 
-    const handleProfileSelect = useCallback(
-        (profile: UiProfileType) => {
-            setSelectedProfile(profile);
-            if (configMode === 'automatic' && profile !== 'Custom') {
-                const defaultPaths = KNOWN_UI_PROFILES[profile] || {};
-                setModelPaths(defaultPaths);
-            }
-        },
-        [configMode],
-    );
-
-    const handleModelPathChange = useCallback((modelType: ModelType, value: string) => {
-        setModelPaths((prev) => ({ ...prev, [modelType]: value.trim() }));
-    }, []);
-
-    const handleSaveConfiguration = useCallback(async () => {
-        if (!basePath) {
-            setFeedback({ type: 'error', message: 'Please select a base path first.' });
-            return;
-        }
-        setIsLoading(true);
-        setFeedback(null);
-        try {
-            const configToSave: PathConfigurationRequest = {
-                base_path: basePath,
-                profile: selectedProfile,
-                custom_model_type_paths: modelPaths as Record<string, string>,
-                color_theme: currentGlobalTheme,
-                config_mode: configMode,
-            };
-
-            const response = await configurePathsAPI(configToSave);
-            if (response.success && response.current_config) {
-                const newConfig = response.current_config;
-                setFeedback({
-                    type: 'success',
-                    message: response.message || 'Configuration saved successfully!',
-                });
-
-                // --- FIX IS HERE ---
-                // The object passed to onConfigurationSave must match the AppPathConfig interface.
-                onConfigurationSave(
-                    {
-                        basePath: newConfig.base_path,
-                        uiProfile: newConfig.profile,
-                        customPaths: newConfig.custom_model_type_paths || {},
-                        // This property was missing, causing the TypeScript error.
-                        configMode: newConfig.config_mode || 'automatic',
-                    },
-                    newConfig.color_theme || currentGlobalTheme,
-                );
-            } else {
-                throw new Error(response.error || 'Failed to save configuration.');
-            }
-        } catch (err: any) {
-            setFeedback({
-                type: 'error',
-                message: err.message || 'An unknown API error occurred.',
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [
-        basePath,
-        selectedProfile,
-        modelPaths,
-        currentGlobalTheme,
-        configMode,
-        onConfigurationSave,
-    ]);
+    // --- Memoized Values ---
 
     const installedUis = useMemo(
         () => uiStatuses.filter((status) => status.is_installed),
         [uiStatuses],
     );
+
     const modelTypesForPaths: ModelType[] = useMemo(
         () =>
             [
@@ -192,182 +141,159 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
         [],
     );
 
-    const renderAutomaticMode = () => (
-        <>
-            <div className="config-card">
-                <h2 className="config-card-header">
-                    <Layers size={20} />
-                    Managed UI Profile
-                </h2>
-                <div className="config-card-body">
-                    {installedUis.length > 0 ? (
-                        <div className="profile-selector-grid">
-                            {installedUis.map((ui) => (
-                                <div
-                                    key={ui.ui_name}
-                                    className={`profile-card ${
-                                        selectedProfile === ui.ui_name ? 'selected' : ''
-                                    }`}
-                                    onClick={() => handleProfileSelect(ui.ui_name)}
-                                    tabIndex={0}
-                                    role="radio"
-                                    aria-checked={selectedProfile === ui.ui_name}
-                                >
-                                    <span className="profile-card-icon">
-                                        <Layers size={24} />
-                                    </span>
-                                    <span className="profile-card-name">{ui.ui_name}</span>
-                                    <span className="profile-card-tag">Managed</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="feedback-message warning">
-                            <Info size={16} />
-                            <span>
-                                No managed UIs found. Install a UI from the Environments tab or
-                                switch to Manual mode.
-                            </span>
-                        </div>
-                    )}
-                </div>
-            </div>
-            <div className={`config-card custom-paths-card ${selectedProfile ? 'visible' : ''}`}>
-                <h2 className="config-card-header">
-                    <Folder size={20} />
-                    Model Folder Paths
-                </h2>
-                <div className="config-card-body custom-paths-body">
-                    <p className="config-hint">
-                        Paths are relative to your base folder: <code>{basePath}</code>
-                    </p>
-                    <div className="custom-paths-list">
-                        {modelTypesForPaths.map((mType) => (
-                            <div key={mType} className="custom-path-entry">
-                                <label htmlFor={`modelPath-${mType}`} className="custom-path-label">
-                                    {mType}
-                                </label>
-                                <input
-                                    type="text"
-                                    id={`modelPath-${mType}`}
-                                    value={modelPaths[mType] || ''}
-                                    placeholder={`e.g., models/${mType}`}
-                                    onChange={(e) => handleModelPathChange(mType, e.target.value)}
-                                    className="config-input"
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </>
-    );
+    // --- Event Handlers ---
 
-    const renderManualMode = () => (
-        <>
-            <div className="config-card">
-                <h2 className="config-card-header">
-                    <SlidersHorizontal size={20} />
-                    Manual Profile
-                </h2>
-                <div className="config-card-body">
-                    <section className="config-section">
-                        <label htmlFor="uiProfileSelect" className="config-label">
-                            UI Profile (for relative paths)
-                        </label>
-                        <select
-                            id="uiProfileSelect"
-                            value={selectedProfile || ''}
-                            onChange={(e) => handleProfileSelect(e.target.value as UiProfileType)}
-                            className="config-select"
-                            disabled={!basePath}
-                        >
-                            <option value="" disabled>
-                                Select a profile...
-                            </option>
-                            <option value="ComfyUI">ComfyUI</option>
-                            <option value="A1111">Automatic1111 / SD.Next / Forge</option>
-                            <option value="Custom">Custom</option>
-                        </select>
-                    </section>
-                </div>
-            </div>
-            <div
-                className={`config-card custom-paths-card ${
-                    selectedProfile === 'Custom' ? 'visible' : ''
-                }`}
-            >
-                <h2 className="config-card-header">
-                    <Settings size={20} />
-                    Advanced: Custom Paths
-                </h2>
-                <div className="config-card-body custom-paths-body">
-                    <p className="config-hint">
-                        Paths are relative to your base folder: <code>{basePath}</code>
-                    </p>
-                    <div className="custom-paths-list">
-                        {modelTypesForPaths.map((mType) => (
-                            <div key={mType} className="custom-path-entry">
-                                <label
-                                    htmlFor={`customPath-${mType}`}
-                                    className="custom-path-label"
-                                >
-                                    {mType}
-                                </label>
-                                <input
-                                    type="text"
-                                    id={`customPath-${mType}`}
-                                    value={modelPaths[mType] || ''}
-                                    placeholder={`e.g., models/${mType}`}
-                                    onChange={(e) => handleModelPathChange(mType, e.target.value)}
-                                    className="config-input"
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </>
-    );
+    /**
+     * Handles the selection of a UI profile. It sets the profile name and
+     * automatically populates the model paths based on known defaults.
+     * @param profile The name of the selected UI profile.
+     */
+    const handleProfileSelect = useCallback((profile: UiProfileType | null) => {
+        setSelectedProfile(profile);
+        if (profile && profile !== 'Custom') {
+            const defaultPaths = KNOWN_UI_PROFILES[profile] || {};
+            setModelPaths(defaultPaths);
+        } else if (profile === 'Custom') {
+            // Clear paths for custom to avoid carrying over old settings
+            setModelPaths({});
+        }
+    }, []);
+
+    /**
+     * Updates the path for a specific model type.
+     * @param modelType The type of model (e.g., 'loras').
+     * @param value The new relative path for that model type.
+     */
+    const handleModelPathChange = useCallback((modelType: ModelType, value: string) => {
+        setModelPaths((prev) => ({ ...prev, [modelType]: value.trim() }));
+    }, []);
+
+    /**
+     * Switches the configuration mode and resets dependent state to ensure a clean slate.
+     * @param mode The new configuration mode ('automatic' or 'manual').
+     */
+    const handleModeChange = (mode: ConfigurationMode) => {
+        setConfigMode(mode);
+        // Reset selections when switching modes to prevent invalid states
+        handleProfileSelect(null);
+    };
+
+    /**
+     * Gathers all configuration data, sends it to the backend API for saving,
+     * and communicates the result back to the parent component.
+     */
+    const handleSaveConfiguration = useCallback(async () => {
+        if (!basePath) {
+            setFeedback({ type: 'error', message: 'A base storage location must be selected.' });
+            return;
+        }
+        if (!selectedProfile) {
+            setFeedback({ type: 'error', message: 'A UI profile must be selected.' });
+            return;
+        }
+
+        setIsLoading(true);
+        setFeedback(null);
+
+        try {
+            const configToSave: PathConfigurationRequest = {
+                base_path: basePath,
+                profile: selectedProfile,
+                custom_model_type_paths: modelPaths as Record<string, string>,
+                color_theme: currentGlobalTheme,
+                config_mode: configMode,
+            };
+
+            const response = await configurePathsAPI(configToSave);
+
+            if (response.success && response.current_config) {
+                const newConfig = response.current_config;
+                setFeedback({
+                    type: 'success',
+                    message: response.message || 'Configuration saved successfully!',
+                });
+
+                // Propagate the newly saved configuration up to the main App component.
+                onConfigurationSave(
+                    {
+                        basePath: newConfig.base_path,
+                        uiProfile: newConfig.profile,
+                        customPaths: newConfig.custom_model_type_paths || {},
+                        configMode: newConfig.config_mode || 'automatic',
+                    },
+                    newConfig.color_theme || currentGlobalTheme,
+                );
+            } else {
+                throw new Error(response.error || 'Failed to save configuration.');
+            }
+        } catch (err: any) {
+            setFeedback({
+                type: 'error',
+                message: err.message || 'An unknown API error occurred.',
+            });
+        } finally {
+            setIsLoading(false);
+            // Automatically clear feedback message after a few seconds
+            setTimeout(() => setFeedback(null), 5000);
+        }
+    }, [
+        basePath,
+        selectedProfile,
+        modelPaths,
+        currentGlobalTheme,
+        configMode,
+        onConfigurationSave,
+    ]);
+
+    // --- Render Logic ---
 
     return (
         <div className="configurations-page">
+            {/* Page Header */}
             <div className="config-header">
-                <h1>Settings</h1>
+                <div className="config-header-text">
+                    <h1>Settings</h1>
+                    <p>Configure model storage and UI integrations.</p>
+                </div>
                 <div className="config-mode-switcher" ref={modeSwitcherRef}>
                     <div className="mode-switch-highlight" ref={highlightRef}></div>
                     <div
-                        onClick={() => setConfigMode('automatic')}
+                        onClick={() => handleModeChange('automatic')}
                         className={`mode-switch-option ${
                             configMode === 'automatic' ? 'active' : ''
                         }`}
+                        role="button"
                     >
-                        <Layers size={16} /> Automatic
+                        <PackageCheck size={16} /> Automatic
                     </div>
                     <div
-                        onClick={() => setConfigMode('manual')}
+                        onClick={() => handleModeChange('manual')}
                         className={`mode-switch-option ${configMode === 'manual' ? 'active' : ''}`}
+                        role="button"
                     >
                         <SlidersHorizontal size={16} /> Manual
                     </div>
                 </div>
             </div>
+
+            {/* Main Content (Scrollable) */}
             <div className="config-main-content">
+                {/* Step 1: Base Path Selection */}
                 <div className="config-card">
                     <h2 className="config-card-header">
                         <Folder size={20} />
-                        Base Storage Location
+                        Step 1: Base Storage Location
                     </h2>
                     <div className="config-card-body">
                         <section className="config-section">
                             <label htmlFor="basePathDisplay" className="config-label">
-                                Base Folder for Models & UIs
+                                Select the main folder where your UIs and models are stored.
                             </label>
                             <div className="base-path-selector">
                                 <input
                                     type="text"
                                     id="basePathDisplay"
-                                    value={basePath || 'Not set'}
+                                    value={basePath || 'Click "Browse" to select a folder...'}
                                     readOnly
                                     className="config-input path-input"
                                     onClick={() => setIsFolderSelectorOpen(true)}
@@ -382,14 +308,127 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                             </div>
                             {!basePath && (
                                 <p className="config-hint error-hint">
-                                    A base folder must be selected to continue.
+                                    This step is required to continue.
                                 </p>
                             )}
                         </section>
                     </div>
                 </div>
-                {configMode === 'automatic' ? renderAutomaticMode() : renderManualMode()}
+
+                {/* Step 2: Profile Selection */}
+                <div className={`config-card ${!basePath ? 'disabled-card' : ''}`}>
+                    <h2 className="config-card-header">
+                        {configMode === 'automatic' ? (
+                            <Layers size={20} />
+                        ) : (
+                            <MousePointerClick size={20} />
+                        )}
+                        Step 2: Select UI Profile
+                    </h2>
+                    <div className="config-card-body">
+                        {configMode === 'automatic' ? (
+                            // Automatic Mode: Select from installed UIs
+                            installedUis.length > 0 ? (
+                                <div className="profile-selector-grid">
+                                    {installedUis.map((ui) => (
+                                        <div
+                                            key={ui.ui_name}
+                                            className={`profile-card ${
+                                                selectedProfile === ui.ui_name ? 'selected' : ''
+                                            }`}
+                                            onClick={() => handleProfileSelect(ui.ui_name)}
+                                            tabIndex={0}
+                                            role="radio"
+                                            aria-checked={selectedProfile === ui.ui_name}
+                                        >
+                                            <span className="profile-card-icon">
+                                                {selectedProfile === ui.ui_name ? (
+                                                    <CheckCircle size={32} />
+                                                ) : (
+                                                    <Layers size={32} />
+                                                )}
+                                            </span>
+                                            <span className="profile-card-name">{ui.ui_name}</span>
+                                            <span className="profile-card-tag">Managed</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="info-box">
+                                    <Info size={24} className="icon" />
+                                    <span>
+                                        No managed UIs found. Install a UI from the 'UI Management'
+                                        tab, or switch to <strong>Manual</strong> mode to configure
+                                        an existing installation.
+                                    </span>
+                                </div>
+                            )
+                        ) : (
+                            // Manual Mode: Select from a dropdown
+                            <section className="config-section">
+                                <label htmlFor="uiProfileSelect" className="config-label">
+                                    Choose the profile that matches your UI for the best path
+                                    suggestions.
+                                </label>
+                                <select
+                                    id="uiProfileSelect"
+                                    value={selectedProfile || ''}
+                                    onChange={(e) =>
+                                        handleProfileSelect(e.target.value as UiProfileType)
+                                    }
+                                    className="config-select"
+                                >
+                                    <option value="" disabled>
+                                        Select a profile type...
+                                    </option>
+                                    <option value="ComfyUI">ComfyUI</option>
+                                    <option value="A1111">A1111 / Forge / SD.Next</option>
+                                    <option value="Custom">Custom (Advanced)</option>
+                                </select>
+                            </section>
+                        )}
+                    </div>
+                </div>
+
+                {/* Step 3: Advanced Path Configuration */}
+                <div className={`config-card ${!selectedProfile ? 'disabled-card' : ''}`}>
+                    <h2 className="config-card-header">
+                        <Settings size={20} />
+                        Step 3: Fine-Tune Model Paths
+                    </h2>
+                    <div className="config-card-body">
+                        <p className="config-hint">
+                            These paths are relative to your base folder:{' '}
+                            <code>{basePath || '...'}</code>. Adjust them if your folder structure
+                            is different from the default.
+                        </p>
+                        <div className="custom-paths-list">
+                            {modelTypesForPaths.map((mType) => (
+                                <div key={mType} className="custom-path-entry">
+                                    <label
+                                        htmlFor={`modelPath-${mType}`}
+                                        className="custom-path-label"
+                                    >
+                                        {mType}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id={`modelPath-${mType}`}
+                                        value={modelPaths[mType] || ''}
+                                        placeholder={`e.g., models/${mType}`}
+                                        onChange={(e) =>
+                                            handleModelPathChange(mType, e.target.value)
+                                        }
+                                        className="config-input"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            {/* Page Footer */}
             <div className="config-footer">
                 {feedback && (
                     <div className={`feedback-message ${feedback.type}`}>
@@ -399,18 +438,22 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                 )}
                 <button
                     onClick={handleSaveConfiguration}
-                    disabled={isLoading || !basePath}
+                    disabled={isLoading || !basePath || !selectedProfile}
                     className="button button-primary save-config-button"
                 >
-                    <Save size={18} />
+                    {isLoading ? <Save size={18} className="animate-spin" /> : <Save size={18} />}
                     {isLoading ? 'Saving...' : 'Save Configuration'}
                 </button>
             </div>
+
+            {/* Folder Selector Modal */}
             <FolderSelector
                 isOpen={isFolderSelectorOpen}
-                onSelectFinalPath={(p) => {
-                    setBasePath(p);
+                onSelectFinalPath={(path) => {
+                    setBasePath(path);
                     setIsFolderSelectorOpen(false);
+                    // When a new base path is selected, reset the profile to force re-selection
+                    handleProfileSelect(null);
                 }}
                 onCancel={() => setIsFolderSelectorOpen(false)}
             />
