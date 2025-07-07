@@ -14,6 +14,7 @@
 @import url('./style/Layout/Navbar.css');
 @import url('./style/Layout/Modals.css');
 @import url('./style/Layout/ConfirmModal.css');
+@import url('./style/Layout/QuickStartButton.css');
 
 @import url('./style/Environments/UiManagementPage.css');
 
