@@ -74,7 +74,10 @@ app.add_middleware(
 # --- Service Instances ---
 source_manager = SourceManager()
 file_manager = FileManager()
-ui_manager = UiManager()
+# --- PHASE 1: MODIFICATION ---
+# Pass the config object from the file_manager to the ui_manager
+# so it can access adopted_ui_paths.
+ui_manager = UiManager(config_manager=file_manager.config)
 
 
 # --- Robust WebSocket Connection Manager ---
@@ -375,13 +378,11 @@ async def get_all_ui_statuses():
     Checks the local environment and returns the status (installed, running)
     for all manageable UIs.
     """
-    # This assumes a base path is set for managing UIs.
-    # For now, we'll use the file_manager's base_path as the parent for a 'managed_uis' folder.
     if not file_manager.base_path:
         return AllUiStatusResponse(items=[])  # Return empty list if not configured
 
-    install_dir = file_manager.base_path / "managed_uis"
-    status_items = await ui_manager.get_all_statuses(install_dir)
+    # The UiManager now gets the config directly, so no path needs to be passed.
+    status_items = await ui_manager.get_all_statuses()
     return AllUiStatusResponse(items=status_items)
 
 
@@ -426,13 +427,8 @@ async def install_ui_environment(ui_name: UiNameTypePydantic):
 )
 async def delete_ui_environment(ui_name: UiNameTypePydantic):
     """Deletes the entire directory for an installed UI environment."""
-    if not file_manager.base_path:
-        raise HTTPException(
-            status_code=400, detail="Base path for installations is not configured."
-        )
-
-    install_dir = file_manager.base_path / "managed_uis"
-    success = await ui_manager.delete_environment(ui_name=ui_name, base_install_path=install_dir)
+    # The UiManager will determine the correct path (adopted or managed)
+    success = await ui_manager.delete_environment(ui_name=ui_name)
     if not success:
         raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
     return {"success": True, "message": f"{ui_name} environment deleted successfully."}
@@ -446,12 +442,6 @@ async def delete_ui_environment(ui_name: UiNameTypePydantic):
 )
 async def run_ui(ui_name: UiNameTypePydantic):
     """Triggers a background task to start a managed UI."""
-    if not file_manager.base_path:
-        raise HTTPException(
-            status_code=400, detail="Base path for installations is not configured."
-        )
-
-    install_dir = file_manager.base_path / "managed_uis"
     task_id = str(uuid.uuid4())
 
     # We use the same tracker, but could create a separate one for processes.
@@ -460,7 +450,8 @@ async def run_ui(ui_name: UiNameTypePydantic):
         repo_id=f"UI Process",
         filename=ui_name,
         task=asyncio.create_task(
-            ui_manager.run_ui(ui_name=ui_name, base_install_path=install_dir, task_id=task_id)
+            # The UiManager will determine the correct path to run from.
+            ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
         ),
     )
     return UiActionResponse(

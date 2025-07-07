@@ -10,6 +10,7 @@ from ..constants.constants import (
     ModelType,
     UiProfileType,
     ColorThemeType,
+    UiNameType,
 )
 
 # Define the new type for configuration mode
@@ -26,8 +27,11 @@ class ConfigManager:
         self.ui_profile: Optional[UiProfileType] = None
         self.custom_model_type_paths: Dict[str, str] = {}
         self.color_theme: ColorThemeType = "dark"
-        # NEW: Add the configuration mode setting
         self.config_mode: ConfigurationMode = "automatic"
+        # --- PHASE 1: ADDITION ---
+        # This new dictionary will store paths to user-provided, "adopted" UI installations.
+        # e.g., {"ComfyUI": "/path/to/existing/ComfyUI"}
+        self.adopted_ui_paths: Dict[UiNameType, str] = {}
         self._load_config()
 
     def _load_config(self):
@@ -47,8 +51,10 @@ class ConfigManager:
             self.ui_profile = config_data.get("ui_profile")
             self.custom_model_type_paths = config_data.get("custom_model_type_paths", {})
             self.color_theme = config_data.get("color_theme", "dark")
-            # NEW: Load the config mode, defaulting to 'automatic' if not present
             self.config_mode = config_data.get("config_mode", "automatic")
+            # --- PHASE 1: ADDITION ---
+            # Load the adopted UI paths, defaulting to an empty dictionary if not present.
+            self.adopted_ui_paths = config_data.get("adopted_ui_paths", {})
 
             logger.info(f"Configuration loaded from {CONFIG_FILE_PATH}")
 
@@ -59,6 +65,7 @@ class ConfigManager:
     def _save_config(self):
         """Saves the current configuration to the JSON file."""
         CONFIG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        # get_current_configuration now includes the new adopted_ui_paths field.
         config_data = self.get_current_configuration()
 
         try:
@@ -75,6 +82,8 @@ class ConfigManager:
         self.custom_model_type_paths = {}
         self.color_theme = "dark"
         self.config_mode = "automatic"
+        # --- PHASE 1: ADDITION ---
+        self.adopted_ui_paths = {}
 
     def get_current_configuration(self) -> Dict[str, Any]:
         """Returns the current configuration as a dictionary."""
@@ -84,6 +93,8 @@ class ConfigManager:
             "custom_model_type_paths": self.custom_model_type_paths,
             "color_theme": self.color_theme,
             "config_mode": self.config_mode,
+            # --- PHASE 1: ADDITION ---
+            "adopted_ui_paths": self.adopted_ui_paths,
         }
 
     def update_configuration(
@@ -92,9 +103,9 @@ class ConfigManager:
         profile: Optional[UiProfileType],
         custom_model_type_paths: Optional[Dict[str, str]],
         color_theme: Optional[ColorThemeType],
-        config_mode: Optional[ConfigurationMode],  # NEW: Accept config_mode
+        config_mode: Optional[ConfigurationMode],
     ) -> Tuple[bool, str]:
-        """Updates and saves the configuration."""
+        """Updates and saves the configuration from the main settings page."""
         changed = False
 
         # Update Base Path
@@ -126,7 +137,7 @@ class ConfigManager:
             self.color_theme = color_theme
             changed = True
 
-        # NEW: Update Config Mode
+        # Update Config Mode
         if config_mode and config_mode != self.config_mode:
             self.config_mode = config_mode
             changed = True
@@ -136,3 +147,21 @@ class ConfigManager:
             return True, "Configuration updated successfully."
 
         return False, "No changes detected in configuration."
+
+    # --- PHASE 1: ADDITION ---
+    def add_adopted_ui_path(self, ui_name: UiNameType, path_str: str) -> Tuple[bool, str]:
+        """
+        Adds or updates a single adopted UI path and saves the configuration.
+        This provides a dedicated method for the adoption process.
+        """
+        path = pathlib.Path(path_str)
+        if not path.is_dir():
+            return False, f"Error: The provided path '{path_str}' is not a valid directory."
+
+        if self.adopted_ui_paths.get(ui_name) == path_str:
+            return False, "No change detected for adopted UI path."
+
+        logger.info(f"Adopting UI '{ui_name}' at path '{path_str}'.")
+        self.adopted_ui_paths[ui_name] = path_str
+        self._save_config()
+        return True, f"Successfully adopted {ui_name}."

@@ -91,12 +91,17 @@ class MalFullConfiguration(BaseModel):
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
     config_mode: Optional[ConfigurationModePydantic]
+    # --- PHASE 1: ADDITION ---
+    # This dictionary holds paths to user-provided, "adopted" UI installations.
+    adopted_ui_paths: Dict[UiNameTypePydantic, str] = Field(default_factory=dict)
 
     class Config:
         populate_by_name = True
 
 
 class PathConfigurationRequest(BaseModel):
+    """Request model for the main settings page configuration."""
+
     base_path: Optional[str] = Field(None)
     profile: Optional[UiProfileTypePydantic] = Field(None)
     custom_model_type_paths: Optional[Dict[str, str]] = Field(None)
