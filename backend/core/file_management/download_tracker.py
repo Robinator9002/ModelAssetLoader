@@ -10,15 +10,12 @@ from typing import (
     Coroutine,
     List,
     Literal,
-)  # Import Literal
+)
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-# --- Define a strict type for download states ---
 DownloadState = Literal["pending", "downloading", "completed", "error", "cancelled"]
-
-# Define a type for the async callback function that broadcasts updates
 BroadcastCallable = Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]
 
 
@@ -29,15 +26,12 @@ class DownloadStatus:
     download_id: str
     filename: str
     repo_id: str
-    # --- Use the strict DownloadState type ---
     status: DownloadState = "pending"
     progress: float = 0.0
     total_size_bytes: int = 0
     downloaded_bytes: int = 0
     error_message: Optional[str] = None
     target_path: Optional[str] = None
-    # This field will hold the running task so we can cancel it.
-    # It won't be part of the JSON response.
     task: Optional[asyncio.Task] = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -56,7 +50,7 @@ class DownloadStatus:
 
 
 class DownloadTracker:
-    """A singleton-like class to track and manage all active downloads."""
+    """A singleton-like class to track and manage all active downloads and tasks."""
 
     _instance = None
 
@@ -83,24 +77,19 @@ class DownloadTracker:
     def start_tracking(
         self, download_id: str, repo_id: str, filename: str, task: asyncio.Task
     ) -> DownloadStatus:
-        """Registers a new download with a pre-generated ID and its task."""
         status = DownloadStatus(
-            download_id=download_id,
-            filename=filename,
-            repo_id=repo_id,
-            status="pending",
-            task=task,
+            download_id=download_id, filename=filename, repo_id=repo_id, status="pending", task=task
         )
         self.active_downloads[download_id] = status
         logger.info(f"Started tracking download {download_id} for '{filename}'.")
-        asyncio.create_task(
-            self._broadcast({"type": "update", "data": status.to_dict()})
-        )
+        asyncio.create_task(self._broadcast({"type": "update", "data": status.to_dict()}))
         return status
 
-    async def update_progress(
+    # --- FIXED: Renamed for clarity and purpose ---
+    async def update_progress_from_bytes(
         self, download_id: str, downloaded_bytes: int, total_size: int
     ):
+        """Updates progress based on byte counts, specifically for file downloads."""
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             if status.status != "downloading":
@@ -109,6 +98,25 @@ class DownloadTracker:
             status.total_size_bytes = total_size
             if total_size > 0:
                 status.progress = round((downloaded_bytes / total_size) * 100, 2)
+            else:
+                status.progress = 0  # Indeterminate if no total size
+            await self._broadcast({"type": "update", "data": status.to_dict()})
+
+    # --- FIXED: New method for step-based tasks ---
+    async def update_task_progress(
+        self, task_id: str, progress: float, status_text: Optional[str] = None
+    ):
+        """Updates progress for a multi-step task where progress is pre-calculated."""
+        if task_id in self.active_downloads:
+            status = self.active_downloads[task_id]
+            if status.status != "downloading":
+                status.status = "downloading"
+
+            status.progress = round(progress, 2)
+            # Use error_message field to convey the current step's status text
+            if status_text:
+                status.error_message = status_text
+
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
     async def complete_download(self, download_id: str, final_path: str):
@@ -120,9 +128,7 @@ class DownloadTracker:
             logger.info(f"Download {download_id} completed. Path: {final_path}")
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
-    async def fail_download(
-        self, download_id: str, error_message: str, cancelled: bool = False
-    ):
+    async def fail_download(self, download_id: str, error_message: str, cancelled: bool = False):
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             status.status = "cancelled" if cancelled else "error"
@@ -131,20 +137,17 @@ class DownloadTracker:
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
     async def cancel_and_remove(self, download_id: str):
-        """Cancels a running download task. The task will then report its cancelled status."""
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             if status.task and not status.task.done():
                 logger.info(f"Requesting cancellation for download task {download_id}.")
                 status.task.cancel()
             else:
-                # If task is already done, this action does nothing. Dismissal is separate.
                 logger.warning(
                     f"Cancellation for {download_id} requested, but task is not running. Ignoring."
                 )
 
     async def remove_download(self, download_id: str):
-        """Removes a download from tracking. This is for dismissal by the client."""
         if download_id in self.active_downloads:
             logger.info(f"Removing download {download_id} from tracking.")
             del self.active_downloads[download_id]
