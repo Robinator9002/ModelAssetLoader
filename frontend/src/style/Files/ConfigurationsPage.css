@@ -41,6 +41,7 @@
     flex-grow: 1;
     overflow-y: auto; /* Enables vertical scrolling if content overflows */
     padding: var(--spacing-unit);
+    max-height: 60vh;
     margin: calc(var(--spacing-unit) * -1);
 
     /* Responsive Grid Layout */
@@ -67,8 +68,9 @@
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease;
-    overflow: hidden; /* Ensures child elements respect border radius */
+    overflow: auto; /* Ensures child elements respect border radius */
     height: 100%; /* Make cards fill the height of the grid row */
+    max-height: 50vh;
 }
 
 .config-card.disabled-card {
