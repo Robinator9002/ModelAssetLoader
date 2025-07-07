@@ -57,7 +57,8 @@ export interface SearchModelParams {
 }
 
 // --- FileManager & Download Interfaces ---
-export type UiProfileType = 'ComfyUI' | 'A1111' | 'ForgeUI' | 'Custom';
+export type UiNameType = 'ComfyUI' | 'A1111' | 'ForgeUI';
+export type UiProfileType = UiNameType | 'Custom';
 export type ColorThemeType = 'dark' | 'light';
 export type ModelType =
     | 'checkpoints'
@@ -86,6 +87,8 @@ export interface MalFullConfiguration {
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
     config_mode: ConfigurationMode | null;
+    // --- CORRECTED: Use Partial<Record<>> to indicate that not all keys must be present.
+    adopted_ui_paths: Partial<Record<UiNameType, string>>;
 }
 
 export interface PathConfigurationResponse {
@@ -163,9 +166,7 @@ export interface FileManagerListResponse {
 
 export type ViewMode = 'models' | 'explorer';
 
-// --- NEW: UI Environment Management Interfaces ---
-export type UiNameType = 'ComfyUI' | 'A1111' | 'ForgeUI';
-
+// --- UI Environment Management Interfaces ---
 export interface AvailableUiItem {
     ui_name: UiNameType;
     git_url: string;
@@ -187,6 +188,23 @@ export interface UiActionResponse {
     success: boolean;
     message: string;
     task_id: string;
+}
+
+// --- PHASE 2.5: NEW INTERFACES ---
+export interface UiPathValidationRequest {
+    path: string;
+}
+
+export interface UiPathValidationResponse {
+    success: boolean;
+    ui_name?: UiNameType | null;
+    error?: string | null;
+}
+
+export interface UiAdoptionRequest {
+    ui_name: UiNameType;
+    path: string;
+    should_backup: boolean;
 }
 
 // --- API Functions (Existing) ---
@@ -284,17 +302,19 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
             ...response.data,
             custom_model_type_paths: response.data.custom_model_type_paths || {},
             color_theme: response.data.color_theme || 'dark',
-            config_mode: response.data.config_mode || 'automatic', // Default to automatic
-
+            config_mode: response.data.config_mode || 'automatic',
+            adopted_ui_paths: response.data.adopted_ui_paths || {},
         };
     } catch (error) {
         console.error('Error fetching current configuration:', error);
+        // This now correctly matches the type definition.
         return {
             base_path: null,
             profile: null,
             custom_model_type_paths: {},
             color_theme: 'dark',
             config_mode: 'automatic',
+            adopted_ui_paths: {},
         };
     }
 };
@@ -377,7 +397,7 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
     }
 };
 
-// --- NEW: API Functions for UI Environment Management ---
+// --- UI Environment Management API Functions ---
 
 export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
     try {
@@ -395,7 +415,6 @@ export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
         return response.data;
     } catch (error) {
         console.error('Error fetching UI statuses:', error);
-        // Return a default empty state on error to prevent UI crashes
         return { items: [] };
     }
 };
@@ -450,6 +469,53 @@ export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; mes
         return response.data;
     } catch (error) {
         console.error(`Error stopping UI task ${taskId}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+// --- PHASE 2.5: NEW API FUNCTIONS ---
+
+/**
+ * Sends a path to the backend to validate if it's a recognizable UI installation.
+ * @param path The absolute path to the directory to validate.
+ * @returns A response object indicating success and the identified UI name, or an error.
+ */
+export const validateUiPathAPI = async (path: string): Promise<UiPathValidationResponse> => {
+    try {
+        const request: UiPathValidationRequest = { path };
+        const response = await apiClient.post<UiPathValidationResponse>(
+            '/uis/validate-path',
+            request,
+        );
+        return response.data;
+    } catch (error) {
+        console.error(`Error validating path ${path}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data) {
+            return {
+                success: false,
+                error: axiosError.response.data.detail || 'An unknown error occurred.',
+            };
+        }
+        throw error;
+    }
+};
+
+/**
+ * Sends a request to the backend to adopt an existing UI installation.
+ * @param request The adoption request details.
+ * @returns A response object indicating that the background task has started.
+ */
+export const adoptUiAPI = async (request: UiAdoptionRequest): Promise<UiActionResponse> => {
+    try {
+        const response = await apiClient.post<UiActionResponse>('/uis/adopt', request);
+        return response.data;
+    } catch (error) {
+        console.error(`Error starting adoption for ${request.ui_name}:`, error);
         const axiosError = error as any;
         if (axiosError.response?.data?.detail) {
             throw new Error(axiosError.response.data.detail);
