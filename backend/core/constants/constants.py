@@ -20,7 +20,6 @@ ModelType = Literal[
 UiProfileType = Literal["ComfyUI", "A1111", "ForgeUI", "Custom"]
 ColorThemeType = Literal["dark", "light"]
 
-# --- New Type for UI Management ---
 # This type is derived from the keys of UI_REPOSITORIES to ensure we only
 # try to install UIs that are actually defined.
 UiNameType = Literal["ComfyUI", "A1111", "ForgeUI"]
@@ -70,22 +69,24 @@ KNOWN_UI_PROFILES: Dict[UiProfileType, Dict[str, str]] = {
 
 
 # --- UI Installation & Management Constants ---
-# This is the central knowledge base for installing different UIs.
-# To add a new UI, simply add an entry here.
+# This is the central knowledge base for installing and running different UIs.
 UI_REPOSITORIES: Dict[UiNameType, Dict[str, Any]] = {
     "ComfyUI": {
         "git_url": "https://github.com/comfyanonymous/ComfyUI.git",
         "requirements_file": "requirements.txt",
-        "python_version": "3.10",  # Example of future metadata
+        "start_script": "main.py",  # FIXED: Added start script
+        "python_version": "3.10",
     },
     "A1111": {
         "git_url": "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git",
         "requirements_file": "requirements.txt",
+        "start_script": "webui.py",  # FIXED: Added start script
         "python_version": "3.10",
     },
     "ForgeUI": {
         "git_url": "https://github.com/lllyasviel/stable-diffusion-webui-forge.git",
         "requirements_file": "requirements.txt",
+        "start_script": "webui.py",  # FIXED: Added start script
         "python_version": "3.10",
     },
 }
