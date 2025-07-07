@@ -3,7 +3,8 @@
  * M.A.L. - ConfigurationsPage Styles (Overhauled)
  * =================================================================
  * This stylesheet provides a modern, step-by-step layout for the
- * main application settings page.
+ * main application settings page. It features a responsive grid
+ * that adapts from columns to a single stack on smaller screens.
 */
 
 .configurations-page {
@@ -35,15 +36,27 @@
     margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
-/* --- Main Scrolling Content Area --- */
+/* --- Main Content Layout --- */
 .config-main-content {
     flex-grow: 1;
-    overflow-y: auto;
+    overflow-y: auto; /* Enables vertical scrolling if content overflows */
     padding: var(--spacing-unit);
     margin: calc(var(--spacing-unit) * -1);
-    display: flex;
-    flex-direction: column;
+
+    /* Responsive Grid Layout */
+    display: grid;
+    /* On large screens, create 3 equal-width columns */
+    grid-template-columns: repeat(3, 1fr);
     gap: calc(var(--spacing-unit) * 3);
+    align-items: start; /* Aligns cards to the top of their grid cell */
+}
+
+/* --- Responsive Breakpoint --- */
+/* When the screen is 1200px wide or less, switch to a single column */
+@media (max-width: 1200px) {
+    .config-main-content {
+        grid-template-columns: 1fr; /* Stack the cards vertically */
+    }
 }
 
 /* --- Config Card: The basic building block --- */
@@ -55,6 +68,7 @@
     flex-direction: column;
     transition: all 0.3s ease;
     overflow: hidden; /* Ensures child elements respect border radius */
+    height: 100%; /* Make cards fill the height of the grid row */
 }
 
 .config-card.disabled-card {
@@ -81,6 +95,7 @@
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing-unit) * 3);
+    flex-grow: 1; /* Allows the body to expand and fill space */
 }
 
 .config-section {
