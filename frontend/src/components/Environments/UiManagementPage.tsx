@@ -1,7 +1,7 @@
 // frontend/src/components/Environments/UiManagementPage.tsx
 import React from 'react';
 import { type AvailableUiItem, type ManagedUiStatus, type UiNameType } from '../../api/api';
-import { Layers, Download, Settings, Play, CheckCircle, Loader2 } from 'lucide-react';
+import { Layers, Download, Settings, Play, CheckCircle, Loader2, FolderPlus } from 'lucide-react';
 
 /**
  * Props for the UiManagementPage component.
@@ -13,13 +13,13 @@ interface UiManagementPageProps {
     onRun: (uiName: UiNameType) => void;
     onStop: (taskId: string) => void;
     onDelete: (uiName: UiNameType) => void;
-    isBusy: (uiName: UiNameType) => boolean; // A function to check if a UI is involved in an ongoing task
+    isBusy: (uiName: UiNameType) => boolean;
+    // --- PHASE 3: NEW PROP ---
+    onAdopt: (uiName: UiNameType) => void;
 }
 
 /**
  * A dedicated page for discovering, installing, and managing different AI UI environments.
- * It displays a list of all UIs the application can manage, shows their current
- * status (e.g., installed, running), and provides actions to the user.
  */
 const UiManagementPage: React.FC<UiManagementPageProps> = ({
     availableUis,
@@ -27,16 +27,12 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
     onInstall,
     onRun,
     onStop,
+    onDelete,
     isBusy,
+    onAdopt, // --- PHASE 3: NEW PROP ---
 }) => {
-    /**
-     * Creates a combined view model for each UI, merging available information
-     * with its current installation and running status.
-     * @returns An array of combined UI data objects.
-     */
     const getCombinedUiData = () => {
         const statusMap = new Map(uiStatuses.map((s) => [s.ui_name, s]));
-
         return availableUis.map((ui) => {
             const status = statusMap.get(ui.ui_name);
             return {
@@ -111,18 +107,29 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                             </div>
                             <div className="modal-actions ui-card-actions">
                                 {!ui.is_installed ? (
-                                    <button
-                                        className="button button-primary"
-                                        onClick={() => onInstall(ui.ui_name)}
-                                        disabled={isUiBusy}
-                                    >
-                                        <Download size={18} /> Install
-                                    </button>
+                                    // --- PHASE 3: MODIFIED BUTTONS ---
+                                    <>
+                                        <button
+                                            className="button button-secondary"
+                                            onClick={() => onAdopt(ui.ui_name)}
+                                            disabled={isUiBusy}
+                                        >
+                                            <FolderPlus size={18} /> Adopt Existing
+                                        </button>
+                                        <button
+                                            className="button button-primary"
+                                            onClick={() => onInstall(ui.ui_name)}
+                                            disabled={isUiBusy}
+                                        >
+                                            <Download size={18} /> Clean Install
+                                        </button>
+                                    </>
                                 ) : (
                                     <>
                                         <button
                                             className="button"
-                                            onClick={() => alert('Not implemented yet!')}
+                                            onClick={() => onDelete(ui.ui_name)}
+                                            title="This will un-adopt an existing installation or delete a managed one."
                                         >
                                             <Settings size={18} /> Manage
                                         </button>

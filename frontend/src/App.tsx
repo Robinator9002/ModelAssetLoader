@@ -10,22 +10,21 @@ import DownloadModal from './components/Downloads/DownloadModal';
 import DownloadSidebar from './components/Downloads/DownloadSidebar';
 import FileManagerPage from './components/FileManager/FileManagerPage';
 import UiManagementPage from './components/Environments/UiManagementPage';
+import AdoptUiModal from './components/Environments/AdoptUiModal';
 
 import {
-    // API functions for UI management
+    // All API functions are imported
     listAvailableUisAPI,
     getUiStatusesAPI,
     installUiAPI,
     runUiAPI,
     stopUiAPI,
     deleteUiAPI,
-    // Existing API functions
     getCurrentConfigurationAPI,
     configurePathsAPI,
     connectToDownloadTracker,
     dismissDownloadAPI,
-    // Type definitions
-    type PathConfigurationRequest,
+    // All type definitions are imported
     type ColorThemeType,
     type MalFullConfiguration,
     type ModelListItem,
@@ -49,6 +48,7 @@ export interface AppPathConfig {
     uiProfile: MalFullConfiguration['profile'];
     customPaths: MalFullConfiguration['custom_model_type_paths'];
     configMode: ConfigurationMode;
+    adoptedUiPaths: MalFullConfiguration['adopted_ui_paths'];
 }
 
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
@@ -58,22 +58,25 @@ const defaultPathConfig: AppPathConfig = {
     uiProfile: null,
     customPaths: {},
     configMode: 'automatic',
+    adoptedUiPaths: {},
 };
 
 function App() {
     // --- Core Application State ---
     const [pathConfig, setPathConfig] = useState<AppPathConfig>(defaultPathConfig);
     const [theme, setTheme] = useState<ColorThemeType>('dark');
-    const [activeTab, setActiveTab] = useState<MalTabKey>('search');
+    const [activeTab, setActiveTab] = useState<MalTabKey>('environments');
     const [isConfigLoading, setIsConfigLoading] = useState<boolean>(true);
 
     // --- View & Modal States ---
     const [selectedModel, setSelectedModel] = useState<ModelListItem | null>(null);
-    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const [modelForDownload, setModelForDownload] = useState<ModelDetails | null>(null);
     const [specificFileForDownload, setSpecificFileForDownload] = useState<ModelFile | null>(null);
+    const [isAdoptModalOpen, setIsAdoptModalOpen] = useState(false);
+    const [uiToAdopt, setUiToAdopt] = useState<UiNameType | null>(null);
 
-    // --- Download Management State ---
+    // --- Download & Task Management State ---
     const [activeDownloads, setActiveDownloads] = useState<Map<string, DownloadStatus>>(new Map());
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
     const ws = useRef<WebSocket | null>(null);
@@ -82,64 +85,73 @@ function App() {
     const [availableUis, setAvailableUis] = useState<AvailableUiItem[]>([]);
     const [uiStatuses, setUiStatuses] = useState<ManagedUiStatus[]>([]);
 
-    // Effect to establish and manage the WebSocket connection for real-time download updates.
-    useEffect(() => {
-        // WebSocket connection logic remains the same...
-        if (!ws.current) {
-            logger.info('Setting up WebSocket for download tracking...');
-            const handleWsMessage = (data: any) => {
-                switch (data.type) {
-                    case 'initial_state': {
-                        const initialMap = new Map<string, DownloadStatus>();
-                        if (data.downloads && Array.isArray(data.downloads)) {
-                            data.downloads.forEach((status: DownloadStatus) => {
-                                initialMap.set(status.download_id, status);
-                            });
-                        }
-                        setActiveDownloads(initialMap);
-                        break;
-                    }
-                    case 'update': {
-                        const status: DownloadStatus = data.data;
-                        if (status && status.download_id) {
-                            setActiveDownloads((prev) =>
-                                new Map(prev).set(status.download_id, status),
-                            );
-                        }
-                        break;
-                    }
-                    case 'remove': {
-                        const { download_id } = data;
-                        if (download_id) {
-                            setActiveDownloads((prev) => {
-                                const newMap = new Map(prev);
-                                newMap.delete(download_id);
-                                return newMap;
-                            });
-                        }
-                        break;
-                    }
-                }
-            };
-            const socket = connectToDownloadTracker(handleWsMessage);
-            ws.current = socket;
+    const fetchUiData = useCallback(async () => {
+        try {
+            const [uis, statuses] = await Promise.all([listAvailableUisAPI(), getUiStatusesAPI()]);
+            setAvailableUis(uis);
+            setUiStatuses(statuses.items);
+        } catch (error) {
+            logger.error('Failed to fetch UI environment data:', error);
         }
-        return () => {
-            if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-                ws.current.close();
+    }, []);
+
+    // Effect to establish and manage the WebSocket connection for real-time updates.
+    useEffect(() => {
+        if (ws.current) return;
+
+        logger.info('Setting up WebSocket for download and task tracking...');
+        const handleWsMessage = (data: any) => {
+            switch (data.type) {
+                case 'initial_state': {
+                    const initialMap = new Map<string, DownloadStatus>(
+                        (data.downloads || []).map((s: DownloadStatus) => [s.download_id, s]),
+                    );
+                    setActiveDownloads(initialMap);
+                    break;
+                }
+                case 'update': {
+                    const status: DownloadStatus = data.data;
+                    if (status?.download_id) {
+                        setActiveDownloads((prev) => new Map(prev).set(status.download_id, status));
+
+                        // --- REACTIVITY FIX ---
+                        // If an installation or adoption task completes, refresh the UI statuses.
+                        if (
+                            status.status === 'completed' &&
+                            (status.repo_id === 'UI Adoption' ||
+                                status.repo_id === 'UI Installation')
+                        ) {
+                            logger.info(
+                                `Task for '${status.filename}' completed. Refreshing UI statuses.`,
+                            );
+                            fetchUiData();
+                        }
+                    }
+                    break;
+                }
+                case 'remove': {
+                    if (data.download_id) {
+                        setActiveDownloads((prev) => {
+                            const newMap = new Map(prev);
+                            newMap.delete(data.download_id);
+                            return newMap;
+                        });
+                    }
+                    break;
+                }
             }
+        };
+        ws.current = connectToDownloadTracker(handleWsMessage);
+
+        return () => {
+            if (ws.current?.readyState === WebSocket.OPEN) ws.current.close();
             ws.current = null;
         };
-    }, []);
+    }, [fetchUiData]); // Added fetchUiData as a dependency
 
-    // --- Handlers for Download Sidebar ---
-    const handleToggleDownloadsSidebar = useCallback(() => {
-        setDownloadsSidebarOpen((prev) => !prev);
-    }, []);
-
-    const handleCloseDownloadsSidebar = useCallback(() => {
-        setDownloadsSidebarOpen(false);
-    }, []);
+    // --- Handlers for various UI actions ---
+    const handleToggleDownloadsSidebar = useCallback(() => setDownloadsSidebarOpen((p) => !p), []);
+    const handleCloseDownloadsSidebar = useCallback(() => setDownloadsSidebarOpen(false), []);
 
     const handleDownloadsStarted = useCallback(() => {
         setIsDownloadModalOpen(false);
@@ -148,7 +160,6 @@ function App() {
         setDownloadsSidebarOpen(true);
     }, []);
 
-    // --- Handlers for Download Modal ---
     const openDownloadModal = useCallback(
         (modelDetails: ModelDetails, specificFile?: ModelFile) => {
             setModelForDownload(modelDetails);
@@ -162,17 +173,6 @@ function App() {
         setIsDownloadModalOpen(false);
         setModelForDownload(null);
         setSpecificFileForDownload(null);
-    }, []);
-
-    // --- UI Management Data Fetching & Handlers ---
-    const fetchUiData = useCallback(async () => {
-        try {
-            const [uis, statuses] = await Promise.all([listAvailableUisAPI(), getUiStatusesAPI()]);
-            setAvailableUis(uis);
-            setUiStatuses(statuses.items);
-        } catch (error) {
-            logger.error('Failed to fetch UI environment data:', error);
-        }
     }, []);
 
     const handleInstallUi = useCallback(async (uiName: UiNameType) => {
@@ -215,20 +215,14 @@ function App() {
 
     const isUiBusy = useCallback(
         (uiName: UiNameType): boolean => {
-            for (const download of activeDownloads.values()) {
-                if (
-                    download.filename === uiName &&
-                    (download.status === 'pending' || download.status === 'downloading')
-                ) {
-                    return true;
-                }
-            }
-            return false;
+            return Array.from(activeDownloads.values()).some(
+                (d) =>
+                    d.filename === uiName && (d.status === 'pending' || d.status === 'downloading'),
+            );
         },
         [activeDownloads],
     );
 
-    // --- QUICK START LOGIC ---
     const activeUiProfileForStart = useMemo(() => {
         const profileName = pathConfig?.uiProfile;
         if (!profileName || profileName === 'Custom') return null;
@@ -237,7 +231,6 @@ function App() {
 
     const handleQuickStart = useCallback(() => {
         if (!activeUiProfileForStart) return;
-
         if (activeUiProfileForStart.is_running && activeUiProfileForStart.running_task_id) {
             handleStopUi(activeUiProfileForStart.running_task_id);
         } else {
@@ -245,22 +238,21 @@ function App() {
         }
     }, [activeUiProfileForStart, handleRunUi, handleStopUi]);
 
-    // --- General App Logic & Handlers ---
     const loadInitialConfig = useCallback(async () => {
         setIsConfigLoading(true);
         try {
             const config = await getCurrentConfigurationAPI();
-            const newPathConfig = {
+            setPathConfig({
                 basePath: config.base_path,
                 uiProfile: config.profile,
                 customPaths: config.custom_model_type_paths || {},
                 configMode: config.config_mode || 'automatic',
-            };
-            setPathConfig(newPathConfig);
+                adoptedUiPaths: config.adopted_ui_paths || {},
+            });
             setTheme(config.color_theme || 'dark');
             await fetchUiData();
         } catch (error) {
-            logger.error('Failed to load initial config from backend:', error);
+            logger.error('Failed to load initial config:', error);
         } finally {
             setIsConfigLoading(false);
         }
@@ -278,33 +270,20 @@ function App() {
         const newTheme = theme === 'light' ? 'dark' : 'light';
         setTheme(newTheme);
         try {
-            const configRequest: PathConfigurationRequest = {
-                ...pathConfig,
-                color_theme: newTheme,
-                base_path: pathConfig?.basePath || null,
-            };
-            await configurePathsAPI(configRequest);
+            await configurePathsAPI({ color_theme: newTheme });
         } catch (error) {
             logger.error('Failed to save theme to backend:', error);
         }
-    }, [theme, pathConfig]);
-
-    const handleModelSelect = useCallback((model: ModelListItem) => {
-        setSelectedModel(model);
-    }, []);
-
-    const handleBackToSearch = useCallback(() => {
-        setSelectedModel(null);
-    }, []);
+    }, [theme]);
 
     const handlePathConfigurationUpdate = useCallback(
         (updatedConfig: AppPathConfig, updatedTheme?: ColorThemeType) => {
             setPathConfig(updatedConfig);
-            if (updatedTheme) {
-                setTheme(updatedTheme);
-            }
+            if (updatedTheme) setTheme(updatedTheme);
+            // After config save, UI statuses might change (e.g., adopted paths)
+            fetchUiData();
         },
-        [],
+        [fetchUiData],
     );
 
     const handleDismissDownload = useCallback((downloadId: string) => {
@@ -313,9 +292,9 @@ function App() {
             newMap.delete(downloadId);
             return newMap;
         });
-        dismissDownloadAPI(downloadId).catch((error) => {
-            logger.error(`Failed to dismiss download ${downloadId} on backend:`, error);
-        });
+        dismissDownloadAPI(downloadId).catch((error) =>
+            logger.error(`Failed to dismiss download ${downloadId}:`, error),
+        );
     }, []);
 
     const downloadSummaryStatus = useMemo((): DownloadSummaryStatus => {
@@ -327,26 +306,42 @@ function App() {
         return 'completed';
     }, [activeDownloads]);
 
-    const renderActiveTabContent = () => {
-        if (isConfigLoading) {
-            return <p className="loading-message">Loading configuration...</p>;
-        }
+    // --- Adoption Modal Handlers ---
+    const handleOpenAdoptModal = useCallback((uiName: UiNameType) => {
+        setUiToAdopt(uiName);
+        setIsAdoptModalOpen(true);
+    }, []);
 
-        if (selectedModel) {
+    const handleCloseAdoptModal = useCallback(() => {
+        setIsAdoptModalOpen(false);
+        setUiToAdopt(null);
+    }, []);
+
+    const handleAdoptionStart = useCallback(
+        (taskId: string) => {
+            handleCloseAdoptModal();
+            setDownloadsSidebarOpen(true);
+            // The websocket handler will now automatically refresh UI data upon completion.
+        },
+        [handleCloseAdoptModal],
+    );
+
+    const renderActiveTabContent = () => {
+        if (isConfigLoading) return <p className="loading-message">Loading configuration...</p>;
+        if (selectedModel)
             return (
                 <ModelDetailsPage
                     selectedModel={selectedModel}
-                    onBack={handleBackToSearch}
+                    onBack={() => setSelectedModel(null)}
                     openDownloadModal={openDownloadModal}
                 />
             );
-        }
 
         switch (activeTab) {
             case 'search':
                 return (
                     <ModelSearchPage
-                        onModelSelect={handleModelSelect}
+                        onModelSelect={setSelectedModel}
                         openDownloadModal={openDownloadModal}
                         isConfigurationDone={!!pathConfig?.basePath}
                     />
@@ -363,6 +358,7 @@ function App() {
                         onStop={handleStopUi}
                         onDelete={handleDeleteUi}
                         isBusy={isUiBusy}
+                        onAdopt={handleOpenAdoptModal}
                     />
                 );
             case 'configuration':
@@ -375,11 +371,10 @@ function App() {
                         initialConfigMode={pathConfig.configMode}
                     />
                 );
-
             default:
                 return (
                     <ModelSearchPage
-                        onModelSelect={handleModelSelect}
+                        onModelSelect={setSelectedModel}
                         openDownloadModal={openDownloadModal}
                         isConfigurationDone={!!pathConfig?.basePath}
                     />
@@ -395,7 +390,6 @@ function App() {
                 activeDownloads={activeDownloads}
                 onDismiss={handleDismissDownload}
             />
-
             <div className="app-content-pusher">
                 <header className="app-header-placeholder">
                     <div
@@ -414,7 +408,6 @@ function App() {
                         <h1>M.A.L.</h1>
                     </div>
                 </header>
-
                 <Navbar
                     activeTab={activeTab}
                     onTabChange={(tab) => {
@@ -424,25 +417,27 @@ function App() {
                     onToggleDownloads={handleToggleDownloadsSidebar}
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeDownloads.size}
-                    // Pass the new props for the quick-start button
                     activeUiProfile={pathConfig?.uiProfile || null}
                     isUiRunning={activeUiProfileForStart?.is_running || false}
                     onQuickStart={handleQuickStart}
                 />
-
                 <main className="main-content-area">{renderActiveTabContent()}</main>
             </div>
-
             <div className="theme-switcher-container">
                 <ThemeSwitcher currentTheme={theme} onToggleTheme={handleThemeToggleAndSave} />
             </div>
-
             <DownloadModal
                 isOpen={isDownloadModalOpen}
                 onClose={closeDownloadModal}
                 modelDetails={modelForDownload}
                 specificFileToDownload={specificFileForDownload}
                 onDownloadsStarted={handleDownloadsStarted}
+            />
+            <AdoptUiModal
+                isOpen={isAdoptModalOpen}
+                uiName={uiToAdopt}
+                onClose={handleCloseAdoptModal}
+                onAdoptionStart={handleAdoptionStart}
             />
         </div>
     );
