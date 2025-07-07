@@ -91,8 +91,6 @@ class MalFullConfiguration(BaseModel):
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
     config_mode: Optional[ConfigurationModePydantic]
-    # --- PHASE 1: ADDITION ---
-    # This dictionary holds paths to user-provided, "adopted" UI installations.
     adopted_ui_paths: Dict[UiNameTypePydantic, str] = Field(default_factory=dict)
 
     class Config:
@@ -230,7 +228,7 @@ class FileManagerListResponse(BaseModel):
     )
 
 
-# --- NEW: Models for UI Environment Management ---
+# --- UI Environment Management Models ---
 
 
 class AvailableUiItem(BaseModel):
@@ -238,7 +236,6 @@ class AvailableUiItem(BaseModel):
 
     ui_name: UiNameTypePydantic = Field(..., description="The unique name of the UI.")
     git_url: str = Field(..., description="The Git URL of the repository.")
-    # Future fields like 'python_version' or 'description' could be added here.
 
 
 class ManagedUiStatus(BaseModel):
@@ -262,7 +259,7 @@ class AllUiStatusResponse(BaseModel):
 
 
 class UiActionResponse(BaseModel):
-    """Standard response for actions that trigger a background task (install, run)."""
+    """Standard response for actions that trigger a background task (install, run, adopt)."""
 
     success: bool
     message: str
@@ -273,3 +270,30 @@ class UiStopRequest(BaseModel):
     """Request model for stopping a running UI process."""
 
     task_id: str = Field(..., description="The task_id of the running process to be stopped.")
+
+
+# --- PHASE 2: NEW MODELS ---
+
+
+class UiPathValidationRequest(BaseModel):
+    """Request model for validating a path for UI adoption."""
+
+    path: str = Field(..., description="The absolute path to the UI directory to validate.")
+
+
+class UiPathValidationResponse(BaseModel):
+    """Response model for the UI path validation endpoint."""
+
+    success: bool
+    ui_name: Optional[UiNameTypePydantic] = Field(
+        None, description="The identified UI name if validation is successful."
+    )
+    error: Optional[str] = Field(None, description="An error message if validation fails.")
+
+
+class UiAdoptionRequest(BaseModel):
+    """Request model for adopting an existing UI installation."""
+
+    ui_name: UiNameTypePydantic = Field(..., description="The UI to adopt.")
+    path: str = Field(..., description="The absolute path to the UI directory.")
+    should_backup: bool = Field(True, description="Whether to create a backup before adopting.")

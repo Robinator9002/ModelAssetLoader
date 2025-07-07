@@ -43,12 +43,15 @@ from backend.api.models import (
     HFModelListItem,
     LocalFileActionRequest,
     LocalFileContentResponse,
-    # --- New UI Management Models ---
     AvailableUiItem,
     AllUiStatusResponse,
     UiActionResponse,
     UiStopRequest,
     UiNameTypePydantic,
+    # --- PHASE 2: NEW IMPORTS ---
+    UiPathValidationRequest,
+    UiPathValidationResponse,
+    UiAdoptionRequest,
 )
 
 # --- FastAPI Application Instance ---
@@ -56,13 +59,11 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.1.0",
+    version="1.2.0",
 )
 
 # --- CORS Middleware ---
-origins = [
-    "http://localhost:5173",
-]
+origins = ["http://localhost:5173"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -74,9 +75,6 @@ app.add_middleware(
 # --- Service Instances ---
 source_manager = SourceManager()
 file_manager = FileManager()
-# --- PHASE 1: MODIFICATION ---
-# Pass the config object from the file_manager to the ui_manager
-# so it can access adopted_ui_paths.
 ui_manager = UiManager(config_manager=file_manager.config)
 
 
@@ -111,26 +109,21 @@ manager = ConnectionManager()
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
 
-    # Define a single broadcast function
     async def broadcast_status_update(data: dict):
         await manager.broadcast(json.dumps(data, default=str))
 
-    # Connect the broadcast function to both trackers
     download_tracker.set_broadcast_callback(broadcast_status_update)
     ui_manager.broadcast_callback = broadcast_status_update
 
     try:
-        # Send initial state for file downloads
         initial_statuses = download_tracker.get_all_statuses()
         await websocket.send_text(
             json.dumps({"type": "initial_state", "downloads": initial_statuses})
         )
-        # Keep the connection alive
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        # If all clients are disconnected, clear the callbacks
         if not manager.active_connections:
             download_tracker.set_broadcast_callback(None)
             ui_manager.broadcast_callback = None
@@ -148,9 +141,7 @@ async def websocket_endpoint(websocket: WebSocket):
     summary="Search Models from a Source",
 )
 async def search_models(
-    source: str = Query(
-        "huggingface", description="The API source to search (e.g., 'huggingface')."
-    ),
+    source: str = Query("huggingface"),
     search: Optional[str] = Query(None),
     author: Optional[str] = Query(None),
     tags: Optional[List[str]] = Query(default_factory=list),
@@ -164,7 +155,7 @@ async def search_models(
             t.strip() for tag_group in tags for t in tag_group.split(",") if t.strip()
         ]
         unique_tags = list(set(processed_tags)) if processed_tags else None
-        models_data, has_more_results = source_manager.search_models(
+        models_data, has_more = source_manager.search_models(
             source=source,
             search_query=search,
             author=author,
@@ -175,18 +166,17 @@ async def search_models(
             page=page,
         )
         return PaginatedModelListResponse(
-            items=[HFModelListItem(**model_data) for model_data in models_data],
+            items=[HFModelListItem(**m) for m in models_data],
             page=page,
             limit=limit,
-            has_more=has_more_results,
+            has_more=has_more,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error in search_models endpoint: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An internal error occurred.")
+        logger.error(f"Error in search_models: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal error.")
 
 
+# ... (other endpoints remain the same) ...
 @app.get(
     "/api/models/{source}/{model_id:path}",
     response_model=HFModelDetails,
@@ -351,7 +341,7 @@ async def get_managed_file_preview_endpoint(path: str = Query(...)):
     return result
 
 
-# === NEW: UI Environment Management Endpoints ===
+# === UI Environment Management Endpoints ===
 @app.get(
     "/api/uis",
     response_model=List[AvailableUiItem],
@@ -359,7 +349,6 @@ async def get_managed_file_preview_endpoint(path: str = Query(...)):
     summary="List Available UIs for Installation",
 )
 async def list_available_uis():
-    """Returns a list of all UIs that the application knows how to install."""
     available_uis = [
         AvailableUiItem(ui_name=name, git_url=details["git_url"])
         for name, details in UI_REPOSITORIES.items()
@@ -374,14 +363,8 @@ async def list_available_uis():
     summary="Get Status of All Managed UIs",
 )
 async def get_all_ui_statuses():
-    """
-    Checks the local environment and returns the status (installed, running)
-    for all manageable UIs.
-    """
     if not file_manager.base_path:
-        return AllUiStatusResponse(items=[])  # Return empty list if not configured
-
-    # The UiManager now gets the config directly, so no path needs to be passed.
+        return AllUiStatusResponse(items=[])
     status_items = await ui_manager.get_all_statuses()
     return AllUiStatusResponse(items=status_items)
 
@@ -393,29 +376,59 @@ async def get_all_ui_statuses():
     summary="Install a UI Environment",
 )
 async def install_ui_environment(ui_name: UiNameTypePydantic):
-    """Triggers a background task to clone and set up a UI environment."""
     if not file_manager.base_path:
-        raise HTTPException(
-            status_code=400, detail="Base path for installations is not configured."
-        )
-
+        raise HTTPException(status_code=400, detail="Base path is not configured.")
     install_dir = file_manager.base_path / "managed_uis"
     task_id = str(uuid.uuid4())
-
     download_tracker.start_tracking(
         download_id=task_id,
         repo_id=f"UI Installation",
         filename=ui_name,
+        task=asyncio.create_task(ui_manager.install_ui_environment(ui_name, install_dir, task_id)),
+    )
+    return UiActionResponse(
+        success=True, message=f"Installation for {ui_name} started.", task_id=task_id
+    )
+
+
+# --- PHASE 2: NEW ENDPOINTS ---
+@app.post(
+    "/api/uis/validate-path",
+    response_model=UiPathValidationResponse,
+    tags=["UIs"],
+    summary="Validate a Directory for UI Adoption",
+)
+async def validate_ui_path_endpoint(request: UiPathValidationRequest):
+    """Checks if a given path is a valid, recognizable UI installation."""
+    result = await ui_manager.validate_ui_path(request.path)
+    return UiPathValidationResponse(**result)
+
+
+@app.post(
+    "/api/uis/adopt",
+    response_model=UiActionResponse,
+    tags=["UIs"],
+    summary="Adopt an Existing UI Installation",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def adopt_ui_endpoint(request: UiAdoptionRequest):
+    """Triggers a background task to adopt an existing UI installation."""
+    task_id = str(uuid.uuid4())
+    download_tracker.start_tracking(
+        download_id=task_id,
+        repo_id="UI Adoption",
+        filename=request.ui_name,
         task=asyncio.create_task(
-            ui_manager.install_ui_environment(
-                ui_name=ui_name, base_install_path=install_dir, task_id=task_id
+            ui_manager.adopt_ui_environment(
+                ui_name=request.ui_name,
+                path_str=request.path,
+                should_backup=request.should_backup,
+                task_id=task_id,
             )
         ),
     )
     return UiActionResponse(
-        success=True,
-        message=f"Installation for {ui_name} started.",
-        task_id=task_id,
+        success=True, message=f"Adoption process for {request.ui_name} started.", task_id=task_id
     )
 
 
@@ -423,15 +436,13 @@ async def install_ui_environment(ui_name: UiNameTypePydantic):
     "/api/uis/{ui_name}",
     status_code=status.HTTP_200_OK,
     tags=["UIs"],
-    summary="Delete a UI Environment",
+    summary="Delete or Un-adopt a UI Environment",
 )
 async def delete_ui_environment(ui_name: UiNameTypePydantic):
-    """Deletes the entire directory for an installed UI environment."""
-    # The UiManager will determine the correct path (adopted or managed)
     success = await ui_manager.delete_environment(ui_name=ui_name)
     if not success:
-        raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
-    return {"success": True, "message": f"{ui_name} environment deleted successfully."}
+        raise HTTPException(status_code=500, detail=f"Failed to process {ui_name}.")
+    return {"success": True, "message": f"{ui_name} processed successfully."}
 
 
 @app.post(
@@ -441,23 +452,12 @@ async def delete_ui_environment(ui_name: UiNameTypePydantic):
     summary="Run an Installed UI",
 )
 async def run_ui(ui_name: UiNameTypePydantic):
-    """Triggers a background task to start a managed UI."""
     task_id = str(uuid.uuid4())
-
-    # We use the same tracker, but could create a separate one for processes.
-    download_tracker.start_tracking(
-        download_id=task_id,
-        repo_id=f"UI Process",
-        filename=ui_name,
-        task=asyncio.create_task(
-            # The UiManager will determine the correct path to run from.
-            ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
-        ),
-    )
+    # The UiManager will determine the correct path to run from.
+    # No need to pass it from here.
+    await ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
     return UiActionResponse(
-        success=True,
-        message=f"Request to run {ui_name} accepted.",
-        task_id=task_id,
+        success=True, message=f"Request to run {ui_name} accepted.", task_id=task_id
     )
 
 
@@ -468,7 +468,6 @@ async def run_ui(ui_name: UiNameTypePydantic):
     summary="Stop a Running UI Process",
 )
 async def stop_ui(request: UiStopRequest):
-    """Stops a running UI process using its unique task ID."""
     await ui_manager.stop_ui(task_id=request.task_id)
     return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
 

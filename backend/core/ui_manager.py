@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import pathlib
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 
 from .constants.constants import UI_REPOSITORIES, UiNameType
 from .ui_management import ui_installer, ui_operator
@@ -18,7 +18,6 @@ class UiManager:
     Orchestrates the installation, execution, and management of different AI UIs.
     """
 
-    # --- PHASE 1: MODIFICATION ---
     def __init__(
         self,
         config_manager: ConfigManager,
@@ -36,19 +35,13 @@ class UiManager:
         (Internal) Determines the correct installation path for a UI,
         checking adopted paths first, then default managed paths.
         """
-        # 1. Check for a specific, user-provided "adopted" path.
         adopted_path_str = self.config.adopted_ui_paths.get(ui_name)
         if adopted_path_str:
             return pathlib.Path(adopted_path_str)
-
-        # 2. If not adopted, check the default M.A.L. installation location.
         if self.config.base_path:
             return self.config.base_path / "managed_uis" / ui_name
-
-        # 3. If no base path is set and it's not adopted, we don't know where it is.
         return None
 
-    # --- PHASE 1: REFACTOR ---
     async def get_all_statuses(self) -> List[ManagedUiStatus]:
         """
         Checks the local environment for all known UIs and returns their status,
@@ -58,10 +51,8 @@ class UiManager:
         for ui_name in UI_REPOSITORIES:
             install_path = self._get_install_path_for_ui(ui_name)
             is_installed = install_path is not None and install_path.is_dir()
-
             running_task_id = self.running_ui_tasks.get(ui_name)
             is_running = running_task_id is not None
-
             statuses.append(
                 ManagedUiStatus(
                     ui_name=ui_name,
@@ -89,22 +80,17 @@ class UiManager:
         if self.broadcast_callback:
             await self.broadcast_callback({"type": "log", "task_id": task_id, "message": line})
 
-    # --- PHASE 1: REFACTOR ---
     async def install_ui_environment(
         self, ui_name: UiNameType, base_install_path: pathlib.Path, task_id: str
     ):
-        """
-        Manages the full installation process for a given UI with granular progress.
-        This method is now only for M.A.L.-managed installations.
-        """
+        """Manages the full installation process for a given UI with granular progress."""
         ui_info = await self._get_ui_info(ui_name, task_id)
         if not ui_info:
             return
 
-        # The install path is always the default managed path for this function.
         target_dir = base_install_path / ui_name
         git_url = ui_info["git_url"]
-        req_file = ui_info.get("requirements_file")  # Use .get for safety
+        req_file = ui_info.get("requirements_file")
 
         if not req_file:
             error_message = (
@@ -114,56 +100,35 @@ class UiManager:
             await download_tracker.fail_download(task_id, error_message)
             return
 
-        # --- Define progress allocation for each step ---
-        CLONE_PROGRESS_END = 15
-        VENV_PROGRESS_END = 25
-        PIP_INSTALL_START = VENV_PROGRESS_END
-        PIP_INSTALL_END = 95
-
+        CLONE_PROGRESS_END, VENV_PROGRESS_END, PIP_INSTALL_START, PIP_INSTALL_END = 15, 25, 25, 95
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-
-            # --- Step 1: Cloning ---
-            logger.info(f"Step 1/3: Cloning {ui_name}...")
             await download_tracker.update_progress(task_id, 0, 100)
             if not await ui_installer.clone_repo(git_url, target_dir, streamer):
                 raise RuntimeError(f"Failed to clone repository for {ui_name}.")
             await download_tracker.update_progress(task_id, CLONE_PROGRESS_END, 100)
-
-            # --- Step 2: Creating venv ---
-            logger.info(f"Step 2/3: Creating venv for {ui_name}...")
             if not await ui_installer.create_venv(target_dir, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
             await download_tracker.update_progress(task_id, VENV_PROGRESS_END, 100)
 
-            # --- Step 3: Installing Dependencies (with granular progress) ---
-            logger.info(f"Step 3/3: Installing dependencies for {ui_name}...")
-
             async def pip_progress_callback(processed: int, total: int):
-                """Calculates and reports progress for the pip install step."""
                 if total == 0:
                     return
-                pip_progress_fraction = processed / total
-                overall_progress = PIP_INSTALL_START + (
-                    pip_progress_fraction * (PIP_INSTALL_END - PIP_INSTALL_START)
+                pip_progress = PIP_INSTALL_START + (
+                    processed / total * (PIP_INSTALL_END - PIP_INSTALL_START)
                 )
-                await download_tracker.update_progress(task_id, int(overall_progress), 100)
+                await download_tracker.update_progress(task_id, int(pip_progress), 100)
 
             if not await ui_installer.install_dependencies(
                 target_dir, req_file, streamer, pip_progress_callback
             ):
                 raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
-
-            # --- Finalization ---
-            logger.info(f"Successfully installed {ui_name} at {target_dir}")
             await download_tracker.complete_download(task_id, str(target_dir))
-
         except Exception as e:
             error_message = f"Installation failed for {ui_name}: {e}"
             logger.error(error_message, exc_info=True)
             await download_tracker.fail_download(task_id, error_message)
 
-    # --- PHASE 1: REFACTOR ---
     async def delete_environment(self, ui_name: UiNameType) -> bool:
         """Deletes a UI environment, whether adopted or managed."""
         target_dir = self._get_install_path_for_ui(ui_name)
@@ -172,17 +137,14 @@ class UiManager:
             return False
 
         logger.info(f"Request to delete environment for '{ui_name}' at '{target_dir}'.")
-        # For adopted UIs, we only remove it from our config, we DO NOT delete the files.
         if self.config.adopted_ui_paths.get(ui_name):
             logger.info(f"'{ui_name}' is an adopted UI. Removing from configuration only.")
             del self.config.adopted_ui_paths[ui_name]
-            self.config._save_config()  # Use internal save method
+            self.config._save_config()
             return True
         else:
-            # For managed UIs, we delete the whole directory.
             return await ui_operator.delete_ui_environment(target_dir)
 
-    # --- PHASE 1: REFACTOR ---
     async def run_ui(self, ui_name: UiNameType, task_id: str):
         """Starts a UI as a managed background process from its correct location."""
         if task_id in self.running_processes:
@@ -209,53 +171,38 @@ class UiManager:
             await download_tracker.fail_download(task_id, error_msg)
             return
 
-        streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-
         await download_tracker.start_tracking(
             download_id=task_id,
             repo_id=f"UI Process",
             filename=ui_name,
             task=asyncio.create_task(
-                self._run_and_manage_process(ui_name, target_dir, start_script, task_id, streamer)
+                self._run_and_manage_process(ui_name, target_dir, start_script, task_id)
             ),
         )
 
     async def _run_and_manage_process(
-        self,
-        ui_name: UiNameType,
-        target_dir: pathlib.Path,
-        start_script: str,
-        task_id: str,
-        streamer: BroadcastCallable,
+        self, ui_name: UiNameType, target_dir: pathlib.Path, start_script: str, task_id: str
     ):
         """(Internal) Helper to contain the full lifecycle of running a process."""
         try:
+            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
             process = await ui_operator.run_ui(target_dir, start_script, streamer)
             if not process:
-                raise RuntimeError("UI process failed to start. Check logs for details.")
+                raise RuntimeError("UI process failed to start.")
 
             self.running_processes[task_id] = process
             self.running_ui_tasks[ui_name] = task_id
-            logger.info(
-                f"Process {process.pid} for task '{task_id}' ({ui_name}) is now being managed."
-            )
+            logger.info(f"Process {process.pid} for task '{task_id}' ({ui_name}) is managed.")
 
-            # Mark the process as "running" in the tracker
             status = download_tracker.active_downloads.get(task_id)
             if status:
-                status.status = "downloading"  # Using 'downloading' to show activity
+                status.status = "downloading"
                 await download_tracker._broadcast({"type": "update", "data": status.to_dict()})
 
             await process.wait()
-            logger.info(f"Process for task '{task_id}' ({ui_name}) has terminated.")
             await download_tracker.complete_download(task_id, f"{ui_name} process finished.")
-
         except Exception as e:
-            error_msg = f"ERROR: {e}"
-            logger.error(
-                f"Failed to run or manage process for task '{task_id}': {e}", exc_info=True
-            )
-            await download_tracker.fail_download(task_id, error_msg)
+            await download_tracker.fail_download(task_id, f"ERROR: {e}")
         finally:
             self.running_processes.pop(task_id, None)
             self.running_ui_tasks.pop(ui_name, None)
@@ -271,14 +218,67 @@ class UiManager:
         try:
             process.terminate()
             await asyncio.wait_for(process.wait(), timeout=10.0)
-            logger.info(f"Process {process.pid} terminated successfully.")
         except asyncio.TimeoutError:
-            logger.warning(f"Process {process.pid} did not terminate gracefully. Killing it.")
             process.kill()
         except Exception as e:
             logger.error(f"Error terminating process {process.pid}: {e}", exc_info=True)
             process.kill()
         finally:
-            # The lifecycle management will handle the final cleanup.
-            # We can send a final message to the tracker.
             await download_tracker.cancel_and_remove(task_id, "Process stopped by user.")
+
+    # --- PHASE 2: NEW METHODS ---
+
+    async def validate_ui_path(self, path_str: str) -> Dict[str, Any]:
+        """
+        Validates if a given path points to a known and valid UI installation.
+        """
+        try:
+            path = pathlib.Path(path_str).resolve(strict=True)
+            ui_name, error = await ui_operator.validate_git_repo(path)
+            if error:
+                return {"success": False, "error": error}
+            return {"success": True, "ui_name": ui_name}
+        except FileNotFoundError:
+            return {"success": False, "error": "The specified path does not exist."}
+        except Exception as e:
+            logger.error(f"Unexpected error during path validation: {e}", exc_info=True)
+            return {"success": False, "error": "An unexpected server error occurred."}
+
+    async def adopt_ui_environment(
+        self, ui_name: UiNameType, path_str: str, should_backup: bool, task_id: str
+    ):
+        """
+        Manages the full adoption process for an existing UI installation.
+        """
+        try:
+            path = pathlib.Path(path_str)
+            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
+            await download_tracker.update_progress(task_id, 0, 100)
+
+            # --- Step 1: Backup (Optional) ---
+            backup_path = None
+            if should_backup:
+                backup_path = await ui_operator.backup_ui_environment(path, streamer)
+                if not backup_path:
+                    raise RuntimeError("Backup process failed. Aborting adoption.")
+            await download_tracker.update_progress(task_id, 50, 100)
+
+            # --- Step 2: Register in Config ---
+            await streamer(f"Registering '{ui_name}' in configuration...")
+            success, msg = self.config.add_adopted_ui_path(ui_name, str(path))
+            if not success:
+                raise RuntimeError(f"Failed to update configuration: {msg}")
+            await streamer("Configuration updated.")
+            await download_tracker.update_progress(task_id, 90, 100)
+
+            # --- Step 3: Finalize ---
+            final_message = f"Successfully adopted {ui_name}."
+            if backup_path:
+                final_message += f" Backup created at: {backup_path}"
+
+            await download_tracker.complete_download(task_id, final_message)
+
+        except Exception as e:
+            error_message = f"Adoption failed for {ui_name}: {e}"
+            logger.error(error_message, exc_info=True)
+            await download_tracker.fail_download(task_id, error_message)

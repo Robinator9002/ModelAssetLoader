@@ -4,33 +4,53 @@ import logging
 import pathlib
 import shutil
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
-# Import the helper from the installer to stream process output
-from .ui_installer import _stream_process, StreamCallback
+from .ui_installer import StreamCallback
+from ..constants.constants import UI_REPOSITORIES, UiNameType
 
 logger = logging.getLogger(__name__)
 
 
+async def _stream_process(
+    process: asyncio.subprocess.Process,
+    stream_callback: Optional[StreamCallback] = None,
+) -> tuple[int, str]:
+    """
+    Reads stdout and stderr from a process line by line, optionally streaming it.
+    This is essential for providing real-time feedback to the user.
+    """
+    output_lines = []
+
+    async def read_stream(stream, stream_name):
+        while not stream.at_eof():
+            line_bytes = await stream.readline()
+            if not line_bytes:
+                break
+            line = line_bytes.decode("utf-8", errors="replace").strip()
+            output_lines.append(line)
+            log_line = f"[{process.pid}:{stream_name}] {line}"
+            logger.debug(log_line)
+            if stream_callback:
+                await stream_callback(line)
+
+    await asyncio.gather(
+        read_stream(process.stdout, "stdout"), read_stream(process.stderr, "stderr")
+    )
+
+    await process.wait()
+    return_code = process.returncode
+    combined_output = "\n".join(output_lines)
+    logger.info(f"Process {process.pid} finished with exit code {return_code}.")
+    return return_code, combined_output
+
+
 async def delete_ui_environment(ui_dir: pathlib.Path) -> bool:
-    """
-    Completely removes a UI environment directory.
-
-    This is a destructive operation. It uses shutil.rmtree to recursively
-    delete the entire folder, including the git repo and the venv.
-
-    Args:
-        ui_dir: The root directory of the UI to delete.
-
-    Returns:
-        True if deletion was successful, False otherwise.
-    """
+    """Completely removes a M.A.L.-managed UI environment directory."""
     if not ui_dir.is_dir():
         logger.warning(f"Cannot delete '{ui_dir}'. It is not a valid directory.")
         return False
 
-    # Basic security check: ensure we're not deleting something obviously wrong
-    # A more robust check might ensure it's within a known 'installed_uis' path.
     if "venv" not in [d.name for d in ui_dir.iterdir() if d.is_dir()]:
         logger.error(
             f"Security check failed: Refusing to delete '{ui_dir}' as it does not appear to be a valid UI environment (no venv found)."
@@ -52,17 +72,7 @@ async def run_ui(
     start_script: str,
     stream_callback: Optional[StreamCallback] = None,
 ) -> Optional[asyncio.subprocess.Process]:
-    """
-    Launches a UI using its specific virtual environment and start script.
-
-    Args:
-        ui_dir: The root directory of the installed UI.
-        start_script: The name of the script to execute (e.g., "main.py").
-        stream_callback: An async function to stream stdout/stderr in real-time.
-
-    Returns:
-        The process object if successfully started, otherwise None.
-    """
+    """Launches a UI using its specific virtual environment and start script."""
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
         if sys.platform == "win32"
@@ -71,15 +81,17 @@ async def run_ui(
     script_path = ui_dir / start_script
 
     if not venv_python.exists():
+        msg = f"ERROR: Virtual environment not found for this UI."
         logger.error(f"Venv Python not found at '{venv_python}'. Cannot run UI.")
         if stream_callback:
-            await stream_callback(f"ERROR: Virtual environment not found for this UI.")
+            await stream_callback(msg)
         return None
 
     if not script_path.exists():
+        msg = f"ERROR: Start script '{start_script}' not found."
         logger.error(f"Start script not found at '{script_path}'. Cannot run UI.")
         if stream_callback:
-            await stream_callback(f"ERROR: Start script '{start_script}' not found.")
+            await stream_callback(msg)
         return None
 
     logger.info(f"Attempting to run '{script_path}' with '{venv_python}'...")
@@ -87,24 +99,97 @@ async def run_ui(
         await stream_callback(f"Starting {ui_dir.name}...")
 
     try:
-        # We pass the command and its arguments to start the UI's main script.
-        # We also need to set the working directory to the UI's root.
         process = await asyncio.create_subprocess_exec(
             str(venv_python),
             str(script_path),
-            # Add any required arguments for the script here if necessary
-            # e.g., "--listen", "--port", "8188"
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=ui_dir,  # Set the working directory
+            cwd=ui_dir,
         )
         logger.info(f"Successfully started process {process.pid} for {ui_dir.name}.")
-
-        # The caller (UiManager) will be responsible for managing this process object
-        # and streaming its output.
         return process
     except Exception as e:
         logger.error(f"Failed to start process for {ui_dir.name}: {e}", exc_info=True)
         if stream_callback:
             await stream_callback(f"FATAL: Could not start the UI process. See logs.")
+        return None
+
+
+# --- PHASE 2: NEW FUNCTIONS ---
+
+
+async def validate_git_repo(path: pathlib.Path) -> Tuple[Optional[UiNameType], Optional[str]]:
+    """
+    Validates if a directory is a known UI by checking its Git remote URL.
+
+    Returns:
+        A tuple of (ui_name, error_message). On success, ui_name is populated.
+        On failure, error_message is populated.
+    """
+    if not path.is_dir():
+        return None, "The provided path is not a valid directory."
+    git_dir = path / ".git"
+    if not git_dir.is_dir():
+        return None, "This directory does not appear to be a Git repository."
+
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "config",
+            "--get",
+            "remote.origin.url",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=path,
+        )
+        return_code, output = await _stream_process(process)
+        if return_code != 0:
+            return None, f"Could not get remote URL. Git error: {output}"
+
+        remote_url = output.strip()
+        for ui_name, details in UI_REPOSITORIES.items():
+            if details["git_url"] == remote_url:
+                logger.info(f"Validated '{path}' as a '{ui_name}' installation.")
+                return ui_name, None
+
+        return None, "The Git remote URL does not match any known UI."
+    except Exception as e:
+        logger.error(f"Error during Git validation for '{path}': {e}", exc_info=True)
+        return None, "An unexpected error occurred during validation."
+
+
+async def backup_ui_environment(
+    source_dir: pathlib.Path, stream_callback: Optional[StreamCallback] = None
+) -> Optional[str]:
+    """
+    Creates a .zip backup of a directory. Runs in a thread to avoid blocking.
+
+    Returns:
+        The absolute path to the created backup file, or None on error.
+    """
+    backup_dir = source_dir.parent
+    backup_name = f"{source_dir.name}_backup_{asyncio.get_event_loop().time():.0f}"
+    backup_path_base = backup_dir / backup_name
+
+    if stream_callback:
+        await stream_callback(f"Starting backup of '{source_dir.name}'...")
+
+    try:
+        # shutil.make_archive is blocking, so we run it in a separate thread.
+        backup_file_path = await asyncio.to_thread(
+            shutil.make_archive,
+            base_name=str(backup_path_base),
+            format="zip",
+            root_dir=source_dir,
+        )
+        msg = f"Backup complete. Saved to: {backup_file_path}"
+        logger.info(msg)
+        if stream_callback:
+            await stream_callback(msg)
+        return backup_file_path
+    except Exception as e:
+        error_msg = f"Failed to create backup for '{source_dir.name}': {e}"
+        logger.error(error_msg, exc_info=True)
+        if stream_callback:
+            await stream_callback(f"ERROR: {error_msg}")
         return None
