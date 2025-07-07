@@ -8,7 +8,7 @@ import shutil
 from typing import Dict, Any, Optional, List
 
 # Import specialized managers and helpers
-from .file_management.config_manager import ConfigManager
+from .file_management.config_manager import ConfigManager, ConfigurationMode
 from .file_management.path_resolver import PathResolver
 from .file_management.model_downloader import ModelDownloader
 from .file_management.host_scanner import HostScanner
@@ -42,7 +42,7 @@ class FileManager:
     def base_path(self) -> Optional[pathlib.Path]:
         return self.config.base_path
 
-    # --- Configuration Methods (Unchanged) ---
+    # --- Configuration Methods ---
     def get_current_configuration(self) -> Dict[str, Any]:
         return self.config.get_current_configuration()
 
@@ -52,23 +52,26 @@ class FileManager:
         profile: Optional[UiProfileType],
         custom_model_type_paths: Optional[Dict[str, str]] = None,
         color_theme: Optional[ColorThemeType] = None,
+        config_mode: Optional[ConfigurationMode] = None,  # FIXED: Added config_mode parameter
     ) -> Dict[str, Any]:
+        """
+        Updates the application's core configuration by delegating to the ConfigManager.
+        """
+        # Pass all arguments, including the new config_mode, to the config manager
         changed, message = self.config.update_configuration(
-            base_path_str, profile, custom_model_type_paths, color_theme
+            base_path_str, profile, custom_model_type_paths, color_theme, config_mode
         )
         success = "failed" not in message
         response = {
             "success": success,
             "message": message,
-            "configured_base_path": (
-                str(self.config.base_path) if self.config.base_path else None
-            ),
+            "configured_base_path": (str(self.config.base_path) if self.config.base_path else None),
         }
         if not success:
             response["error"] = message
         return response
 
-    # --- Download Methods (Unchanged, but cancel/dismiss logic is now split) ---
+    # --- Download Methods ---
     def start_download_model_file(
         self,
         source: str,
@@ -78,7 +81,6 @@ class FileManager:
         custom_sub_path: Optional[str] = None,
         revision: Optional[str] = None,
     ) -> Dict[str, Any]:
-        # (Code is unchanged)
         if source != "huggingface":
             return {
                 "success": False,
@@ -89,9 +91,7 @@ class FileManager:
                 "success": False,
                 "error": "Base path is not configured. Please configure it first.",
             }
-        final_save_path = self.paths.resolve_final_save_path(
-            filename, model_type, custom_sub_path
-        )
+        final_save_path = self.paths.resolve_final_save_path(filename, model_type, custom_sub_path)
         if not final_save_path:
             return {
                 "success": False,
@@ -123,21 +123,17 @@ class FileManager:
             "download_id": download_id,
         }
 
-    # --- Explicit cancel method ---
     async def cancel_download(self, download_id: str):
         """Requests cancellation of a running download task."""
         logger.info(f"Cancel request received for download {download_id}.")
-        # This single tracker method handles cancelling the task if it's running.
         await download_tracker.cancel_and_remove(download_id)
 
-    # --- Dismiss now only handles removal from tracker ---
     async def dismiss_download(self, download_id: str):
         """Removes a finished (completed/error/cancelled) download from the tracker."""
         logger.info(f"Dismiss request received for download {download_id}.")
-        # This method is for cleanup after a download is in a final state.
         await download_tracker.remove_download(download_id)
 
-    # --- Host Scanning Methods (Unchanged) ---
+    # --- Host Scanning Methods ---
     def list_host_directories(
         self, path_to_scan_str: Optional[str] = None, max_depth: int = 1
     ) -> Dict[str, Any]:
@@ -169,10 +165,7 @@ class FileManager:
         try:
             for entry in os.scandir(directory):
                 if entry.is_file(follow_symlinks=False):
-                    if any(
-                        entry.name.lower().endswith(ext)
-                        for ext in MODEL_FILE_EXTENSIONS
-                    ):
+                    if any(entry.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
                         return True
                 elif entry.is_dir(follow_symlinks=False):
                     if self._has_models_recursive(pathlib.Path(entry.path)):
@@ -181,9 +174,7 @@ class FileManager:
             return False
         return False
 
-    def _get_directory_contents(
-        self, directory: pathlib.Path, mode: str
-    ) -> List[Dict[str, Any]]:
+    def _get_directory_contents(self, directory: pathlib.Path, mode: str) -> List[Dict[str, Any]]:
         items = []
         for p in directory.iterdir():
             try:
@@ -199,9 +190,7 @@ class FileManager:
                     if is_dir:
                         if self._has_models_recursive(p):
                             items.append(item_data)
-                    elif any(
-                        p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS
-                    ):
+                    elif any(p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
                         items.append(item_data)
                 else:
                     items.append(item_data)
@@ -231,9 +220,7 @@ class FileManager:
                     break
 
         final_items = self._get_directory_contents(current_path, mode)
-        final_items.sort(
-            key=lambda x: (x["item_type"] != "directory", x["name"].lower())
-        )
+        final_items.sort(key=lambda x: (x["item_type"] != "directory", x["name"].lower()))
 
         final_relative_path = (
             str(current_path.relative_to(self.base_path))
