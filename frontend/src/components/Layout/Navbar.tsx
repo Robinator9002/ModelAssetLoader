@@ -25,6 +25,7 @@ interface NavbarProps {
     downloadCount: number;
     // Props for the new quick-start button
     activeUiProfile: UiProfileType | null;
+    isUiInstalled: boolean; // --- FIX: Added this prop ---
     isUiRunning: boolean;
     onQuickStart: () => void;
 }
@@ -69,6 +70,7 @@ const Navbar: React.FC<NavbarProps> = ({
     downloadStatus,
     downloadCount,
     activeUiProfile,
+    isUiInstalled, // --- FIX: Destructured the new prop ---
     isUiRunning,
     onQuickStart,
 }) => {
@@ -88,6 +90,9 @@ const Navbar: React.FC<NavbarProps> = ({
                 return <DownloadCloud size={18} />;
         }
     };
+
+    // --- FIX: The condition now checks if the UI is installed before rendering the button ---
+    const showQuickStartButton = activeUiProfile && activeUiProfile !== 'Custom' && isUiInstalled;
 
     return (
         <header className="app-navbar">
@@ -112,7 +117,7 @@ const Navbar: React.FC<NavbarProps> = ({
             </nav>
 
             <div className="navbar-actions">
-                {activeUiProfile && activeUiProfile !== 'Custom' && (
+                {showQuickStartButton && (
                     <button
                         className={`quick-start-button ${isUiRunning ? 'running' : 'stopped'}`}
                         onClick={onQuickStart}

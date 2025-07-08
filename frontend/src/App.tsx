@@ -220,7 +220,7 @@ function App() {
         const profileName = pathConfig?.uiProfile;
         if (!profileName || profileName === 'Custom') return null;
         return uiStatuses.find((s) => s.ui_name === profileName) || null;
-    }, [pathConfig, uiStatuses]);
+    }, [pathConfig.uiProfile, uiStatuses]);
 
     const handleQuickStart = useCallback(() => {
         if (!activeUiProfileForStart) return;
@@ -395,6 +395,7 @@ function App() {
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeDownloads.size}
                     activeUiProfile={pathConfig?.uiProfile || null}
+                    isUiInstalled={activeUiProfileForStart?.is_installed || false}
                     isUiRunning={activeUiProfileForStart?.is_running || false}
                     onQuickStart={handleQuickStart}
                 />
