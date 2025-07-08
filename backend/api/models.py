@@ -91,7 +91,7 @@ class MalFullConfiguration(BaseModel):
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
     config_mode: Optional[ConfigurationModePydantic]
-    adopted_ui_paths: Dict[UiNameTypePydantic, str] = Field(default_factory=dict)
+    # REMOVED: adopted_ui_paths field is gone.
 
     class Config:
         populate_by_name = True
@@ -259,7 +259,7 @@ class AllUiStatusResponse(BaseModel):
 
 
 class UiActionResponse(BaseModel):
-    """Standard response for actions that trigger a background task (install, run, adopt)."""
+    """Standard response for actions that trigger a background task (install, run)."""
 
     success: bool
     message: str
@@ -272,28 +272,7 @@ class UiStopRequest(BaseModel):
     task_id: str = Field(..., description="The task_id of the running process to be stopped.")
 
 
-# --- PHASE 2: NEW MODELS ---
-
-
-class UiPathValidationRequest(BaseModel):
-    """Request model for validating a path for UI adoption."""
-
-    path: str = Field(..., description="The absolute path to the UI directory to validate.")
-
-
-class UiPathValidationResponse(BaseModel):
-    """Response model for the UI path validation endpoint."""
-
-    success: bool
-    ui_name: Optional[UiNameTypePydantic] = Field(
-        None, description="The identified UI name if validation is successful."
-    )
-    error: Optional[str] = Field(None, description="An error message if validation fails.")
-
-
-class UiAdoptionRequest(BaseModel):
-    """Request model for adopting an existing UI installation."""
-
-    ui_name: UiNameTypePydantic = Field(..., description="The UI to adopt.")
-    path: str = Field(..., description="The absolute path to the UI directory.")
-    should_backup: bool = Field(True, description="Whether to create a backup before adopting.")
+# --- REMOVED: All models related to UI Adoption are gone ---
+# - UiPathValidationRequest
+# - UiPathValidationResponse
+# - UiAdoptionRequest

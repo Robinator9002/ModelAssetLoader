@@ -48,10 +48,7 @@ from backend.api.models import (
     UiActionResponse,
     UiStopRequest,
     UiNameTypePydantic,
-    # --- PHASE 2: NEW IMPORTS ---
-    UiPathValidationRequest,
-    UiPathValidationResponse,
-    UiAdoptionRequest,
+    # --- REMOVED: Adoption-related model imports are gone ---
 )
 
 # --- FastAPI Application Instance ---
@@ -176,7 +173,6 @@ async def search_models(
         raise HTTPException(status_code=500, detail="Internal error.")
 
 
-# ... (other endpoints remain the same) ...
 @app.get(
     "/api/models/{source}/{model_id:path}",
     response_model=HFModelDetails,
@@ -391,52 +387,16 @@ async def install_ui_environment(ui_name: UiNameTypePydantic):
     )
 
 
-# --- PHASE 2: NEW ENDPOINTS ---
-@app.post(
-    "/api/uis/validate-path",
-    response_model=UiPathValidationResponse,
-    tags=["UIs"],
-    summary="Validate a Directory for UI Adoption",
-)
-async def validate_ui_path_endpoint(request: UiPathValidationRequest):
-    """Checks if a given path is a valid, recognizable UI installation."""
-    result = await ui_manager.validate_ui_path(request.path)
-    return UiPathValidationResponse(**result)
-
-
-@app.post(
-    "/api/uis/adopt",
-    response_model=UiActionResponse,
-    tags=["UIs"],
-    summary="Adopt an Existing UI Installation",
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def adopt_ui_endpoint(request: UiAdoptionRequest):
-    """Triggers a background task to adopt an existing UI installation."""
-    task_id = str(uuid.uuid4())
-    download_tracker.start_tracking(
-        download_id=task_id,
-        repo_id="UI Adoption",
-        filename=request.ui_name,
-        task=asyncio.create_task(
-            ui_manager.adopt_ui_environment(
-                ui_name=request.ui_name,
-                path_str=request.path,
-                should_backup=request.should_backup,
-                task_id=task_id,
-            )
-        ),
-    )
-    return UiActionResponse(
-        success=True, message=f"Adoption process for {request.ui_name} started.", task_id=task_id
-    )
+# --- REMOVED: Adoption-related endpoints are gone ---
+# - /api/uis/validate-path
+# - /api/uis/adopt
 
 
 @app.delete(
     "/api/uis/{ui_name}",
     status_code=status.HTTP_200_OK,
     tags=["UIs"],
-    summary="Delete or Un-adopt a UI Environment",
+    summary="Delete a UI Environment",
 )
 async def delete_ui_environment(ui_name: UiNameTypePydantic):
     success = await ui_manager.delete_environment(ui_name=ui_name)
@@ -450,16 +410,12 @@ async def delete_ui_environment(ui_name: UiNameTypePydantic):
     response_model=UiActionResponse,
     tags=["UIs"],
     summary="Run an Installed UI",
-    status_code=status.HTTP_202_ACCEPTED,  # Use 202 for starting a background task
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def run_ui(ui_name: UiNameTypePydantic):
     """Triggers a background task to start a managed UI."""
     task_id = str(uuid.uuid4())
-    # --- LOGIC FIX ---
-    # The UiManager.run_ui method is synchronous and starts a background task.
-    # It should not be awaited.
     ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
-
     return UiActionResponse(
         success=True, message=f"Request to run {ui_name} accepted.", task_id=task_id
     )

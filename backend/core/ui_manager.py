@@ -32,12 +32,9 @@ class UiManager:
 
     def _get_install_path_for_ui(self, ui_name: UiNameType) -> Optional[pathlib.Path]:
         """
-        (Internal) Determines the correct installation path for a UI,
-        checking adopted paths first, then default managed paths.
+        (Internal) Determines the installation path for a UI.
+        This is now simplified to always be inside the managed_uis directory.
         """
-        adopted_path_str = self.config.adopted_ui_paths.get(ui_name)
-        if adopted_path_str:
-            return pathlib.Path(adopted_path_str)
         if self.config.base_path:
             return self.config.base_path / "managed_uis" / ui_name
         return None
@@ -170,20 +167,15 @@ class UiManager:
             await download_tracker.fail_download(task_id, error_message)
 
     async def delete_environment(self, ui_name: UiNameType) -> bool:
-        """Deletes a UI environment, whether adopted or managed."""
+        """Deletes a managed UI environment."""
         target_dir = self._get_install_path_for_ui(ui_name)
         if not target_dir:
             logger.error(f"Cannot delete {ui_name}, path could not be determined.")
             return False
 
         logger.info(f"Request to delete environment for '{ui_name}' at '{target_dir}'.")
-        if self.config.adopted_ui_paths.get(ui_name):
-            logger.info(f"'{ui_name}' is an adopted UI. Removing from configuration only.")
-            del self.config.adopted_ui_paths[ui_name]
-            self.config._save_config()
-            return True
-        else:
-            return await ui_operator.delete_ui_environment(target_dir)
+        # Simplified: always deletes the managed directory. No more adoption check.
+        return await ui_operator.delete_ui_environment(target_dir)
 
     def run_ui(self, ui_name: UiNameType, task_id: str):
         """Creates a background task to start and manage a UI process."""
@@ -246,7 +238,6 @@ class UiManager:
             )
             if process:
                 process.kill()  # Ensure it's killed if the managing task is cancelled.
-            # The fail_download will be handled by the stop_ui method logic
             raise
         except Exception as e:
             logger.error(f"Error in UI process task '{task_id}': {e}", exc_info=True)
@@ -274,80 +265,3 @@ class UiManager:
         except Exception as e:
             logger.error(f"Error terminating process {process.pid}: {e}", exc_info=True)
             process.kill()  # Force kill on error
-
-    async def validate_ui_path(self, path_str: str) -> Dict[str, Any]:
-        """Validates if a given path points to a known and valid UI installation."""
-        try:
-            path = pathlib.Path(path_str).resolve(strict=True)
-            ui_name, error = await ui_operator.validate_git_repo(path)
-            if error:
-                return {"success": False, "error": error}
-            return {"success": True, "ui_name": ui_name}
-        except FileNotFoundError:
-            return {"success": False, "error": "The specified path does not exist."}
-        except Exception as e:
-            logger.error(f"Unexpected error during path validation: {e}", exc_info=True)
-            return {"success": False, "error": "An unexpected server error occurred."}
-
-    async def adopt_ui_environment(
-        self, ui_name: UiNameType, path_str: str, should_backup: bool, task_id: str
-    ):
-        """Manages the full adoption process for an existing UI installation."""
-        try:
-            await download_tracker.update_task_progress(
-                task_id, 0, f"Starting adoption for {ui_name}..."
-            )
-            path = pathlib.Path(path_str)
-            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-
-            # --- Backup Step (if selected) ---
-            backup_path = None
-            if should_backup:
-                await download_tracker.update_task_progress(task_id, 10, f"Backing up {ui_name}...")
-                backup_path = await ui_operator.backup_ui_environment(path, streamer)
-                if not backup_path:
-                    raise RuntimeError("Backup process failed. Aborting adoption.")
-                await download_tracker.update_task_progress(task_id, 40, "Backup complete.")
-            else:
-                await download_tracker.update_task_progress(task_id, 40, "Skipping backup.")
-
-            # --- Configuration Step ---
-            await download_tracker.update_task_progress(
-                task_id, 50, f"Registering '{ui_name}' in configuration..."
-            )
-            success, msg = self.config.add_adopted_ui_path(ui_name, str(path))
-            if not success:
-                raise RuntimeError(f"Failed to update configuration: {msg}")
-            await streamer("Configuration updated successfully.")
-
-            # --- NEW: Dependency Repair Step ---
-            await download_tracker.update_task_progress(
-                task_id, 60, "Verifying and repairing dependencies..."
-            )
-            ui_info = await self._get_ui_info(ui_name, task_id)
-            if not ui_info or not ui_info.get("requirements_file"):
-                raise RuntimeError(
-                    f"No requirements file defined for {ui_name}, cannot repair environment."
-                )
-
-            req_file = ui_info["requirements_file"]
-            if not await ui_installer.install_dependencies(path, req_file, streamer):
-                # This is a non-fatal error. The UI is adopted, but we must warn the user.
-                await streamer(
-                    f"WARNING: Could not install/verify dependencies from {req_file}. The UI may not start correctly."
-                )
-            else:
-                await streamer("Dependencies verified successfully.")
-
-            # --- Finalization ---
-            await download_tracker.update_task_progress(task_id, 95, "Finalizing adoption...")
-            final_message = f"Successfully adopted and verified {ui_name}."
-            if backup_path:
-                final_message += f" Backup created at: {backup_path}"
-
-            await download_tracker.complete_download(task_id, final_message)
-
-        except Exception as e:
-            error_message = f"Adoption failed for {ui_name}: {e}"
-            logger.error(error_message, exc_info=True)
-            await download_tracker.fail_download(task_id, error_message)
