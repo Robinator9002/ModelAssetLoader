@@ -8,7 +8,6 @@ from typing import Callable, Coroutine, Any, Optional, Literal
 
 # --- Type Definitions ---
 StreamCallback = Callable[[str], Coroutine[Any, Any, None]]
-# Define a more descriptive progress callback that includes the phase
 PipPhase = Literal["collecting", "installing"]
 PipProgressCallback = Callable[[PipPhase, int, int, str], Coroutine[Any, Any, None]]
 
@@ -116,10 +115,7 @@ async def install_dependencies(
 
     logger.info(f"Installing dependencies from '{req_path}'...")
 
-    # --- State for the new two-phase progress tracking ---
     phase: PipPhase = "collecting"
-
-    # Get the count of top-level packages for the collecting phase heuristic
     try:
         with open(req_path, "r", encoding="utf-8") as f:
             top_level_packages = [
@@ -127,13 +123,11 @@ async def install_dependencies(
             ]
             top_level_total = len(top_level_packages)
     except Exception:
-        top_level_total = 1  # Fallback
+        top_level_total = 1
 
-    # State for the installing phase
     install_packages_total = 0
     processed_count = 0
 
-    # Regex to find package names from various pip output lines
     collect_regex = re.compile(r"Collecting\s+([a-zA-Z0-9-_.]+)")
     installing_regex = re.compile(r"Installing collected packages:\s+(.*)")
     success_regex = re.compile(r"Successfully installed\s+(.*)")
@@ -145,49 +139,39 @@ async def install_dependencies(
         if stream_callback:
             await stream_callback(line)
 
-        # --- Phase 1: Collecting ---
         if phase == "collecting":
             collect_match = collect_regex.match(line)
             if collect_match:
                 processed_count += 1
                 package_name = collect_match.group(1).strip()
                 if progress_callback:
-                    # Report progress against the top-level package count
+                    # Pass the raw count of 'Collecting' lines and the top-level total for the heuristic
                     await progress_callback(
-                        "collecting",
-                        min(processed_count, top_level_total),
-                        top_level_total,
-                        package_name,
+                        "collecting", processed_count, top_level_total, package_name
                     )
 
-            # --- The switch to Phase 2 ---
             installing_match = installing_regex.match(line)
             if installing_match:
                 phase = "installing"
-                # Get the true total number of packages to be installed
                 packages_to_install = [p.strip() for p in installing_match.group(1).split(",")]
                 install_packages_total = len(packages_to_install)
-                processed_count = 0  # Reset counter for the new phase
+                processed_count = 0
                 logger.info(
                     f"Switched to 'installing' phase. {install_packages_total} packages to install."
                 )
                 if progress_callback:
-                    # Signal the phase change with the new total
                     await progress_callback(
                         "installing", 0, install_packages_total, "Starting installation..."
                     )
 
-        # --- Phase 2: Installing ---
         elif phase == "installing":
-            # Check for both successfully installed and already satisfied packages
             line_processed_count = 0
             package_name = ""
 
             success_match = success_regex.search(line)
             if success_match:
-                # A single line can list multiple packages
                 line_processed_count = len(success_match.group(1).split())
-                package_name = success_match.group(1).split()[0]
+                package_name = success_match.group(1).split("-")[0]
 
             satisfied_match = satisfied_regex.search(line)
             if satisfied_match:

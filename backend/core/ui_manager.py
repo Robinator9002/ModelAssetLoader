@@ -78,7 +78,6 @@ class UiManager:
             await download_tracker.fail_download(task_id, msg)
             return
 
-        # --- Define progress ranges for our new multi-phase installation ---
         CLONE_END = 15.0
         VENV_END = 25.0
         COLLECT_START, COLLECT_END = 25.0, 70.0
@@ -90,37 +89,37 @@ class UiManager:
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
 
-            # Stage 1: Git Clone
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
             if not await ui_installer.clone_repo(git_url, target_dir, streamer):
                 raise RuntimeError(f"Failed to clone repository for {ui_name}.")
 
-            # Stage 2: Create Venv
             await download_tracker.update_task_progress(
                 task_id, CLONE_END, "Creating virtual environment..."
             )
             if not await ui_installer.create_venv(target_dir, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
-            # --- New Phased Progress Callback ---
             async def pip_progress_updater(
                 phase: ui_installer.PipPhase, current: int, total: int, package_name: str
             ):
                 if phase == "collecting":
-                    # Use the top-level package count as a heuristic for this phase
-                    fraction = current / total if total > 0 else 0
+                    # Heuristic: Assume the actual number of dependencies to collect is roughly
+                    # N times the number of top-level packages. A factor of 3 is a reasonable guess.
+                    # This prevents the progress from finishing too early.
+                    estimated_total = total * 3 if total > 0 else 1
+                    fraction = min(current / estimated_total, 1.0)  # Cap at 100% of this phase
+
                     progress = COLLECT_START + (fraction * COLLECT_RANGE)
-                    status_text = f"Collecting ({current}/{total}): {package_name}"
+                    status_text = f"Collecting: {package_name}"
                     await download_tracker.update_task_progress(task_id, progress, status_text)
 
                 elif phase == "installing":
-                    # Use the true total package count for accurate progress
+                    # This phase is accurate because 'total' is the true count from pip.
                     fraction = current / total if total > 0 else 0
                     progress = INSTALL_START + (fraction * INSTALL_RANGE)
                     status_text = f"Installing ({current}/{total}): {package_name}"
                     await download_tracker.update_task_progress(task_id, progress, status_text)
 
-            # Stage 3: Pip Install (now with two internal phases)
             await download_tracker.update_task_progress(
                 task_id, VENV_END, "Resolving dependencies..."
             )
@@ -129,7 +128,6 @@ class UiManager:
             ):
                 raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
 
-            # Finalization
             await download_tracker.update_task_progress(
                 task_id, INSTALL_END, "Finalizing installation..."
             )
@@ -140,11 +138,9 @@ class UiManager:
             logger.error(error_message, exc_info=True)
             await download_tracker.fail_download(task_id, error_message)
 
-    # ... (rest of the UiManager class remains unchanged)
     async def delete_environment(self, ui_name: UiNameType) -> bool:
         target_dir = self._get_install_path_for_ui(ui_name)
         if not target_dir:
-            logger.error(f"Cannot delete {ui_name}, path could not be determined.")
             return False
         return await ui_operator.delete_ui_environment(target_dir)
 
@@ -181,13 +177,9 @@ class UiManager:
                 task_id, 5, status_text="Process is running...", new_status="running"
             )
 
-            # This helper is defined elsewhere, assuming it streams output correctly
-            async def _monitor_and_stream_process(process, task_id):
-                # In a real scenario, this would stream stdout/stderr
-                await process.wait()
-                return process.returncode, "Process output"
-
-            return_code, output = await _monitor_and_stream_process(process, task_id)
+            # This would ideally be a more robust implementation
+            await process.wait()
+            return_code = process.returncode
 
             if return_code == 0:
                 await download_tracker.complete_download(task_id, f"{ui_name} finished.")
@@ -205,10 +197,8 @@ class UiManager:
     async def stop_ui(self, task_id: str):
         process = self.running_processes.get(task_id)
         if not process:
-            logger.warning(f"Stop request for task '{task_id}', but it's not running.")
             return
 
-        logger.info(f"Stopping process {process.pid} for task '{task_id}'...")
         try:
             process.terminate()
             await asyncio.wait_for(process.wait(), timeout=10)
