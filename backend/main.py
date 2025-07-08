@@ -48,7 +48,6 @@ from backend.api.models import (
     UiActionResponse,
     UiStopRequest,
     UiNameTypePydantic,
-    # --- REMOVED: Adoption-related model imports are gone ---
 )
 
 # --- FastAPI Application Instance ---
@@ -56,7 +55,7 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.2.0",
+    version="1.3.0",
 )
 
 # --- CORS Middleware ---
@@ -385,11 +384,6 @@ async def install_ui_environment(ui_name: UiNameTypePydantic):
     return UiActionResponse(
         success=True, message=f"Installation for {ui_name} started.", task_id=task_id
     )
-
-
-# --- REMOVED: Adoption-related endpoints are gone ---
-# - /api/uis/validate-path
-# - /api/uis/adopt
 
 
 @app.delete(

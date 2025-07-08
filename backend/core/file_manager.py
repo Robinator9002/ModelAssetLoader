@@ -42,7 +42,6 @@ class FileManager:
     def base_path(self) -> Optional[pathlib.Path]:
         return self.config.base_path
 
-    # --- Configuration Methods (Unchanged) ---
     def get_current_configuration(self) -> Dict[str, Any]:
         return self.config.get_current_configuration()
 
@@ -52,9 +51,13 @@ class FileManager:
         profile: Optional[UiProfileType],
         custom_model_type_paths: Optional[Dict[str, str]] = None,
         color_theme: Optional[ColorThemeType] = None,
+        config_mode: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """
+        Configures the application paths and settings.
+        """
         changed, message = self.config.update_configuration(
-            base_path_str, profile, custom_model_type_paths, color_theme
+            base_path_str, profile, custom_model_type_paths, color_theme, config_mode
         )
         success = "failed" not in message
         response = {
@@ -66,7 +69,6 @@ class FileManager:
             response["error"] = message
         return response
 
-    # --- Download Methods (Unchanged, but cancel/dismiss logic is now split) ---
     def start_download_model_file(
         self,
         source: str,
@@ -76,7 +78,6 @@ class FileManager:
         custom_sub_path: Optional[str] = None,
         revision: Optional[str] = None,
     ) -> Dict[str, Any]:
-        # (Code is unchanged)
         if source != "huggingface":
             return {
                 "success": False,
@@ -119,27 +120,21 @@ class FileManager:
             "download_id": download_id,
         }
 
-    # --- Explicit cancel method ---
     async def cancel_download(self, download_id: str):
         """Requests cancellation of a running download task."""
         logger.info(f"Cancel request received for download {download_id}.")
-        # This single tracker method handles cancelling the task if it's running.
         await download_tracker.cancel_and_remove(download_id)
 
-    # --- Dismiss now only handles removal from tracker ---
     async def dismiss_download(self, download_id: str):
         """Removes a finished (completed/error/cancelled) download from the tracker."""
         logger.info(f"Dismiss request received for download {download_id}.")
-        # This method is for cleanup after a download is in a final state.
         await download_tracker.remove_download(download_id)
 
-    # --- Host Scanning Methods (Unchanged) ---
     def list_host_directories(
         self, path_to_scan_str: Optional[str] = None, max_depth: int = 1
     ) -> Dict[str, Any]:
         return self.scanner.list_host_directories(path_to_scan_str, max_depth)
 
-    # --- Local File Management Methods ---
     def _resolve_and_validate_path(
         self, relative_path_str: Optional[str]
     ) -> Optional[pathlib.Path]:
