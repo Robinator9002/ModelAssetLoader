@@ -87,7 +87,6 @@ export interface MalFullConfiguration {
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
     config_mode: ConfigurationMode | null;
-    // REMOVED: adopted_ui_paths is gone
 }
 
 export interface PathConfigurationResponse {
@@ -124,6 +123,7 @@ export interface DownloadStatus {
     total_size_bytes: number;
     downloaded_bytes: number;
     error_message?: string | null;
+    status_text?: string | null; // --- FIX: Added the missing property ---
     target_path?: string | null;
 }
 
@@ -189,9 +189,8 @@ export interface UiActionResponse {
     task_id: string;
 }
 
-// --- REMOVED: Adoption-related interfaces are gone ---
-
 // --- API Functions ---
+// ... (rest of the API functions remain unchanged)
 export const searchModels = async (
     params: SearchModelParams,
 ): Promise<PaginatedModelListResponse> => {
@@ -455,10 +454,6 @@ export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; mes
         throw error;
     }
 };
-
-// --- REMOVED: Adoption-related API functions are gone ---
-// - validateUiPathAPI
-// - adoptUiAPI
 
 export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSocket => {
     const wsUrl = `${WS_BASE_URL}/ws/downloads`;

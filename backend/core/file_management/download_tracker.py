@@ -33,6 +33,7 @@ class DownloadStatus:
     total_size_bytes: int = 0
     downloaded_bytes: int = 0
     error_message: Optional[str] = None
+    status_text: Optional[str] = None  # ADDED: For in-progress status messages
     target_path: Optional[str] = None
     task: Optional[asyncio.Task] = field(default=None, repr=False, compare=False)
 
@@ -47,6 +48,7 @@ class DownloadStatus:
             "total_size_bytes": self.total_size_bytes,
             "downloaded_bytes": self.downloaded_bytes,
             "error_message": self.error_message,
+            "status_text": self.status_text,  # ADDED
             "target_path": self.target_path,
         }
 
@@ -114,15 +116,14 @@ class DownloadTracker:
         if task_id in self.active_downloads:
             status = self.active_downloads[task_id]
 
-            # --- FIX: Allow updating the status field directly ---
             if new_status:
                 status.status = new_status
             elif status.status not in ["downloading", "running"]:
                 status.status = "downloading"
 
             status.progress = round(progress, 2)
-            if status_text:
-                status.error_message = status_text  # Use error_message to convey status text
+            # CHANGED: Use the new dedicated field for status text.
+            status.status_text = status_text
 
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
@@ -132,6 +133,7 @@ class DownloadTracker:
             status.status = "completed"
             status.progress = 100.0
             status.target_path = final_path
+            status.status_text = "Completed"
             logger.info(f"Download {download_id} completed. Path: {final_path}")
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
@@ -140,6 +142,7 @@ class DownloadTracker:
             status = self.active_downloads[download_id]
             status.status = "cancelled" if cancelled else "error"
             status.error_message = error_message
+            status.status_text = "Failed" if not cancelled else "Cancelled"
             logger.error(f"Download {download_id} failed/cancelled: {error_message}")
             await self._broadcast({"type": "update", "data": status.to_dict()})
 

@@ -3,10 +3,14 @@ import asyncio
 import logging
 import pathlib
 import sys
-from typing import Callable, Coroutine, Any, Optional
+import re
+from typing import Callable, Coroutine, Any, Optional, Literal
 
-# Type definitions
+# --- Type Definitions ---
 StreamCallback = Callable[[str], Coroutine[Any, Any, None]]
+# Define a more descriptive progress callback that includes the phase
+PipPhase = Literal["collecting", "installing"]
+PipProgressCallback = Callable[[PipPhase, int, int, str], Coroutine[Any, Any, None]]
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +19,6 @@ async def _stream_process(
     process: asyncio.subprocess.Process,
     stream_callback: Optional[StreamCallback] = None,
 ) -> tuple[int, str]:
-    """
-    Reads stdout and stderr from a process line by line, optionally streaming it.
-    """
     output_lines = []
 
     async def read_stream(stream, stream_name):
@@ -39,7 +40,6 @@ async def _stream_process(
     await asyncio.gather(
         read_stream(process.stdout, "stdout"), read_stream(process.stderr, "stderr")
     )
-
     await process.wait()
     return_code = process.returncode
     logger.info(f"Process {process.pid} finished with exit code {return_code}.")
@@ -51,7 +51,6 @@ async def clone_repo(
     target_dir: pathlib.Path,
     stream_callback: Optional[StreamCallback] = None,
 ) -> bool:
-    """Clones a Git repository into a specified directory."""
     if target_dir.exists() and any(target_dir.iterdir()):
         logger.warning(f"Target directory {target_dir} already exists. Skipping clone.")
         if stream_callback:
@@ -60,7 +59,6 @@ async def clone_repo(
 
     logger.info(f"Cloning '{git_url}' into '{target_dir}'...")
     target_dir.mkdir(parents=True, exist_ok=True)
-
     process = await asyncio.create_subprocess_exec(
         "git",
         "clone",
@@ -79,7 +77,6 @@ async def clone_repo(
 async def create_venv(
     ui_dir: pathlib.Path, stream_callback: Optional[StreamCallback] = None
 ) -> bool:
-    """Creates a Python virtual environment inside the UI's directory."""
     venv_path = ui_dir / "venv"
     if venv_path.exists():
         logger.info(f"Virtual environment already exists at '{venv_path}'. Skipping.")
@@ -104,10 +101,8 @@ async def install_dependencies(
     ui_dir: pathlib.Path,
     requirements_file: str,
     stream_callback: Optional[StreamCallback] = None,
+    progress_callback: Optional[PipProgressCallback] = None,
 ) -> bool:
-    """
-    Installs dependencies from a requirements.txt file into the UI's venv.
-    """
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
         if sys.platform == "win32"
@@ -121,8 +116,94 @@ async def install_dependencies(
 
     logger.info(f"Installing dependencies from '{req_path}'...")
 
-    # --- FIX: Added a generous --timeout flag to the pip command ---
-    # This gives pip 10 minutes (600 seconds) to download any single package.
+    # --- State for the new two-phase progress tracking ---
+    phase: PipPhase = "collecting"
+
+    # Get the count of top-level packages for the collecting phase heuristic
+    try:
+        with open(req_path, "r", encoding="utf-8") as f:
+            top_level_packages = [
+                line.strip() for line in f if line.strip() and not line.startswith("#")
+            ]
+            top_level_total = len(top_level_packages)
+    except Exception:
+        top_level_total = 1  # Fallback
+
+    # State for the installing phase
+    install_packages_total = 0
+    processed_count = 0
+
+    # Regex to find package names from various pip output lines
+    collect_regex = re.compile(r"Collecting\s+([a-zA-Z0-9-_.]+)")
+    installing_regex = re.compile(r"Installing collected packages:\s+(.*)")
+    success_regex = re.compile(r"Successfully installed\s+(.*)")
+    satisfied_regex = re.compile(r"Requirement already satisfied:\s+([a-zA-Z0-9-_.]+)")
+
+    async def pip_streamer(line: str):
+        nonlocal phase, install_packages_total, processed_count
+
+        if stream_callback:
+            await stream_callback(line)
+
+        # --- Phase 1: Collecting ---
+        if phase == "collecting":
+            collect_match = collect_regex.match(line)
+            if collect_match:
+                processed_count += 1
+                package_name = collect_match.group(1).strip()
+                if progress_callback:
+                    # Report progress against the top-level package count
+                    await progress_callback(
+                        "collecting",
+                        min(processed_count, top_level_total),
+                        top_level_total,
+                        package_name,
+                    )
+
+            # --- The switch to Phase 2 ---
+            installing_match = installing_regex.match(line)
+            if installing_match:
+                phase = "installing"
+                # Get the true total number of packages to be installed
+                packages_to_install = [p.strip() for p in installing_match.group(1).split(",")]
+                install_packages_total = len(packages_to_install)
+                processed_count = 0  # Reset counter for the new phase
+                logger.info(
+                    f"Switched to 'installing' phase. {install_packages_total} packages to install."
+                )
+                if progress_callback:
+                    # Signal the phase change with the new total
+                    await progress_callback(
+                        "installing", 0, install_packages_total, "Starting installation..."
+                    )
+
+        # --- Phase 2: Installing ---
+        elif phase == "installing":
+            # Check for both successfully installed and already satisfied packages
+            line_processed_count = 0
+            package_name = ""
+
+            success_match = success_regex.search(line)
+            if success_match:
+                # A single line can list multiple packages
+                line_processed_count = len(success_match.group(1).split())
+                package_name = success_match.group(1).split()[0]
+
+            satisfied_match = satisfied_regex.search(line)
+            if satisfied_match:
+                line_processed_count = 1
+                package_name = satisfied_match.group(1)
+
+            if line_processed_count > 0:
+                processed_count += line_processed_count
+                if progress_callback:
+                    await progress_callback(
+                        "installing",
+                        min(processed_count, install_packages_total),
+                        install_packages_total,
+                        package_name,
+                    )
+
     process = await asyncio.create_subprocess_exec(
         str(venv_python),
         "-m",
@@ -137,6 +218,5 @@ async def install_dependencies(
         stderr=asyncio.subprocess.PIPE,
     )
 
-    return_code, _ = await _stream_process(process, stream_callback)
-
+    return_code, _ = await _stream_process(process, pip_streamer)
     return return_code == 0
