@@ -10,7 +10,7 @@ import DownloadModal from './components/Downloads/DownloadModal';
 import DownloadSidebar from './components/Downloads/DownloadSidebar';
 import FileManagerPage from './components/FileManager/FileManagerPage';
 import UiManagementPage from './components/Environments/UiManagementPage';
-import AdoptUiModal from './components/Environments/AdoptUiModal';
+// REMOVED: AdoptUiModal import is gone
 
 import {
     // All API functions are imported
@@ -48,7 +48,7 @@ export interface AppPathConfig {
     uiProfile: MalFullConfiguration['profile'];
     customPaths: MalFullConfiguration['custom_model_type_paths'];
     configMode: ConfigurationMode;
-    adoptedUiPaths: MalFullConfiguration['adopted_ui_paths'];
+    // REMOVED: adoptedUiPaths is gone
 }
 
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
@@ -58,7 +58,6 @@ const defaultPathConfig: AppPathConfig = {
     uiProfile: null,
     customPaths: {},
     configMode: 'automatic',
-    adoptedUiPaths: {},
 };
 
 function App() {
@@ -73,8 +72,7 @@ function App() {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const [modelForDownload, setModelForDownload] = useState<ModelDetails | null>(null);
     const [specificFileForDownload, setSpecificFileForDownload] = useState<ModelFile | null>(null);
-    const [isAdoptModalOpen, setIsAdoptModalOpen] = useState(false);
-    const [uiToAdopt, setUiToAdopt] = useState<UiNameType | null>(null);
+    // REMOVED: Adoption modal state is gone
 
     // --- Download & Task Management State ---
     const [activeDownloads, setActiveDownloads] = useState<Map<string, DownloadStatus>>(new Map());
@@ -114,15 +112,10 @@ function App() {
                     if (status?.download_id) {
                         setActiveDownloads((prev) => new Map(prev).set(status.download_id, status));
 
-                        // --- REACTIVITY FIX ---
-                        // If an installation or adoption task completes, refresh the UI statuses.
-                        if (
-                            status.status === 'completed' &&
-                            (status.repo_id === 'UI Adoption' ||
-                                status.repo_id === 'UI Installation')
-                        ) {
+                        // If an installation task completes, refresh the UI statuses.
+                        if (status.status === 'completed' && status.repo_id === 'UI Installation') {
                             logger.info(
-                                `Task for '${status.filename}' completed. Refreshing UI statuses.`,
+                                `Installation for '${status.filename}' completed. Refreshing UI statuses.`,
                             );
                             fetchUiData();
                         }
@@ -147,7 +140,7 @@ function App() {
             if (ws.current?.readyState === WebSocket.OPEN) ws.current.close();
             ws.current = null;
         };
-    }, [fetchUiData]); // Added fetchUiData as a dependency
+    }, [fetchUiData]);
 
     // --- Handlers for various UI actions ---
     const handleToggleDownloadsSidebar = useCallback(() => setDownloadsSidebarOpen((p) => !p), []);
@@ -247,7 +240,6 @@ function App() {
                 uiProfile: config.profile,
                 customPaths: config.custom_model_type_paths || {},
                 configMode: config.config_mode || 'automatic',
-                adoptedUiPaths: config.adopted_ui_paths || {},
             });
             setTheme(config.color_theme || 'dark');
             await fetchUiData();
@@ -280,7 +272,6 @@ function App() {
         (updatedConfig: AppPathConfig, updatedTheme?: ColorThemeType) => {
             setPathConfig(updatedConfig);
             if (updatedTheme) setTheme(updatedTheme);
-            // After config save, UI statuses might change (e.g., adopted paths)
             fetchUiData();
         },
         [fetchUiData],
@@ -301,30 +292,17 @@ function App() {
         const statuses = Array.from(activeDownloads.values());
         if (statuses.length === 0) return 'idle';
         if (statuses.some((s) => s.status === 'error')) return 'error';
-        if (statuses.some((s) => s.status === 'downloading' || s.status === 'pending'))
+        if (
+            statuses.some(
+                (s) =>
+                    s.status === 'downloading' || s.status === 'pending' || s.status === 'running',
+            )
+        )
             return 'downloading';
         return 'completed';
     }, [activeDownloads]);
 
-    // --- Adoption Modal Handlers ---
-    const handleOpenAdoptModal = useCallback((uiName: UiNameType) => {
-        setUiToAdopt(uiName);
-        setIsAdoptModalOpen(true);
-    }, []);
-
-    const handleCloseAdoptModal = useCallback(() => {
-        setIsAdoptModalOpen(false);
-        setUiToAdopt(null);
-    }, []);
-
-    const handleAdoptionStart = useCallback(
-        (taskId: string) => {
-            handleCloseAdoptModal();
-            setDownloadsSidebarOpen(true);
-            // The websocket handler will now automatically refresh UI data upon completion.
-        },
-        [handleCloseAdoptModal],
-    );
+    // REMOVED: All adoption modal handlers are gone.
 
     const renderActiveTabContent = () => {
         if (isConfigLoading) return <p className="loading-message">Loading configuration...</p>;
@@ -358,7 +336,6 @@ function App() {
                         onStop={handleStopUi}
                         onDelete={handleDeleteUi}
                         isBusy={isUiBusy}
-                        onAdopt={handleOpenAdoptModal}
                     />
                 );
             case 'configuration':
@@ -433,12 +410,7 @@ function App() {
                 specificFileToDownload={specificFileForDownload}
                 onDownloadsStarted={handleDownloadsStarted}
             />
-            <AdoptUiModal
-                isOpen={isAdoptModalOpen}
-                uiName={uiToAdopt}
-                onClose={handleCloseAdoptModal}
-                onAdoptionStart={handleAdoptionStart}
-            />
+            {/* REMOVED: AdoptUiModal is gone from the JSX */}
         </div>
     );
 }

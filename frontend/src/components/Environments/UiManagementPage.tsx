@@ -1,7 +1,7 @@
 // frontend/src/components/Environments/UiManagementPage.tsx
 import React from 'react';
 import { type AvailableUiItem, type ManagedUiStatus, type UiNameType } from '../../api/api';
-import { Layers, Download, Settings, Play, CheckCircle, Loader2, FolderPlus } from 'lucide-react';
+import { Layers, Download, Settings, Play, CheckCircle, Loader2 } from 'lucide-react';
 
 /**
  * Props for the UiManagementPage component.
@@ -14,8 +14,7 @@ interface UiManagementPageProps {
     onStop: (taskId: string) => void;
     onDelete: (uiName: UiNameType) => void;
     isBusy: (uiName: UiNameType) => boolean;
-    // --- PHASE 3: NEW PROP ---
-    onAdopt: (uiName: UiNameType) => void;
+    // REMOVED: onAdopt prop is gone
 }
 
 /**
@@ -29,7 +28,6 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
     onStop,
     onDelete,
     isBusy,
-    onAdopt, // --- PHASE 3: NEW PROP ---
 }) => {
     const getCombinedUiData = () => {
         const statusMap = new Map(uiStatuses.map((s) => [s.ui_name, s]));
@@ -107,29 +105,21 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                             </div>
                             <div className="modal-actions ui-card-actions">
                                 {!ui.is_installed ? (
-                                    // --- PHASE 3: MODIFIED BUTTONS ---
-                                    <>
-                                        <button
-                                            className="button button-secondary"
-                                            onClick={() => onAdopt(ui.ui_name)}
-                                            disabled={isUiBusy}
-                                        >
-                                            <FolderPlus size={18} /> Adopt Existing
-                                        </button>
-                                        <button
-                                            className="button button-primary"
-                                            onClick={() => onInstall(ui.ui_name)}
-                                            disabled={isUiBusy}
-                                        >
-                                            <Download size={18} /> Clean Install
-                                        </button>
-                                    </>
+                                    // SIMPLIFIED: Only the "Clean Install" button remains.
+                                    // It now takes up the full available width.
+                                    <button
+                                        className="button button-primary full-width"
+                                        onClick={() => onInstall(ui.ui_name)}
+                                        disabled={isUiBusy}
+                                    >
+                                        <Download size={18} /> Clean Install
+                                    </button>
                                 ) : (
                                     <>
                                         <button
                                             className="button"
                                             onClick={() => onDelete(ui.ui_name)}
-                                            title="This will un-adopt an existing installation or delete a managed one."
+                                            title="This will delete the managed installation."
                                         >
                                             <Settings size={18} /> Manage
                                         </button>

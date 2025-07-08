@@ -87,7 +87,7 @@ export interface MalFullConfiguration {
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
     config_mode: ConfigurationMode | null;
-    adopted_ui_paths: Partial<Record<UiNameType, string>>;
+    // REMOVED: adopted_ui_paths is gone
 }
 
 export interface PathConfigurationResponse {
@@ -119,7 +119,6 @@ export interface DownloadStatus {
     download_id: string;
     filename: string;
     repo_id: string;
-    // --- FIX: Add 'running' to the possible states ---
     status: 'pending' | 'downloading' | 'running' | 'completed' | 'error' | 'cancelled';
     progress: number;
     total_size_bytes: number;
@@ -190,24 +189,9 @@ export interface UiActionResponse {
     task_id: string;
 }
 
-export interface UiPathValidationRequest {
-    path: string;
-}
-
-export interface UiPathValidationResponse {
-    success: boolean;
-    ui_name?: UiNameType | null;
-    error?: string | null;
-}
-
-export interface UiAdoptionRequest {
-    ui_name: UiNameType;
-    path: string;
-    should_backup: boolean;
-}
+// --- REMOVED: Adoption-related interfaces are gone ---
 
 // --- API Functions ---
-// (All existing API functions remain the same)
 export const searchModels = async (
     params: SearchModelParams,
 ): Promise<PaginatedModelListResponse> => {
@@ -303,7 +287,6 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
             custom_model_type_paths: response.data.custom_model_type_paths || {},
             color_theme: response.data.color_theme || 'dark',
             config_mode: response.data.config_mode || 'automatic',
-            adopted_ui_paths: response.data.adopted_ui_paths || {},
         };
     } catch (error) {
         console.error('Error fetching current configuration:', error);
@@ -313,7 +296,6 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
             custom_model_type_paths: {},
             color_theme: 'dark',
             config_mode: 'automatic',
-            adopted_ui_paths: {},
         };
     }
 };
@@ -474,40 +456,9 @@ export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; mes
     }
 };
 
-export const validateUiPathAPI = async (path: string): Promise<UiPathValidationResponse> => {
-    try {
-        const request: UiPathValidationRequest = { path };
-        const response = await apiClient.post<UiPathValidationResponse>(
-            '/uis/validate-path',
-            request,
-        );
-        return response.data;
-    } catch (error) {
-        console.error(`Error validating path ${path}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data) {
-            return {
-                success: false,
-                error: axiosError.response.data.detail || 'An unknown error occurred.',
-            };
-        }
-        throw error;
-    }
-};
-
-export const adoptUiAPI = async (request: UiAdoptionRequest): Promise<UiActionResponse> => {
-    try {
-        const response = await apiClient.post<UiActionResponse>('/uis/adopt', request);
-        return response.data;
-    } catch (error) {
-        console.error(`Error starting adoption for ${request.ui_name}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
-    }
-};
+// --- REMOVED: Adoption-related API functions are gone ---
+// - validateUiPathAPI
+// - adoptUiAPI
 
 export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSocket => {
     const wsUrl = `${WS_BASE_URL}/ws/downloads`;
