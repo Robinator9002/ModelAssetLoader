@@ -39,7 +39,6 @@ class UiManager:
         if adopted_path_str:
             return pathlib.Path(adopted_path_str)
         if self.config.base_path:
-            # The base path for M.A.L. installations is a dedicated subfolder.
             return self.config.base_path / "managed_uis" / ui_name
         return None
 
@@ -83,7 +82,7 @@ class UiManager:
     async def install_ui_environment(
         self, ui_name: UiNameType, base_install_path: pathlib.Path, task_id: str
     ):
-        """Manages the full installation process for a given UI with granular progress."""
+        """Manages the full installation process for a given UI with stage-based progress."""
         ui_info = await self._get_ui_info(ui_name, task_id)
         if not ui_info:
             return
@@ -100,41 +99,37 @@ class UiManager:
             await download_tracker.fail_download(task_id, error_message)
             return
 
-        CLONE_PROGRESS_END, VENV_PROGRESS_END, PIP_INSTALL_START, PIP_INSTALL_END = (
-            15.0,
-            25.0,
-            25.0,
-            95.0,
-        )
+        # Define progress percentages for each major stage
+        CLONE_PROGRESS_END = 15.0
+        VENV_PROGRESS_END = 25.0
+        PIP_INSTALL_END = 95.0
+
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
 
+            # Stage 1: Git Clone
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
             if not await ui_installer.clone_repo(git_url, target_dir, streamer):
                 raise RuntimeError(f"Failed to clone repository for {ui_name}.")
+
+            # Stage 2: Create Venv
             await download_tracker.update_task_progress(
                 task_id, CLONE_PROGRESS_END, "Creating virtual environment..."
             )
-
             if not await ui_installer.create_venv(target_dir, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
+
+            # Stage 3: Pip Install
             await download_tracker.update_task_progress(
-                task_id, VENV_PROGRESS_END, "Installing dependencies..."
+                task_id, VENV_PROGRESS_END, "Installing dependencies (this may take a while)..."
             )
-
-            async def pip_progress_callback(processed: int, total: int):
-                if total == 0:
-                    return
-                pip_progress = PIP_INSTALL_START + (
-                    (processed / total) * (PIP_INSTALL_END - PIP_INSTALL_START)
-                )
-                await download_tracker.update_task_progress(task_id, pip_progress)
-
-            if not await ui_installer.install_dependencies(
-                target_dir, req_file, streamer, pip_progress_callback
-            ):
+            if not await ui_installer.install_dependencies(target_dir, req_file, streamer):
                 raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
 
+            # Finalization
+            await download_tracker.update_task_progress(
+                task_id, PIP_INSTALL_END, "Finalizing installation..."
+            )
             await download_tracker.complete_download(task_id, str(target_dir))
 
         except Exception as e:
@@ -160,7 +155,6 @@ class UiManager:
 
     def run_ui(self, ui_name: UiNameType, task_id: str):
         """Creates a background task to start and manage a UI process."""
-        # This is now a synchronous call that kicks off an async task.
         download_tracker.start_tracking(
             download_id=task_id,
             repo_id=f"UI Process",
