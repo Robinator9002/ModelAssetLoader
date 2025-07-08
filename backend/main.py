@@ -456,13 +456,14 @@ async def run_ui(ui_name: UiNameTypePydantic):
     """Triggers a background task to start a managed UI."""
     task_id = str(uuid.uuid4())
     # --- LOGIC FIX ---
-    # The UiManager now determines the path itself. We just need to give it the name and a task ID.
-    # This call is now non-blocking and immediately returns.
-    await ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
+    # The UiManager.run_ui method is synchronous and starts a background task.
+    # It should not be awaited.
+    ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
 
     return UiActionResponse(
         success=True, message=f"Request to run {ui_name} accepted.", task_id=task_id
     )
+
 
 @app.post(
     "/api/uis/stop",
