@@ -1,287 +1,263 @@
-# backend/core/ui_manager.py
-import asyncio
+# backend/core/file_manager.py
 import logging
 import pathlib
-from typing import Optional, Dict, List, Any
+import asyncio
+import uuid
+import os
+import shutil
+from typing import Dict, Any, Optional, List
 
-from .constants.constants import UI_REPOSITORIES, UiNameType
-from .ui_management import ui_installer, ui_operator
-from .file_management.download_tracker import download_tracker, BroadcastCallable
+# Import specialized managers and helpers
 from .file_management.config_manager import ConfigManager
-from backend.api.models import ManagedUiStatus
+from .file_management.path_resolver import PathResolver
+from .file_management.model_downloader import ModelDownloader
+from .file_management.host_scanner import HostScanner
+from .file_management.download_tracker import download_tracker
+from .constants.constants import (
+    ModelType,
+    UiProfileType,
+    ColorThemeType,
+    MODEL_FILE_EXTENSIONS,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class UiManager:
+class FileManager:
     """
-    Orchestrates the installation, execution, and management of different AI UIs.
+    Acts as a high-level orchestrator for all file and model management operations.
     """
 
-    def __init__(
+    def __init__(self):
+        """Initializes all the specialized manager components."""
+        self.config = ConfigManager()
+        self.paths = PathResolver(self.config)
+        self.downloader = ModelDownloader()
+        self.scanner = HostScanner()
+        logger.info(
+            f"FileManager initialized. Profile: '{self.config.ui_profile}', Base Path: '{self.config.base_path}'."
+        )
+
+    @property
+    def base_path(self) -> Optional[pathlib.Path]:
+        return self.config.base_path
+
+    # --- Configuration Methods (Unchanged) ---
+    def get_current_configuration(self) -> Dict[str, Any]:
+        return self.config.get_current_configuration()
+
+    def configure_paths(
         self,
-        config_manager: ConfigManager,
-        broadcast_callback: Optional[BroadcastCallable] = None,
-    ):
-        """Initializes the UiManager with a reference to the configuration."""
-        self.config = config_manager
-        self.broadcast_callback = broadcast_callback
-        self.running_processes: Dict[str, asyncio.subprocess.Process] = {}
-        self.running_ui_tasks: Dict[UiNameType, str] = {}
-        logger.info("UiManager initialized.")
-
-    def _get_install_path_for_ui(self, ui_name: UiNameType) -> Optional[pathlib.Path]:
-        """
-        (Internal) Determines the correct installation path for a UI,
-        checking adopted paths first, then default managed paths.
-        """
-        adopted_path_str = self.config.adopted_ui_paths.get(ui_name)
-        if adopted_path_str:
-            return pathlib.Path(adopted_path_str)
-        if self.config.base_path:
-            return self.config.base_path / "managed_uis" / ui_name
-        return None
-
-    async def get_all_statuses(self) -> List[ManagedUiStatus]:
-        """
-        Checks the local environment for all known UIs and returns their status,
-        now aware of both adopted and managed installations.
-        """
-        statuses: List[ManagedUiStatus] = []
-        for ui_name in UI_REPOSITORIES:
-            install_path = self._get_install_path_for_ui(ui_name)
-            is_installed = install_path is not None and install_path.is_dir()
-            running_task_id = self.running_ui_tasks.get(ui_name)
-            is_running = running_task_id is not None
-            statuses.append(
-                ManagedUiStatus(
-                    ui_name=ui_name,
-                    is_installed=is_installed,
-                    is_running=is_running,
-                    install_path=str(install_path) if is_installed else None,
-                    running_task_id=running_task_id,
-                )
-            )
-        return statuses
-
-    async def _get_ui_info(self, ui_name: UiNameType, task_id: str) -> Optional[dict]:
-        """(Internal) Safely gets UI info and fails the task if not found."""
-        ui_info = UI_REPOSITORIES.get(ui_name)
-        if not ui_info:
-            logger.error(f"Unknown UI '{ui_name}'. Cannot proceed.")
-            await download_tracker.fail_download(
-                task_id, f"Unknown UI '{ui_name}'. Action aborted."
-            )
-        return ui_info
-
-    async def _stream_progress_to_tracker(self, task_id: str, line: str):
-        """(Internal) Formats and sends log messages via the broadcast callback."""
-        logger.info(f"[{task_id}] {line}")
-        if self.broadcast_callback:
-            await self.broadcast_callback({"type": "log", "task_id": task_id, "message": line})
-
-    async def install_ui_environment(
-        self, ui_name: UiNameType, base_install_path: pathlib.Path, task_id: str
-    ):
-        """Manages the full installation process for a given UI with granular progress."""
-        ui_info = await self._get_ui_info(ui_name, task_id)
-        if not ui_info:
-            return
-
-        target_dir = base_install_path / ui_name
-        git_url = ui_info["git_url"]
-        req_file = ui_info.get("requirements_file")
-
-        if not req_file:
-            error_message = (
-                f"Installation failed: 'requirements_file' not defined for {ui_name} in constants."
-            )
-            logger.error(error_message)
-            await download_tracker.fail_download(task_id, error_message)
-            return
-
-        CLONE_PROGRESS_END, VENV_PROGRESS_END, PIP_INSTALL_START, PIP_INSTALL_END = (
-            15.0,
-            25.0,
-            25.0,
-            95.0,
+        base_path_str: Optional[str],
+        profile: Optional[UiProfileType],
+        custom_model_type_paths: Optional[Dict[str, str]] = None,
+        color_theme: Optional[ColorThemeType] = None,
+    ) -> Dict[str, Any]:
+        changed, message = self.config.update_configuration(
+            base_path_str, profile, custom_model_type_paths, color_theme
         )
+        success = "failed" not in message
+        response = {
+            "success": success,
+            "message": message,
+            "configured_base_path": (str(self.config.base_path) if self.config.base_path else None),
+        }
+        if not success:
+            response["error"] = message
+        return response
+
+    # --- Download Methods (Unchanged, but cancel/dismiss logic is now split) ---
+    def start_download_model_file(
+        self,
+        source: str,
+        repo_id: str,
+        filename: str,
+        model_type: ModelType,
+        custom_sub_path: Optional[str] = None,
+        revision: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        # (Code is unchanged)
+        if source != "huggingface":
+            return {
+                "success": False,
+                "error": f"Source '{source}' is not supported for downloads.",
+            }
+        if not self.base_path:
+            return {
+                "success": False,
+                "error": "Base path is not configured. Please configure it first.",
+            }
+        final_save_path = self.paths.resolve_final_save_path(filename, model_type, custom_sub_path)
+        if not final_save_path:
+            return {
+                "success": False,
+                "error": f"Could not resolve a valid save path for model type '{model_type}'.",
+            }
+        download_id = str(uuid.uuid4())
+        download_task = asyncio.create_task(
+            self.downloader.download_model_file(
+                download_id=download_id,
+                repo_id=repo_id,
+                hf_filename=filename,
+                target_directory=final_save_path.parent,
+                target_filename_override=final_save_path.name,
+                revision=revision,
+            )
+        )
+        download_tracker.start_tracking(
+            download_id=download_id,
+            repo_id=repo_id,
+            filename=final_save_path.name,
+            task=download_task,
+        )
+        logger.info(
+            f"Queued download {download_id} for '{filename}' -> '{final_save_path}' as a background task."
+        )
+        return {
+            "success": True,
+            "message": "Download started.",
+            "download_id": download_id,
+        }
+
+    # --- Explicit cancel method ---
+    async def cancel_download(self, download_id: str):
+        """Requests cancellation of a running download task."""
+        logger.info(f"Cancel request received for download {download_id}.")
+        # This single tracker method handles cancelling the task if it's running.
+        await download_tracker.cancel_and_remove(download_id)
+
+    # --- Dismiss now only handles removal from tracker ---
+    async def dismiss_download(self, download_id: str):
+        """Removes a finished (completed/error/cancelled) download from the tracker."""
+        logger.info(f"Dismiss request received for download {download_id}.")
+        # This method is for cleanup after a download is in a final state.
+        await download_tracker.remove_download(download_id)
+
+    # --- Host Scanning Methods (Unchanged) ---
+    def list_host_directories(
+        self, path_to_scan_str: Optional[str] = None, max_depth: int = 1
+    ) -> Dict[str, Any]:
+        return self.scanner.list_host_directories(path_to_scan_str, max_depth)
+
+    # --- Local File Management Methods ---
+    def _resolve_and_validate_path(
+        self, relative_path_str: Optional[str]
+    ) -> Optional[pathlib.Path]:
+        if not self.base_path:
+            return None
+        if not relative_path_str:
+            return self.base_path
+        clean_path_str = os.path.normpath(relative_path_str.strip())
+        if os.path.isabs(clean_path_str) or ".." in clean_path_str.split(os.sep):
+            return None
         try:
-            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-
-            # --- FIXED: Use the new purpose-built progress update method ---
-            await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
-            if not await ui_installer.clone_repo(git_url, target_dir, streamer):
-                raise RuntimeError(f"Failed to clone repository for {ui_name}.")
-            await download_tracker.update_task_progress(
-                task_id, CLONE_PROGRESS_END, "Creating virtual environment..."
-            )
-
-            if not await ui_installer.create_venv(target_dir, streamer):
-                raise RuntimeError(f"Failed to create venv for {ui_name}.")
-            await download_tracker.update_task_progress(
-                task_id, VENV_PROGRESS_END, "Installing dependencies..."
-            )
-
-            async def pip_progress_callback(processed: int, total: int):
-                if total == 0:
-                    return
-                pip_progress = PIP_INSTALL_START + (
-                    (processed / total) * (PIP_INSTALL_END - PIP_INSTALL_START)
-                )
-                await download_tracker.update_task_progress(task_id, pip_progress)
-
-            if not await ui_installer.install_dependencies(
-                target_dir, req_file, streamer, pip_progress_callback
+            absolute_path = (self.base_path / clean_path_str).resolve()
+            if (
+                self.base_path.resolve() not in absolute_path.parents
+                and absolute_path != self.base_path.resolve()
             ):
-                raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
+                return None
+            return absolute_path
+        except Exception:
+            return None
 
-            await download_tracker.complete_download(task_id, str(target_dir))
-
-        except Exception as e:
-            error_message = f"Installation failed for {ui_name}: {e}"
-            logger.error(error_message, exc_info=True)
-            await download_tracker.fail_download(task_id, error_message)
-
-    async def delete_environment(self, ui_name: UiNameType) -> bool:
-        """Deletes a UI environment, whether adopted or managed."""
-        target_dir = self._get_install_path_for_ui(ui_name)
-        if not target_dir:
-            logger.error(f"Cannot delete {ui_name}, path could not be determined.")
+    def _has_models_recursive(self, directory: pathlib.Path) -> bool:
+        try:
+            for entry in os.scandir(directory):
+                if entry.is_file(follow_symlinks=False):
+                    if any(entry.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
+                        return True
+                elif entry.is_dir(follow_symlinks=False):
+                    if self._has_models_recursive(pathlib.Path(entry.path)):
+                        return True
+        except (PermissionError, FileNotFoundError):
             return False
+        return False
 
-        logger.info(f"Request to delete environment for '{ui_name}' at '{target_dir}'.")
-        if self.config.adopted_ui_paths.get(ui_name):
-            logger.info(f"'{ui_name}' is an adopted UI. Removing from configuration only.")
-            del self.config.adopted_ui_paths[ui_name]
-            self.config._save_config()
-            return True
-        else:
-            return await ui_operator.delete_ui_environment(target_dir)
+    def _get_directory_contents(self, directory: pathlib.Path, mode: str) -> List[Dict[str, Any]]:
+        items = []
+        for p in directory.iterdir():
+            try:
+                is_dir = p.is_dir()
+                item_data = {
+                    "name": p.name,
+                    "path": str(p.relative_to(self.base_path)),
+                    "item_type": "directory" if is_dir else "file",
+                    "size": p.stat().st_size if not is_dir else None,
+                    "last_modified": p.stat().st_mtime,
+                }
+                if mode == "models":
+                    if is_dir:
+                        if self._has_models_recursive(p):
+                            items.append(item_data)
+                    elif any(p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
+                        items.append(item_data)
+                else:
+                    items.append(item_data)
+            except (FileNotFoundError, PermissionError):
+                continue
+        return items
 
-    async def run_ui(self, ui_name: UiNameType, task_id: str):
-        """Starts a UI as a managed background process from its correct location."""
-        if task_id in self.running_processes:
-            await self._stream_progress_to_tracker(
-                task_id, f"ERROR: Task ID '{task_id}' is already in use."
-            )
-            return
+    def list_managed_files(
+        self, relative_path_str: Optional[str], mode: str = "explorer"
+    ) -> Dict[str, Any]:
+        current_path = self._resolve_and_validate_path(relative_path_str)
+        if not current_path or not current_path.is_dir():
+            return {"path": relative_path_str, "items": []}
 
-        ui_info = await self._get_ui_info(ui_name, task_id)
-        if not ui_info:
-            return
+        if mode == "models":
+            # Limit the drill-down to prevent infinite loops with symlinks, etc.
+            for _ in range(10):  # Max drill-down depth of 10
+                items = self._get_directory_contents(current_path, mode="models")
+                if len(items) == 1 and items[0]["item_type"] == "directory":
+                    new_path_str = items[0]["path"]
+                    resolved_new_path = self._resolve_and_validate_path(new_path_str)
+                    if resolved_new_path:
+                        current_path = resolved_new_path
+                    else:
+                        break
+                else:
+                    break
 
-        target_dir = self._get_install_path_for_ui(ui_name)
-        if not target_dir or not target_dir.is_dir():
-            error_msg = f"ERROR: Cannot run {ui_name}. Installation directory not found."
-            await self._stream_progress_to_tracker(task_id, error_msg)
-            await download_tracker.fail_download(task_id, error_msg)
-            return
+        final_items = self._get_directory_contents(current_path, mode)
+        final_items.sort(key=lambda x: (x["item_type"] != "directory", x["name"].lower()))
 
-        start_script = ui_info.get("start_script")
-        if not start_script:
-            error_msg = f"ERROR: No 'start_script' defined for {ui_name} in constants.py."
-            await self._stream_progress_to_tracker(task_id, error_msg)
-            await download_tracker.fail_download(task_id, error_msg)
-            return
-
-        await download_tracker.start_tracking(
-            download_id=task_id,
-            repo_id=f"UI Process",
-            filename=ui_name,
-            task=asyncio.create_task(
-                self._run_and_manage_process(ui_name, target_dir, start_script, task_id)
-            ),
+        final_relative_path = (
+            str(current_path.relative_to(self.base_path))
+            if current_path != self.base_path
+            else None
         )
+        if final_relative_path == ".":
+            final_relative_path = None
 
-    async def _run_and_manage_process(
-        self, ui_name: UiNameType, target_dir: pathlib.Path, start_script: str, task_id: str
-    ):
-        """(Internal) Helper to contain the full lifecycle of running a process."""
+        return {"path": final_relative_path, "items": final_items}
+
+    def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
+        target_path = self._resolve_and_validate_path(relative_path_str)
+        if not target_path or not target_path.exists():
+            return {"success": False, "error": "Path not found."}
+        if target_path == self.base_path:
+            return {"success": False, "error": "Cannot delete root."}
         try:
-            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            process = await ui_operator.run_ui(target_dir, start_script, streamer)
-            if not process:
-                raise RuntimeError("UI process failed to start.")
-
-            self.running_processes[task_id] = process
-            self.running_ui_tasks[ui_name] = task_id
-            logger.info(f"Process {process.pid} for task '{task_id}' ({ui_name}) is managed.")
-
-            status = download_tracker.active_downloads.get(task_id)
-            if status:
-                status.status = "downloading"
-                await download_tracker._broadcast({"type": "update", "data": status.to_dict()})
-
-            await process.wait()
-            await download_tracker.complete_download(task_id, f"{ui_name} process finished.")
+            if target_path.is_dir():
+                shutil.rmtree(target_path)
+            else:
+                os.remove(target_path)
+            return {"success": True, "message": "Item deleted."}
         except Exception as e:
-            await download_tracker.fail_download(task_id, f"ERROR: {e}")
-        finally:
-            self.running_processes.pop(task_id, None)
-            self.running_ui_tasks.pop(ui_name, None)
+            return {"success": False, "error": str(e)}
 
-    async def stop_ui(self, task_id: str):
-        """Stops a running UI process."""
-        if task_id not in self.running_processes:
-            logger.warning(f"Request to stop task '{task_id}', but it is not running.")
-            return
-
-        process = self.running_processes[task_id]
-        logger.info(f"Stopping process {process.pid} for task '{task_id}'...")
+    def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
+        target_path = self._resolve_and_validate_path(relative_path_str)
+        if not target_path or not target_path.is_file():
+            return {"success": False, "error": "Not a file."}
+        allowed_extensions = {".txt", ".md", ".json", ".yaml", ".yml", ".py"}
+        if target_path.suffix.lower() not in allowed_extensions:
+            return {"success": False, "error": "Preview not allowed."}
+        if target_path.stat().st_size > 1024 * 1024:
+            return {"success": False, "error": "File too large."}
         try:
-            process.terminate()
-            await asyncio.wait_for(process.wait(), timeout=10.0)
-        except asyncio.TimeoutError:
-            process.kill()
+            content = target_path.read_text(encoding="utf-8")
+            return {"success": True, "path": relative_path_str, "content": content}
         except Exception as e:
-            logger.error(f"Error terminating process {process.pid}: {e}", exc_info=True)
-            process.kill()
-        finally:
-            await download_tracker.cancel_and_remove(task_id, "Process stopped by user.")
-
-    async def validate_ui_path(self, path_str: str) -> Dict[str, Any]:
-        """Validates if a given path points to a known and valid UI installation."""
-        try:
-            path = pathlib.Path(path_str).resolve(strict=True)
-            ui_name, error = await ui_operator.validate_git_repo(path)
-            if error:
-                return {"success": False, "error": error}
-            return {"success": True, "ui_name": ui_name}
-        except FileNotFoundError:
-            return {"success": False, "error": "The specified path does not exist."}
-        except Exception as e:
-            logger.error(f"Unexpected error during path validation: {e}", exc_info=True)
-            return {"success": False, "error": "An unexpected server error occurred."}
-
-    async def adopt_ui_environment(
-        self, ui_name: UiNameType, path_str: str, should_backup: bool, task_id: str
-    ):
-        """Manages the full adoption process for an existing UI installation."""
-        try:
-            path = pathlib.Path(path_str)
-            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-
-            backup_path = None
-            if should_backup:
-                await download_tracker.update_task_progress(task_id, 10, f"Backing up {ui_name}...")
-                backup_path = await ui_operator.backup_ui_environment(path, streamer)
-                if not backup_path:
-                    raise RuntimeError("Backup process failed. Aborting adoption.")
-
-            await download_tracker.update_task_progress(task_id, 75, f"Registering '{ui_name}'...")
-            success, msg = self.config.add_adopted_ui_path(ui_name, str(path))
-            if not success:
-                raise RuntimeError(f"Failed to update configuration: {msg}")
-            await streamer("Configuration updated.")
-
-            final_message = f"Successfully adopted {ui_name}."
-            if backup_path:
-                final_message += f" Backup created at: {backup_path}"
-
-            await download_tracker.complete_download(task_id, final_message)
-
-        except Exception as e:
-            error_message = f"Adoption failed for {ui_name}: {e}"
-            logger.error(error_message, exc_info=True)
-            await download_tracker.fail_download(task_id, error_message)
+            return {"success": False, "error": str(e)}

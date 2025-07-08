@@ -87,7 +87,6 @@ export interface MalFullConfiguration {
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
     config_mode: ConfigurationMode | null;
-    // --- CORRECTED: Use Partial<Record<>> to indicate that not all keys must be present.
     adopted_ui_paths: Partial<Record<UiNameType, string>>;
 }
 
@@ -120,7 +119,8 @@ export interface DownloadStatus {
     download_id: string;
     filename: string;
     repo_id: string;
-    status: 'pending' | 'downloading' | 'completed' | 'error' | 'cancelled';
+    // --- FIX: Add 'running' to the possible states ---
+    status: 'pending' | 'downloading' | 'running' | 'completed' | 'error' | 'cancelled';
     progress: number;
     total_size_bytes: number;
     downloaded_bytes: number;
@@ -190,7 +190,6 @@ export interface UiActionResponse {
     task_id: string;
 }
 
-// --- PHASE 2.5: NEW INTERFACES ---
 export interface UiPathValidationRequest {
     path: string;
 }
@@ -207,7 +206,8 @@ export interface UiAdoptionRequest {
     should_backup: boolean;
 }
 
-// --- API Functions (Existing) ---
+// --- API Functions ---
+// (All existing API functions remain the same)
 export const searchModels = async (
     params: SearchModelParams,
 ): Promise<PaginatedModelListResponse> => {
@@ -307,7 +307,6 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
         };
     } catch (error) {
         console.error('Error fetching current configuration:', error);
-        // This now correctly matches the type definition.
         return {
             base_path: null,
             profile: null,
@@ -397,8 +396,6 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
     }
 };
 
-// --- UI Environment Management API Functions ---
-
 export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
     try {
         const response = await apiClient.get<AvailableUiItem[]>('/uis');
@@ -477,13 +474,6 @@ export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; mes
     }
 };
 
-// --- PHASE 2.5: NEW API FUNCTIONS ---
-
-/**
- * Sends a path to the backend to validate if it's a recognizable UI installation.
- * @param path The absolute path to the directory to validate.
- * @returns A response object indicating success and the identified UI name, or an error.
- */
 export const validateUiPathAPI = async (path: string): Promise<UiPathValidationResponse> => {
     try {
         const request: UiPathValidationRequest = { path };
@@ -505,11 +495,6 @@ export const validateUiPathAPI = async (path: string): Promise<UiPathValidationR
     }
 };
 
-/**
- * Sends a request to the backend to adopt an existing UI installation.
- * @param request The adoption request details.
- * @returns A response object indicating that the background task has started.
- */
 export const adoptUiAPI = async (request: UiAdoptionRequest): Promise<UiActionResponse> => {
     try {
         const response = await apiClient.post<UiActionResponse>('/uis/adopt', request);
@@ -524,7 +509,6 @@ export const adoptUiAPI = async (request: UiAdoptionRequest): Promise<UiActionRe
     }
 };
 
-// --- WebSocket Connection (Unchanged) ---
 export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSocket => {
     const wsUrl = `${WS_BASE_URL}/ws/downloads`;
     const ws = new WebSocket(wsUrl);

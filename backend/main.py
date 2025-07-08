@@ -450,16 +450,19 @@ async def delete_ui_environment(ui_name: UiNameTypePydantic):
     response_model=UiActionResponse,
     tags=["UIs"],
     summary="Run an Installed UI",
+    status_code=status.HTTP_202_ACCEPTED,  # Use 202 for starting a background task
 )
 async def run_ui(ui_name: UiNameTypePydantic):
+    """Triggers a background task to start a managed UI."""
     task_id = str(uuid.uuid4())
-    # The UiManager will determine the correct path to run from.
-    # No need to pass it from here.
+    # --- LOGIC FIX ---
+    # The UiManager now determines the path itself. We just need to give it the name and a task ID.
+    # This call is now non-blocking and immediately returns.
     await ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
+
     return UiActionResponse(
         success=True, message=f"Request to run {ui_name} accepted.", task_id=task_id
     )
-
 
 @app.post(
     "/api/uis/stop",

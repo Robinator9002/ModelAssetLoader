@@ -15,13 +15,15 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-DownloadState = Literal["pending", "downloading", "completed", "error", "cancelled"]
+# --- Define a strict type for download/task states ---
+DownloadState = Literal["pending", "downloading", "running", "completed", "error", "cancelled"]
+
 BroadcastCallable = Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]
 
 
 @dataclass
 class DownloadStatus:
-    """Holds the state and metadata of a single download task."""
+    """Holds the state and metadata of a single download or background task."""
 
     download_id: str
     filename: str
@@ -77,6 +79,7 @@ class DownloadTracker:
     def start_tracking(
         self, download_id: str, repo_id: str, filename: str, task: asyncio.Task
     ) -> DownloadStatus:
+        """Registers a new download/task. This is a synchronous operation."""
         status = DownloadStatus(
             download_id=download_id, filename=filename, repo_id=repo_id, status="pending", task=task
         )
@@ -85,37 +88,41 @@ class DownloadTracker:
         asyncio.create_task(self._broadcast({"type": "update", "data": status.to_dict()}))
         return status
 
-    # --- FIXED: Renamed for clarity and purpose ---
     async def update_progress_from_bytes(
         self, download_id: str, downloaded_bytes: int, total_size: int
     ):
-        """Updates progress based on byte counts, specifically for file downloads."""
+        """Updates progress based on byte counts, for file downloads."""
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
-            if status.status != "downloading":
+            if status.status not in ["downloading", "running"]:
                 status.status = "downloading"
             status.downloaded_bytes = downloaded_bytes
             status.total_size_bytes = total_size
-            if total_size > 0:
-                status.progress = round((downloaded_bytes / total_size) * 100, 2)
-            else:
-                status.progress = 0  # Indeterminate if no total size
+            status.progress = (
+                round((downloaded_bytes / total_size) * 100, 2) if total_size > 0 else 0
+            )
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
-    # --- FIXED: New method for step-based tasks ---
     async def update_task_progress(
-        self, task_id: str, progress: float, status_text: Optional[str] = None
+        self,
+        task_id: str,
+        progress: float,
+        status_text: Optional[str] = None,
+        new_status: Optional[DownloadState] = None,
     ):
-        """Updates progress for a multi-step task where progress is pre-calculated."""
+        """Updates progress for a multi-step task and can optionally update its state."""
         if task_id in self.active_downloads:
             status = self.active_downloads[task_id]
-            if status.status != "downloading":
+
+            # --- FIX: Allow updating the status field directly ---
+            if new_status:
+                status.status = new_status
+            elif status.status not in ["downloading", "running"]:
                 status.status = "downloading"
 
             status.progress = round(progress, 2)
-            # Use error_message field to convey the current step's status text
             if status_text:
-                status.error_message = status_text
+                status.error_message = status_text  # Use error_message to convey status text
 
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
@@ -144,7 +151,7 @@ class DownloadTracker:
                 status.task.cancel()
             else:
                 logger.warning(
-                    f"Cancellation for {download_id} requested, but task is not running. Ignoring."
+                    f"Cancellation for {download_id} requested, but task is not running."
                 )
 
     async def remove_download(self, download_id: str):
