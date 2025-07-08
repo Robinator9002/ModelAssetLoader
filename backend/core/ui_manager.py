@@ -100,24 +100,21 @@ class UiManager:
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
             async def pip_progress_updater(
-                phase: ui_installer.PipPhase, current: int, total: int, package_name: str
+                phase: ui_installer.PipPhase, current: int, total: int, status_text: str
             ):
                 if phase == "collecting":
-                    # Heuristic: Assume the actual number of dependencies to collect is roughly
-                    # N times the number of top-level packages. A factor of 3 is a reasonable guess.
-                    # This prevents the progress from finishing too early.
+                    # Heuristic for collecting phase
                     estimated_total = total * 3 if total > 0 else 1
-                    fraction = min(current / estimated_total, 1.0)  # Cap at 100% of this phase
-
+                    fraction = min(current / estimated_total, 1.0)
                     progress = COLLECT_START + (fraction * COLLECT_RANGE)
-                    status_text = f"Collecting: {package_name}"
-                    await download_tracker.update_task_progress(task_id, progress, status_text)
+                    await download_tracker.update_task_progress(
+                        task_id, progress, f"Collecting: {status_text}"
+                    )
 
                 elif phase == "installing":
-                    # This phase is accurate because 'total' is the true count from pip.
+                    # Accurate progress for installing phase
                     fraction = current / total if total > 0 else 0
                     progress = INSTALL_START + (fraction * INSTALL_RANGE)
-                    status_text = f"Installing ({current}/{total}): {package_name}"
                     await download_tracker.update_task_progress(task_id, progress, status_text)
 
             await download_tracker.update_task_progress(
@@ -177,7 +174,6 @@ class UiManager:
                 task_id, 5, status_text="Process is running...", new_status="running"
             )
 
-            # This would ideally be a more robust implementation
             await process.wait()
             return_code = process.returncode
 

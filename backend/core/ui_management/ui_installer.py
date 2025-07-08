@@ -125,16 +125,13 @@ async def install_dependencies(
     except Exception:
         top_level_total = 1
 
-    install_packages_total = 0
     processed_count = 0
 
     collect_regex = re.compile(r"Collecting\s+([a-zA-Z0-9-_.]+)")
     installing_regex = re.compile(r"Installing collected packages:\s+(.*)")
-    success_regex = re.compile(r"Successfully installed\s+(.*)")
-    satisfied_regex = re.compile(r"Requirement already satisfied:\s+([a-zA-Z0-9-_.]+)")
 
     async def pip_streamer(line: str):
-        nonlocal phase, install_packages_total, processed_count
+        nonlocal phase, processed_count
 
         if stream_callback:
             await stream_callback(line)
@@ -145,7 +142,6 @@ async def install_dependencies(
                 processed_count += 1
                 package_name = collect_match.group(1).strip()
                 if progress_callback:
-                    # Pass the raw count of 'Collecting' lines and the top-level total for the heuristic
                     await progress_callback(
                         "collecting", processed_count, top_level_total, package_name
                     )
@@ -155,38 +151,29 @@ async def install_dependencies(
                 phase = "installing"
                 packages_to_install = [p.strip() for p in installing_match.group(1).split(",")]
                 install_packages_total = len(packages_to_install)
-                processed_count = 0
+
                 logger.info(
                     f"Switched to 'installing' phase. {install_packages_total} packages to install."
                 )
-                if progress_callback:
-                    await progress_callback(
-                        "installing", 0, install_packages_total, "Starting installation..."
-                    )
 
-        elif phase == "installing":
-            line_processed_count = 0
-            package_name = ""
+                async def progress_ticker():
+                    """This ticker simulates the installation progress smoothly."""
+                    for i in range(1, install_packages_total + 1):
+                        if process.returncode is not None:
+                            break  # Stop if the main process has already finished
 
-            success_match = success_regex.search(line)
-            if success_match:
-                line_processed_count = len(success_match.group(1).split())
-                package_name = success_match.group(1).split("-")[0]
+                        # Update the frontend
+                        if progress_callback:
+                            status_text = f"Installing {i}/{install_packages_total}"
+                            await progress_callback(
+                                "installing", i, install_packages_total, status_text
+                            )
 
-            satisfied_match = satisfied_regex.search(line)
-            if satisfied_match:
-                line_processed_count = 1
-                package_name = satisfied_match.group(1)
+                        # Calculate a short delay to make the progress bar move smoothly
+                        await asyncio.sleep(0.1)
 
-            if line_processed_count > 0:
-                processed_count += line_processed_count
-                if progress_callback:
-                    await progress_callback(
-                        "installing",
-                        min(processed_count, install_packages_total),
-                        install_packages_total,
-                        package_name,
-                    )
+                if install_packages_total > 0:
+                    asyncio.create_task(progress_ticker())
 
     process = await asyncio.create_subprocess_exec(
         str(venv_python),

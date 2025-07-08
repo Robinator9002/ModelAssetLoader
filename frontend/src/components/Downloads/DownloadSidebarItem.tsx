@@ -77,7 +77,6 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
             : `Are you sure you want to cancel the task for "${filename}"?`;
     const confirmText = isUiTask && taskStatus === 'running' ? 'Yes, Stop' : 'Yes, Cancel';
 
-    // Determine if we should show the detailed status text
     const showStatusText = isUiTask && status_text && taskStatus !== 'completed';
 
     return (
@@ -107,19 +106,21 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                         </div>
                     ) : (
                         <div className="progress-display">
-                            {/* --- FIX: Conditionally render the status text --- */}
                             {showStatusText && (
                                 <div className="download-item-status-text" title={status_text!}>
                                     {status_text}
                                 </div>
                             )}
+                            {/* --- FIX: Moved the percentage text SPAN inside its container DIV --- */}
                             <div className="progress-bar-container">
                                 <div
                                     className={`progress-bar ${taskStatus}`}
                                     style={{ width: `${progress}%` }}
                                 />
+                                <span className="progress-text">
+                                    {progress?.toFixed(1) || '0.0'}%
+                                </span>
                             </div>
-                            <span className="progress-text">{progress?.toFixed(1) || '0.0'}%</span>
                         </div>
                     )}
                 </div>
