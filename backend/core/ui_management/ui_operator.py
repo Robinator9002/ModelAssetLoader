@@ -70,8 +70,7 @@ async def delete_ui_environment(ui_dir: pathlib.Path) -> bool:
 async def run_ui(
     ui_dir: pathlib.Path,
     start_script: str,
-    stream_callback: Optional[StreamCallback] = None,
-) -> Optional[asyncio.subprocess.Process]:
+) -> Tuple[Optional[asyncio.subprocess.Process], Optional[str]]:
     """Launches a UI using its specific virtual environment and start script."""
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
@@ -81,23 +80,16 @@ async def run_ui(
     script_path = ui_dir / start_script
 
     if not venv_python.exists():
-        msg = f"ERROR: Virtual environment not found for this UI."
-        logger.error(f"Venv Python not found at '{venv_python}'. Cannot run UI.")
-        if stream_callback:
-            await stream_callback(msg)
-        return None
+        msg = f"ERROR: Virtual environment python not found at '{venv_python}'. Cannot run UI."
+        logger.error(msg)
+        return None, msg
 
     if not script_path.exists():
-        msg = f"ERROR: Start script '{start_script}' not found."
-        logger.error(f"Start script not found at '{script_path}'. Cannot run UI.")
-        if stream_callback:
-            await stream_callback(msg)
-        return None
+        msg = f"ERROR: Start script '{start_script}' not found at '{script_path}'. Cannot run UI."
+        logger.error(msg)
+        return None, msg
 
     logger.info(f"Attempting to run '{script_path}' with '{venv_python}'...")
-    if stream_callback:
-        await stream_callback(f"Starting {ui_dir.name}...")
-
     try:
         process = await asyncio.create_subprocess_exec(
             str(venv_python),
@@ -107,12 +99,11 @@ async def run_ui(
             cwd=ui_dir,
         )
         logger.info(f"Successfully started process {process.pid} for {ui_dir.name}.")
-        return process
+        return process, None
     except Exception as e:
+        msg = f"FATAL: Could not start the UI process. See logs. Error: {e}"
         logger.error(f"Failed to start process for {ui_dir.name}: {e}", exc_info=True)
-        if stream_callback:
-            await stream_callback(f"FATAL: Could not start the UI process. See logs.")
-        return None
+        return None, msg
 
 
 # --- PHASE 2: NEW FUNCTIONS ---

@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import pathlib
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 
 from .constants.constants import UI_REPOSITORIES, UiNameType
 from .ui_management import ui_installer, ui_operator
@@ -78,6 +78,38 @@ class UiManager:
         logger.info(f"[{task_id}] {line}")
         if self.broadcast_callback:
             await self.broadcast_callback({"type": "log", "task_id": task_id, "message": line})
+
+    async def _monitor_and_stream_process(
+        self, process: asyncio.subprocess.Process, task_id: str
+    ) -> Tuple[int, str]:
+        """
+        Monitors a process, streams its output to the tracker, and returns the exit code and combined output.
+        """
+        output_lines = []
+
+        async def read_stream(stream, stream_name):
+            while not stream.at_eof():
+                line_bytes = await stream.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode("utf-8", errors="replace").strip()
+                output_lines.append(f"[{stream_name}] {line}")
+                # Stream every line to the frontend via the tracker's log mechanism
+                await self._stream_progress_to_tracker(task_id, line)
+
+        # Run stream readers concurrently
+        await asyncio.gather(
+            read_stream(process.stdout, "stdout"), read_stream(process.stderr, "stderr")
+        )
+
+        # Wait for the process to terminate and get the exit code
+        await process.wait()
+        return_code = process.returncode
+        combined_output = "\n".join(output_lines)
+        logger.info(
+            f"Process {process.pid} (task {task_id}) finished with exit code {return_code}."
+        )
+        return return_code, combined_output
 
     async def install_ui_environment(
         self, ui_name: UiNameType, base_install_path: pathlib.Path, task_id: str
@@ -164,6 +196,7 @@ class UiManager:
 
     async def _run_and_manage_process(self, ui_name: UiNameType, task_id: str):
         """(Internal) Helper that contains the full lifecycle of running a process."""
+        process = None
         try:
             if task_id in self.running_processes:
                 raise RuntimeError(f"Task ID '{task_id}' is already in use.")
@@ -182,25 +215,47 @@ class UiManager:
             if not start_script:
                 raise RuntimeError(f"No 'start_script' defined for {ui_name} in constants.py.")
 
-            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            process = await ui_operator.run_ui(target_dir, start_script, streamer)
+            # Get the process object from the operator
+            process, error_msg = await ui_operator.run_ui(target_dir, start_script)
             if not process:
-                raise RuntimeError("UI process failed to start.")
+                raise RuntimeError(error_msg or "UI process failed to start for an unknown reason.")
 
+            # From this point, the process has started successfully on the OS level.
             self.running_processes[task_id] = process
             self.running_ui_tasks[ui_name] = task_id
             logger.info(f"Process {process.pid} for task '{task_id}' ({ui_name}) is managed.")
+            await download_tracker.update_task_progress(
+                task_id, 5, status_text="Process is running...", new_status="running"
+            )
 
-            await download_tracker.update_task_progress(task_id, 100, new_status="running")
+            # Now, monitor the process, stream its output, and get the final result.
+            return_code, combined_output = await self._monitor_and_stream_process(process, task_id)
 
-            await process.wait()
-            await download_tracker.complete_download(task_id, f"{ui_name} process finished.")
+            # Process has finished. Update tracker based on its exit code.
+            if return_code == 0:
+                await download_tracker.complete_download(
+                    task_id, f"{ui_name} process finished cleanly."
+                )
+            else:
+                error_details = f"{ui_name} process stopped or exited with code {return_code}.\n\nOutput:\n{combined_output}"
+                await download_tracker.fail_download(task_id, error_details, cancelled=True)
+
+        except asyncio.CancelledError:
+            logger.warning(
+                f"UI process task '{task_id}' was cancelled by the user (e.g., via stop button)."
+            )
+            if process:
+                process.kill()  # Ensure it's killed if the managing task is cancelled.
+            # The fail_download will be handled by the stop_ui method logic
+            raise
         except Exception as e:
             logger.error(f"Error in UI process task '{task_id}': {e}", exc_info=True)
             await download_tracker.fail_download(task_id, f"ERROR: {e}")
         finally:
+            # Clean up state regardless of how the process ended.
             self.running_processes.pop(task_id, None)
-            self.running_ui_tasks.pop(ui_name, None)
+            if ui_name in self.running_ui_tasks and self.running_ui_tasks[ui_name] == task_id:
+                self.running_ui_tasks.pop(ui_name, None)
 
     async def stop_ui(self, task_id: str):
         """Stops a running UI process."""
@@ -214,12 +269,11 @@ class UiManager:
             process.terminate()
             await asyncio.wait_for(process.wait(), timeout=10.0)
         except asyncio.TimeoutError:
+            logger.warning(f"Process {process.pid} did not terminate gracefully. Killing.")
             process.kill()
         except Exception as e:
             logger.error(f"Error terminating process {process.pid}: {e}", exc_info=True)
-            process.kill()
-        finally:
-            await download_tracker.cancel_and_remove(task_id, "Process stopped by user.")
+            process.kill()  # Force kill on error
 
     async def validate_ui_path(self, path_str: str) -> Dict[str, Any]:
         """Validates if a given path points to a known and valid UI installation."""
@@ -240,23 +294,54 @@ class UiManager:
     ):
         """Manages the full adoption process for an existing UI installation."""
         try:
+            await download_tracker.update_task_progress(
+                task_id, 0, f"Starting adoption for {ui_name}..."
+            )
             path = pathlib.Path(path_str)
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
 
+            # --- Backup Step (if selected) ---
             backup_path = None
             if should_backup:
                 await download_tracker.update_task_progress(task_id, 10, f"Backing up {ui_name}...")
                 backup_path = await ui_operator.backup_ui_environment(path, streamer)
                 if not backup_path:
                     raise RuntimeError("Backup process failed. Aborting adoption.")
+                await download_tracker.update_task_progress(task_id, 40, "Backup complete.")
+            else:
+                await download_tracker.update_task_progress(task_id, 40, "Skipping backup.")
 
-            await download_tracker.update_task_progress(task_id, 75, f"Registering '{ui_name}'...")
+            # --- Configuration Step ---
+            await download_tracker.update_task_progress(
+                task_id, 50, f"Registering '{ui_name}' in configuration..."
+            )
             success, msg = self.config.add_adopted_ui_path(ui_name, str(path))
             if not success:
                 raise RuntimeError(f"Failed to update configuration: {msg}")
-            await streamer("Configuration updated.")
+            await streamer("Configuration updated successfully.")
 
-            final_message = f"Successfully adopted {ui_name}."
+            # --- NEW: Dependency Repair Step ---
+            await download_tracker.update_task_progress(
+                task_id, 60, "Verifying and repairing dependencies..."
+            )
+            ui_info = await self._get_ui_info(ui_name, task_id)
+            if not ui_info or not ui_info.get("requirements_file"):
+                raise RuntimeError(
+                    f"No requirements file defined for {ui_name}, cannot repair environment."
+                )
+
+            req_file = ui_info["requirements_file"]
+            if not await ui_installer.install_dependencies(path, req_file, streamer):
+                # This is a non-fatal error. The UI is adopted, but we must warn the user.
+                await streamer(
+                    f"WARNING: Could not install/verify dependencies from {req_file}. The UI may not start correctly."
+                )
+            else:
+                await streamer("Dependencies verified successfully.")
+
+            # --- Finalization ---
+            await download_tracker.update_task_progress(task_id, 95, "Finalizing adoption...")
+            final_message = f"Successfully adopted and verified {ui_name}."
             if backup_path:
                 final_message += f" Backup created at: {backup_path}"
 
