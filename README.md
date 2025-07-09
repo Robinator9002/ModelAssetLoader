@@ -35,7 +35,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
 
-    [ ] Add functionality to download and manage the AI UIs themselves (ComfyUI, A1111, etc.).
+    [x] Add functionality to download and manage the AI UIs themselves (ComfyUI, A1111, etc.).
 
     [ ] Integrate more model sources, with CivitAI as the next major target.
 
