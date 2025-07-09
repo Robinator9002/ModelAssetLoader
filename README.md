@@ -23,7 +23,7 @@ This project is under active development. I'm building this in the open and ship
 
 M.A.L. is more than just a downloader. My goal is for it to be the central hub for your entire local AI ecosystem. Here's where I'm headed:
 
-[x] Phase 1: Polish the Core (Now Underway)
+[x] Phase 1: Polish the Core (Already Finished)
 
     [x] Re-implement advanced search sorting and filtering.
 
@@ -31,7 +31,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Add an Download Sidebar, replacing the old Toasts, for better visibility and workflow.
 
-[ ] Phase 2: Environment Management
+[ ] Phase 2: Environment Management (Near Finish)
 
     [x] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
 
@@ -39,7 +39,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [ ] Rework the Configuration and Installation Mechanics to fit the new Automation System.
 
-[ ] Phase 3: The Platform
+[ ] Phase 3: The Platform (Coming Soon)
 
     [ ] Integrate more model sources, with CivitAI as the next major target.
 
