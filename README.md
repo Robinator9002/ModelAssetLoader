@@ -29,7 +29,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Complete a full UI/CSS cleanup for a polished, professional feel.
 
-    [x] Add an Download Sidebar, replacing the old Toasts, for better visibility and workflow
+    [x] Add an Download Sidebar, replacing the old Toasts, for better visibility and workflow.
 
 [ ] Phase 2: Environment Management
 
@@ -37,9 +37,11 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Add functionality to download and manage the AI UIs themselves (ComfyUI, A1111, etc.).
 
-    [ ] Integrate more model sources, with CivitAI as the next major target.
+    [ ] Rework the Configuration and Installation Mechanics to fit the new Automation System.
 
 [ ] Phase 3: The Platform
+
+    [ ] Integrate more model sources, with CivitAI as the next major target.
 
     [ ] Expand support to a wider range of applications, including LLM chat interfaces.
 
