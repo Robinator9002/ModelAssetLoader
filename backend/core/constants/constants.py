@@ -30,6 +30,11 @@ CONFIG_FILE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "confi
 CONFIG_FILE_NAME = "mal_settings.json"
 CONFIG_FILE_PATH = CONFIG_FILE_DIR / CONFIG_FILE_NAME
 
+# --- Managed UI Installation Root ---
+# This is the fixed root directory where M.A.L. will install and manage UI environments.
+# It is independent of any user-configured base_path to avoid circular dependencies.
+MANAGED_UIS_ROOT_PATH = CONFIG_FILE_DIR.parent / "managed_uis"
+
 
 # --- Model Management Constants ---
 MODEL_FILE_EXTENSIONS = (".safetensors", ".ckpt", ".pt", ".bin", ".pth", ".onnx")
@@ -74,20 +79,23 @@ UI_REPOSITORIES: Dict[UiNameType, Dict[str, Any]] = {
     "ComfyUI": {
         "git_url": "https://github.com/comfyanonymous/ComfyUI.git",
         "requirements_file": "requirements.txt",
-        "start_script": "main.py",  # FIXED: Added start script
+        "start_script": "main.py",
         "python_version": "3.10",
+        "default_profile_name": "ComfyUI",
     },
     "A1111": {
         "git_url": "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git",
         "requirements_file": "requirements.txt",
-        "start_script": "webui.py",  # FIXED: Added start script
+        "start_script": "webui.py",
         "python_version": "3.10",
+        "default_profile_name": "A1111",
     },
     "ForgeUI": {
         "git_url": "https://github.com/lllyasviel/stable-diffusion-webui-forge.git",
         "requirements_file": "requirements.txt",
-        "start_script": "webui.py",  # FIXED: Added start script
+        "start_script": "webui.py",
         "python_version": "3.10",
+        "default_profile_name": "ForgeUI",
     },
 }
 

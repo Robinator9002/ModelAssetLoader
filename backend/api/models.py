@@ -4,8 +4,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 # --- Generic Model Information ---
-# These models are now designed to be source-agnostic where possible,
-# with source-specific details included.
+# These models are designed to be source-agnostic where possible.
 
 
 class ModelFile(BaseModel):
@@ -66,11 +65,6 @@ class ModelDetails(ModelListItem):
     )
 
 
-# For clarity in the OpenAPI docs, we can alias them, but functionally they are the same now.
-HFModelListItem = ModelListItem
-HFModelDetails = ModelDetails
-HFModelFile = ModelFile
-
 # --- Types for FileManager Configuration and Operations ---
 # Import from constants to ensure single source of truth
 from backend.core.constants.constants import UiNameType, ModelType, UiProfileType, ColorThemeType
@@ -84,33 +78,42 @@ ConfigurationModePydantic = Literal["automatic", "manual"]
 
 # --- Models for Path and File Configuration ---
 class MalFullConfiguration(BaseModel):
-    """Represents the full, current configuration of the FileManager."""
+    """
+    Represents the full, current configuration of the application, as sent to the frontend.
+    """
 
+    # The effective base path, dynamically resolved by the backend.
     base_path: Optional[str]
     ui_profile: Optional[UiProfileTypePydantic] = Field(None, alias="profile")
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
     config_mode: Optional[ConfigurationModePydantic]
-    # REMOVED: adopted_ui_paths field is gone.
+    # The name of the managed UI selected in 'automatic' mode.
+    automatic_mode_ui: Optional[UiNameTypePydantic] = Field(None)
 
     class Config:
         populate_by_name = True
 
 
 class PathConfigurationRequest(BaseModel):
-    """Request model for the main settings page configuration."""
+    """Request model for updating the main settings page configuration."""
 
-    base_path: Optional[str] = Field(None)
+    base_path: Optional[str] = Field(None, description="The base path for 'manual' mode.")
     profile: Optional[UiProfileTypePydantic] = Field(None)
     custom_model_type_paths: Optional[Dict[str, str]] = Field(None)
     color_theme: Optional[ColorThemeTypePydantic] = Field(None)
     config_mode: Optional[ConfigurationModePydantic] = Field(None)
+    automatic_mode_ui: Optional[UiNameTypePydantic] = Field(
+        None, description="The selected UI for 'automatic' mode."
+    )
 
 
 class PathConfigurationResponse(BaseModel):
+    """Response model for a configuration update request."""
+
     success: bool
     message: Optional[str] = None
-    configured_base_path: Optional[str] = None
+    # The full, updated configuration state to sync the frontend.
     current_config: Optional[MalFullConfiguration] = None
 
 
@@ -127,6 +130,8 @@ class FileDownloadRequest(BaseModel):
 
 
 class FileDownloadResponse(BaseModel):
+    """Response for a download request, indicating if it was successfully started."""
+
     success: bool
     message: Optional[str] = None
     error: Optional[str] = None
@@ -145,9 +150,7 @@ class LocalFileItem(BaseModel):
     size: Optional[int] = Field(
         None, description="Size of the file in bytes (null for directories)."
     )
-    last_modified: Optional[datetime] = Field(
-        None, description="Timestamp of the last modification."
-    )
+    last_modified: datetime = Field(..., description="Timestamp of the last modification.")
 
     class Config:
         populate_by_name = True
@@ -168,33 +171,19 @@ class LocalFileContentResponse(BaseModel):
     error: Optional[str] = None
 
 
-# --- Models for Directory Structure and Scanning (Existing) ---
-class DirectoryItem(BaseModel):
-    name: str
-    path: str
-    type: Literal["file", "directory"]
-    children: Optional[List["DirectoryItem"]] = None
+class FileManagerListResponse(BaseModel):
+    """
+    The response for a file listing request, including the final path
+    after any smart navigation and the items at that path.
+    """
+
+    path: Optional[str] = Field(description="The final relative path that is being displayed.")
+    items: List[LocalFileItem] = Field(
+        description="The list of files and directories at the final path."
+    )
 
 
-DirectoryItem.model_rebuild()
-
-
-class DirectoryStructureResponse(BaseModel):
-    success: bool
-    structure: Optional[List[DirectoryItem]] = None
-    error: Optional[str] = None
-    base_path_configured: bool
-
-
-class RescanPathRequest(BaseModel):
-    path: Optional[str] = Field(None)
-
-
-class RescanPathResponse(BaseModel):
-    success: bool
-    message: Optional[str] = None
-
-
+# --- Models for Host Directory Scanning ---
 class HostDirectoryItem(BaseModel):
     name: str
     path: str
@@ -212,22 +201,6 @@ class ScanHostDirectoriesResponse(BaseModel):
     data: Optional[List[HostDirectoryItem]] = None
 
 
-PathConfigurationResponse.model_rebuild()
-
-
-# --- Smart Response Model for File Manager ---
-class FileManagerListResponse(BaseModel):
-    """
-    The response for a file listing request, including the final path
-    after any smart navigation and the items at that path.
-    """
-
-    path: Optional[str] = Field(description="The final relative path that is being displayed.")
-    items: List[LocalFileItem] = Field(
-        description="The list of files and directories at the final path."
-    )
-
-
 # --- UI Environment Management Models ---
 
 
@@ -236,6 +209,9 @@ class AvailableUiItem(BaseModel):
 
     ui_name: UiNameTypePydantic = Field(..., description="The unique name of the UI.")
     git_url: str = Field(..., description="The Git URL of the repository.")
+    default_profile_name: UiProfileTypePydantic = Field(
+        ..., description="The default UI profile associated with this UI."
+    )
 
 
 class ManagedUiStatus(BaseModel):
@@ -270,9 +246,3 @@ class UiStopRequest(BaseModel):
     """Request model for stopping a running UI process."""
 
     task_id: str = Field(..., description="The task_id of the running process to be stopped.")
-
-
-# --- REMOVED: All models related to UI Adoption are gone ---
-# - UiPathValidationRequest
-# - UiPathValidationResponse
-# - UiAdoptionRequest
