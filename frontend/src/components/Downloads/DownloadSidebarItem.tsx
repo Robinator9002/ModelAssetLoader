@@ -24,7 +24,8 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
 
     const isCancellable =
         taskStatus === 'pending' || taskStatus === 'downloading' || taskStatus === 'running';
-    const isUiTask = repo_id === 'UI Process' || repo_id === 'UI Installation';
+    const isUiInstallation = repo_id === 'UI Installation';
+    const isUiProcess = repo_id === 'UI Process';
 
     const getStatusIcon = () => {
         switch (taskStatus) {
@@ -49,7 +50,7 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
 
     const handleConfirmCancel = async () => {
         try {
-            if (isUiTask && taskStatus === 'running') {
+            if (isUiProcess && taskStatus === 'running') {
                 await stopUiAPI(download_id);
             } else {
                 await cancelDownloadAPI(download_id);
@@ -70,14 +71,69 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
     };
 
     const confirmModalTitle =
-        isUiTask && taskStatus === 'running' ? 'Stop Process?' : 'Cancel Task?';
+        isUiProcess && taskStatus === 'running' ? 'Stop Process?' : 'Cancel Task?';
     const confirmModalMessage =
-        isUiTask && taskStatus === 'running'
+        isUiProcess && taskStatus === 'running'
             ? `Are you sure you want to stop the running process for "${filename}"?`
             : `Are you sure you want to cancel the task for "${filename}"?`;
-    const confirmText = isUiTask && taskStatus === 'running' ? 'Yes, Stop' : 'Yes, Cancel';
+    const confirmText = isUiProcess && taskStatus === 'running' ? 'Yes, Stop' : 'Yes, Cancel';
 
-    const showStatusText = isUiTask && status_text && taskStatus !== 'completed';
+    const showStatusText = isUiInstallation && status_text && taskStatus !== 'completed';
+
+    const renderBody = () => {
+        if (taskStatus === 'error') {
+            return (
+                <div
+                    className="download-item-error-message"
+                    title={error_message || 'An error occurred.'}
+                >
+                    {error_message || 'An unknown error occurred.'}
+                </div>
+            );
+        }
+        if (taskStatus === 'cancelled') {
+            return (
+                <div
+                    className="download-item-error-message"
+                    title={error_message || 'Task was cancelled.'}
+                >
+                    {error_message || 'The task was cancelled by the user.'}
+                </div>
+            );
+        }
+        // --- NEW: Custom display for running processes ---
+        if (taskStatus === 'running' && isUiProcess) {
+            return (
+                <div className="running-process-display">
+                    <div className="running-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div className="download-item-status-text">Process is Active</div>
+                </div>
+            );
+        }
+        // Default display for downloads and installations
+        return (
+            <div className="progress-display">
+                {showStatusText && (
+                    <div className="download-item-status-text" title={status_text!}>
+                        {status_text}
+                    </div>
+                )}
+                <div className="progress-bar-container">
+                    <div
+                        className={`progress-bar ${taskStatus}`}
+                        style={{ width: `${progress}%` }}
+                    />
+                    <span className="progress-text">{progress?.toFixed(1) || '0.0'}%</span>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <>
@@ -88,43 +144,7 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                         {filename}
                     </span>
                 </div>
-
-                <div className="download-item-body">
-                    {taskStatus === 'error' ? (
-                        <div
-                            className="download-item-error-message"
-                            title={error_message || 'An error occurred.'}
-                        >
-                            {error_message || 'An unknown error occurred.'}
-                        </div>
-                    ) : taskStatus === 'cancelled' ? (
-                        <div
-                            className="download-item-error-message"
-                            title={error_message || 'Task was cancelled.'}
-                        >
-                            {error_message || 'The task was cancelled by the user.'}
-                        </div>
-                    ) : (
-                        <div className="progress-display">
-                            {showStatusText && (
-                                <div className="download-item-status-text" title={status_text!}>
-                                    {status_text}
-                                </div>
-                            )}
-                            {/* --- FIX: Moved the percentage text SPAN inside its container DIV --- */}
-                            <div className="progress-bar-container">
-                                <div
-                                    className={`progress-bar ${taskStatus}`}
-                                    style={{ width: `${progress}%` }}
-                                />
-                                <span className="progress-text">
-                                    {progress?.toFixed(1) || '0.0'}%
-                                </span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
+                <div className="download-item-body">{renderBody()}</div>
                 <div className="download-item-actions">
                     <button
                         onClick={handleActionClick}
@@ -136,7 +156,6 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                     </button>
                 </div>
             </div>
-
             <ConfirmModal
                 isOpen={isConfirmOpen}
                 title={confirmModalTitle}

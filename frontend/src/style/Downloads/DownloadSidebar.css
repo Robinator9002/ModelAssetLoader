@@ -80,6 +80,10 @@
 .download-sidebar-item.cancelled {
     border-left-color: var(--color-text-placeholder);
 }
+/* Special border for running state */
+.download-sidebar-item.running {
+    border-left-color: var(--color-accent);
+}
 
 .download-item-header {
     grid-area: header;
@@ -114,14 +118,14 @@
     color: var(--color-text-secondary);
 }
 .download-item-status-icon .icon-running {
-    color: var(--color-primary);
+    color: var(--color-accent);
 }
 
 .download-item-body {
     grid-area: body;
     display: flex;
     flex-direction: column;
-    gap: calc(var(--spacing-unit) * 1); /* Reduced gap to bring text closer to bar */
+    gap: calc(var(--spacing-unit) * 1);
     padding-top: var(--spacing-unit);
     border-top: 1px solid var(--color-border);
     margin-top: var(--spacing-unit);
@@ -152,7 +156,6 @@
     gap: calc(var(--spacing-unit) * 0.75);
 }
 
-/* --- NEW: Styling for the status text --- */
 .download-item-status-text {
     font-size: 0.8rem;
     color: var(--color-text-secondary);
@@ -217,4 +220,57 @@
     color: var(--color-text-on-primary);
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
     pointer-events: none;
+}
+
+/* --- NEW: Styles for the Running Process Indicator --- */
+
+.running-process-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing-unit) * 1.5);
+    min-height: 40px; /* Give it some space */
+}
+
+.running-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing-unit) * 0.75);
+}
+
+.running-indicator span {
+    display: block;
+    width: 6px;
+    height: 20px;
+    background-color: var(--color-accent);
+    border-radius: 3px;
+    animation: runningPulse 1.2s infinite ease-in-out;
+}
+
+/* Stagger the animation for each bar */
+.running-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+.running-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+.running-indicator span:nth-child(4) {
+    animation-delay: 0.6s;
+}
+.running-indicator span:nth-child(5) {
+    animation-delay: 0.8s;
+}
+
+@keyframes runningPulse {
+    0%,
+    100% {
+        transform: scaleY(0.4);
+        opacity: 0.5;
+    }
+    20% {
+        transform: scaleY(1);
+        opacity: 1;
+    }
 }
