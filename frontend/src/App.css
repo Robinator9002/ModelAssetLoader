@@ -43,7 +43,7 @@
     flex-direction: column;
     height: 100vh; /* Full viewport height */
     width: 100vw; /* Full viewport width */
-    overflow: hidden; /* Prevent body scrollbars */
+    overflow: auto; /* Prevent body scrollbars */
     background-color: var(--color-background);
 }
 

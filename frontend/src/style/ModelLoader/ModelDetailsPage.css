@@ -49,7 +49,8 @@
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing-unit) * 2);
-    overflow: hidden; /* Hide any potential overflow from children */
+    max-height: 60vh;
+    overflow: auto; /* Hide any potential overflow from children */
 }
 
 .files-section {
