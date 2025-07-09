@@ -10,7 +10,6 @@ import DownloadModal from './components/Downloads/DownloadModal';
 import DownloadSidebar from './components/Downloads/DownloadSidebar';
 import FileManagerPage from './components/FileManager/FileManagerPage';
 import UiManagementPage from './components/Environments/UiManagementPage';
-// REMOVED: AdoptUiModal import is gone
 
 import {
     // All API functions are imported
@@ -26,7 +25,6 @@ import {
     dismissDownloadAPI,
     // All type definitions are imported
     type ColorThemeType,
-    type MalFullConfiguration,
     type ModelListItem,
     type ModelDetails,
     type ModelFile,
@@ -35,6 +33,7 @@ import {
     type ManagedUiStatus,
     type UiNameType,
     type ConfigurationMode,
+    type UiProfileType,
 } from './api/api';
 import appIcon from '/icon.png';
 
@@ -43,12 +42,13 @@ const logger = {
     error: (...args: any[]) => console.error('[App]', ...args),
 };
 
+// The comprehensive shape of the application's configuration state.
 export interface AppPathConfig {
     basePath: string | null;
-    uiProfile: MalFullConfiguration['profile'];
-    customPaths: MalFullConfiguration['custom_model_type_paths'];
+    uiProfile: UiProfileType | null;
+    customPaths: Record<string, string>;
     configMode: ConfigurationMode;
-    // REMOVED: adoptedUiPaths is gone
+    automaticModeUi: UiNameType | null;
 }
 
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
@@ -58,6 +58,7 @@ const defaultPathConfig: AppPathConfig = {
     uiProfile: null,
     customPaths: {},
     configMode: 'automatic',
+    automaticModeUi: null,
 };
 
 function App() {
@@ -72,7 +73,6 @@ function App() {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const [modelForDownload, setModelForDownload] = useState<ModelDetails | null>(null);
     const [specificFileForDownload, setSpecificFileForDownload] = useState<ModelFile | null>(null);
-    // REMOVED: Adoption modal state is gone
 
     // --- Download & Task Management State ---
     const [activeDownloads, setActiveDownloads] = useState<Map<string, DownloadStatus>>(new Map());
@@ -112,7 +112,6 @@ function App() {
                     if (status?.download_id) {
                         setActiveDownloads((prev) => new Map(prev).set(status.download_id, status));
 
-                        // If an installation task completes, refresh the UI statuses.
                         if (status.status === 'completed' && status.repo_id === 'UI Installation') {
                             logger.info(
                                 `Installation for '${status.filename}' completed. Refreshing UI statuses.`,
@@ -216,21 +215,6 @@ function App() {
         [activeDownloads],
     );
 
-    const activeUiProfileForStart = useMemo(() => {
-        const profileName = pathConfig?.uiProfile;
-        if (!profileName || profileName === 'Custom') return null;
-        return uiStatuses.find((s) => s.ui_name === profileName) || null;
-    }, [pathConfig.uiProfile, uiStatuses]);
-
-    const handleQuickStart = useCallback(() => {
-        if (!activeUiProfileForStart) return;
-        if (activeUiProfileForStart.is_running && activeUiProfileForStart.running_task_id) {
-            handleStopUi(activeUiProfileForStart.running_task_id);
-        } else {
-            handleRunUi(activeUiProfileForStart.ui_name);
-        }
-    }, [activeUiProfileForStart, handleRunUi, handleStopUi]);
-
     const loadInitialConfig = useCallback(async () => {
         setIsConfigLoading(true);
         try {
@@ -240,6 +224,7 @@ function App() {
                 uiProfile: config.profile,
                 customPaths: config.custom_model_type_paths || {},
                 configMode: config.config_mode || 'automatic',
+                automaticModeUi: config.automatic_mode_ui || null,
             });
             setTheme(config.color_theme || 'dark');
             await fetchUiData();
@@ -302,7 +287,34 @@ function App() {
         return 'completed';
     }, [activeDownloads]);
 
-    // REMOVED: All adoption modal handlers are gone.
+    // Combine available UI info with their live status for easier prop drilling.
+    const combinedManagedUis = useMemo(() => {
+        const availableMap = new Map(availableUis.map((ui) => [ui.ui_name, ui]));
+        return uiStatuses.map((status) => ({
+            ...status,
+            ...availableMap.get(status.ui_name),
+        }));
+    }, [availableUis, uiStatuses]);
+
+    // Determine the active UI for the "Quick Start" button based on config mode.
+    const activeUiForQuickStart = useMemo(() => {
+        const targetUiName =
+            pathConfig.configMode === 'automatic'
+                ? pathConfig.automaticModeUi
+                : pathConfig.uiProfile;
+
+        if (!targetUiName || targetUiName === 'Custom') return null;
+        return combinedManagedUis.find((s) => s.ui_name === targetUiName) || null;
+    }, [pathConfig, combinedManagedUis]);
+
+    const handleQuickStart = useCallback(() => {
+        if (!activeUiForQuickStart) return;
+        if (activeUiForQuickStart.is_running && activeUiForQuickStart.running_task_id) {
+            handleStopUi(activeUiForQuickStart.running_task_id);
+        } else if (activeUiForQuickStart.is_installed) {
+            handleRunUi(activeUiForQuickStart.ui_name);
+        }
+    }, [activeUiForQuickStart, handleRunUi, handleStopUi]);
 
     const renderActiveTabContent = () => {
         if (isConfigLoading) return <p className="loading-message">Loading configuration...</p>;
@@ -344,8 +356,7 @@ function App() {
                         initialPathConfig={pathConfig}
                         onConfigurationSave={handlePathConfigurationUpdate}
                         currentGlobalTheme={theme}
-                        uiStatuses={uiStatuses}
-                        initialConfigMode={pathConfig.configMode}
+                        managedUis={combinedManagedUis}
                     />
                 );
             default:
@@ -394,9 +405,9 @@ function App() {
                     onToggleDownloads={handleToggleDownloadsSidebar}
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeDownloads.size}
-                    activeUiProfile={pathConfig?.uiProfile || null}
-                    isUiInstalled={activeUiProfileForStart?.is_installed || false}
-                    isUiRunning={activeUiProfileForStart?.is_running || false}
+                    activeUiProfile={activeUiForQuickStart?.ui_name || null}
+                    isUiInstalled={activeUiForQuickStart?.is_installed || false}
+                    isUiRunning={activeUiForQuickStart?.is_running || false}
                     onQuickStart={handleQuickStart}
                 />
                 <main className="main-content-area">{renderActiveTabContent()}</main>
@@ -411,7 +422,6 @@ function App() {
                 specificFileToDownload={specificFileForDownload}
                 onDownloadsStarted={handleDownloadsStarted}
             />
-            {/* REMOVED: AdoptUiModal is gone from the JSX */}
         </div>
     );
 }
