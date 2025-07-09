@@ -32,7 +32,7 @@ from backend.core.constants.constants import UI_REPOSITORIES
 # --- API Model Imports ---
 from backend.api.models import (
     PaginatedModelListResponse,
-    HFModelDetails,
+    ModelDetails,
     PathConfigurationRequest,
     PathConfigurationResponse,
     FileDownloadRequest,
@@ -40,7 +40,7 @@ from backend.api.models import (
     MalFullConfiguration,
     FileManagerListResponse,
     ScanHostDirectoriesResponse,
-    HFModelListItem,
+    ModelListItem,
     LocalFileActionRequest,
     LocalFileContentResponse,
     AvailableUiItem,
@@ -55,7 +55,7 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.3.0",
+    version="1.4.0",
 )
 
 # --- CORS Middleware ---
@@ -69,13 +69,16 @@ app.add_middleware(
 )
 
 # --- Service Instances ---
+# Initialize the core managers for the application.
 source_manager = SourceManager()
 file_manager = FileManager()
-ui_manager = UiManager(config_manager=file_manager.config)
+ui_manager = UiManager()
 
 
-# --- Robust WebSocket Connection Manager ---
+# --- WebSocket Connection Manager ---
 class ConnectionManager:
+    """Manages active WebSocket connections for real-time broadcasting."""
+
     def __init__(self):
         self.active_connections: List[WebSocket] = []
 
@@ -103,23 +106,32 @@ manager = ConnectionManager()
 # --- WebSocket Endpoint for Real-time Updates ---
 @app.websocket("/ws/downloads")
 async def websocket_endpoint(websocket: WebSocket):
+    """
+    Handles WebSocket connections for sending real-time updates on downloads
+    and other background tasks.
+    """
     await manager.connect(websocket)
 
+    # Define the callback function for broadcasting status updates.
     async def broadcast_status_update(data: dict):
         await manager.broadcast(json.dumps(data, default=str))
 
+    # Set the callback on the singleton trackers.
     download_tracker.set_broadcast_callback(broadcast_status_update)
     ui_manager.broadcast_callback = broadcast_status_update
 
     try:
+        # Send the initial state of all tracked tasks to the new client.
         initial_statuses = download_tracker.get_all_statuses()
         await websocket.send_text(
             json.dumps({"type": "initial_state", "downloads": initial_statuses})
         )
+        # Keep the connection alive.
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        # If this was the last client, clear the callbacks to prevent unnecessary work.
         if not manager.active_connections:
             download_tracker.set_broadcast_callback(None)
             ui_manager.broadcast_callback = None
@@ -140,17 +152,14 @@ async def search_models(
     source: str = Query("huggingface"),
     search: Optional[str] = Query(None),
     author: Optional[str] = Query(None),
-    tags: Optional[List[str]] = Query(default_factory=list),
+    tags: Optional[List[str]] = Query(None),
     sort: Optional[str] = Query("lastModified"),
     direction: Optional[int] = Query(-1, enum=[-1, 1]),
     limit: int = Query(30, ge=1, le=100),
     page: int = Query(1, ge=1),
 ):
     try:
-        processed_tags = [
-            t.strip() for tag_group in tags for t in tag_group.split(",") if t.strip()
-        ]
-        unique_tags = list(set(processed_tags)) if processed_tags else None
+        unique_tags = list(set(tags)) if tags else None
         models_data, has_more = source_manager.search_models(
             source=source,
             search_query=search,
@@ -162,19 +171,19 @@ async def search_models(
             page=page,
         )
         return PaginatedModelListResponse(
-            items=[HFModelListItem(**m) for m in models_data],
+            items=[ModelListItem(**m) for m in models_data],
             page=page,
             limit=limit,
             has_more=has_more,
         )
     except Exception as e:
         logger.error(f"Error in search_models: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal error.")
+        raise HTTPException(status_code=500, detail="Internal error during model search.")
 
 
 @app.get(
     "/api/models/{source}/{model_id:path}",
-    response_model=HFModelDetails,
+    response_model=ModelDetails,
     tags=["Models"],
     summary="Get Model Details from a Source",
 )
@@ -183,7 +192,7 @@ async def get_model_details(source: str, model_id: str):
         details_data = source_manager.get_model_details(model_id=model_id, source=source)
         if not details_data:
             raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
-        return HFModelDetails(**details_data)
+        return ModelDetails(**details_data)
     except HTTPException:
         raise
     except Exception as e:
@@ -199,6 +208,7 @@ async def get_model_details(source: str, model_id: str):
     summary="Get Current FileManager Configuration",
 )
 async def get_file_manager_configuration():
+    # Retrieve the dynamically resolved configuration.
     config = file_manager.get_current_configuration()
     return MalFullConfiguration(**config)
 
@@ -210,20 +220,26 @@ async def get_file_manager_configuration():
     summary="Configure FileManager Paths and Settings",
 )
 async def configure_file_manager_paths_endpoint(config_request: PathConfigurationRequest):
-    result = file_manager.configure_paths(
+    """
+    Updates the application's core configuration based on the provided settings.
+    This now handles both 'automatic' and 'manual' configuration modes.
+    """
+    success, message = file_manager.configure_paths(
         base_path_str=config_request.base_path,
         profile=config_request.profile,
         custom_model_type_paths=config_request.custom_model_type_paths,
         color_theme=config_request.color_theme,
         config_mode=config_request.config_mode,
+        automatic_mode_ui=config_request.automatic_mode_ui,
     )
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Configuration failed."))
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    # On success, return the full, updated configuration state.
     updated_config_dict = file_manager.get_current_configuration()
     return PathConfigurationResponse(
-        success=result.get("success", False),
-        message=result.get("message"),
-        configured_base_path=result.get("configured_base_path"),
+        success=True,
+        message=message,
         current_config=MalFullConfiguration(**updated_config_dict),
     )
 
@@ -344,8 +360,13 @@ async def get_managed_file_preview_endpoint(path: str = Query(...)):
     summary="List Available UIs for Installation",
 )
 async def list_available_uis():
+    """Returns a list of all UIs that M.A.L. knows how to install."""
     available_uis = [
-        AvailableUiItem(ui_name=name, git_url=details["git_url"])
+        AvailableUiItem(
+            ui_name=name,
+            git_url=details["git_url"],
+            default_profile_name=details["default_profile_name"],
+        )
         for name, details in UI_REPOSITORIES.items()
     ]
     return available_uis
@@ -358,8 +379,6 @@ async def list_available_uis():
     summary="Get Status of All Managed UIs",
 )
 async def get_all_ui_statuses():
-    if not file_manager.base_path:
-        return AllUiStatusResponse(items=[])
     status_items = await ui_manager.get_all_statuses()
     return AllUiStatusResponse(items=status_items)
 
@@ -371,15 +390,13 @@ async def get_all_ui_statuses():
     summary="Install a UI Environment",
 )
 async def install_ui_environment(ui_name: UiNameTypePydantic):
-    if not file_manager.base_path:
-        raise HTTPException(status_code=400, detail="Base path is not configured.")
-    install_dir = file_manager.base_path / "managed_uis"
+    """Triggers the background installation process for a specified UI."""
     task_id = str(uuid.uuid4())
     download_tracker.start_tracking(
         download_id=task_id,
-        repo_id=f"UI Installation",
+        repo_id="UI Installation",
         filename=ui_name,
-        task=asyncio.create_task(ui_manager.install_ui_environment(ui_name, install_dir, task_id)),
+        task=asyncio.create_task(ui_manager.install_ui_environment(ui_name, task_id)),
     )
     return UiActionResponse(
         success=True, message=f"Installation for {ui_name} started.", task_id=task_id
@@ -392,11 +409,11 @@ async def install_ui_environment(ui_name: UiNameTypePydantic):
     tags=["UIs"],
     summary="Delete a UI Environment",
 )
-async def delete_ui_environment(ui_name: UiNameTypePydantic):
+async def delete_ui_environment_endpoint(ui_name: UiNameTypePydantic):
     success = await ui_manager.delete_environment(ui_name=ui_name)
     if not success:
-        raise HTTPException(status_code=500, detail=f"Failed to process {ui_name}.")
-    return {"success": True, "message": f"{ui_name} processed successfully."}
+        raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
+    return {"success": True, "message": f"{ui_name} environment deleted successfully."}
 
 
 @app.post(

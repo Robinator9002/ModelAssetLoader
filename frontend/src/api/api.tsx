@@ -79,6 +79,7 @@ export interface PathConfigurationRequest {
     custom_model_type_paths?: Record<string, string> | null;
     color_theme?: ColorThemeType | null;
     config_mode?: ConfigurationMode | null;
+    automatic_mode_ui?: UiNameType | null;
 }
 
 export interface MalFullConfiguration {
@@ -87,13 +88,13 @@ export interface MalFullConfiguration {
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
     config_mode: ConfigurationMode | null;
+    automatic_mode_ui: UiNameType | null;
 }
 
 export interface PathConfigurationResponse {
     success: boolean;
     message?: string | null;
     error?: string | null;
-    configured_base_path?: string | null;
     current_config?: MalFullConfiguration | null;
 }
 
@@ -123,7 +124,7 @@ export interface DownloadStatus {
     total_size_bytes: number;
     downloaded_bytes: number;
     error_message?: string | null;
-    status_text?: string | null; // --- FIX: Added the missing property ---
+    status_text?: string | null;
     target_path?: string | null;
 }
 
@@ -169,6 +170,7 @@ export type ViewMode = 'models' | 'explorer';
 export interface AvailableUiItem {
     ui_name: UiNameType;
     git_url: string;
+    default_profile_name: UiProfileType;
 }
 
 export interface ManagedUiStatus {
@@ -190,7 +192,9 @@ export interface UiActionResponse {
 }
 
 // --- API Functions ---
-// ... (rest of the API functions remain unchanged)
+// The actual function implementations remain the same, as they correctly
+// pass through the data structures defined above.
+
 export const searchModels = async (
     params: SearchModelParams,
 ): Promise<PaginatedModelListResponse> => {
@@ -286,6 +290,7 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
             custom_model_type_paths: response.data.custom_model_type_paths || {},
             color_theme: response.data.color_theme || 'dark',
             config_mode: response.data.config_mode || 'automatic',
+            automatic_mode_ui: response.data.automatic_mode_ui || null,
         };
     } catch (error) {
         console.error('Error fetching current configuration:', error);
@@ -295,6 +300,7 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
             custom_model_type_paths: {},
             color_theme: 'dark',
             config_mode: 'automatic',
+            automatic_mode_ui: null,
         };
     }
 };
