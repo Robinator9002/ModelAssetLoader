@@ -39,6 +39,8 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [ ] Rework the Configuration and Installation Mechanics to fit the new Automation System.
 
+    [ ] Add Adoption Mechanic for Installation
+
 [ ] Phase 3: The Platform (Coming Soon)
 
     [ ] Integrate more model sources, with CivitAI as the next major target.
