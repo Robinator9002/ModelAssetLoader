@@ -1,0 +1,98 @@
+/*
+ * =================================================================
+ * M.A.L. - InstallUiModal Component Styles
+ * =================================================================
+ * This file styles the modal used for configuring UI installations.
+ * It inherits from global.css and Modals.css.
+*/
+
+/* --- Modal Body & Layout --- */
+.install-modal-content {
+    max-width: 550px;
+}
+
+.install-modal-body {
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3)
+        calc(var(--spacing-unit) * 4);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 3);
+}
+
+.modal-description {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    margin-bottom: var(--spacing-unit);
+}
+
+.modal-description strong {
+    color: var(--color-text-primary);
+}
+
+/* --- Form Section Styling --- */
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 1);
+}
+
+/* Reusing config-label and config-hint from ConfigurationsPage styles */
+.config-label {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--color-text-primary);
+}
+
+.config-hint {
+    font-size: 0.85rem;
+    color: var(--color-text-placeholder);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Reusing base-path-selector for consistency */
+.base-path-selector {
+    display: flex;
+    gap: var(--spacing-unit);
+}
+
+.base-path-selector .path-input {
+    flex-grow: 1;
+}
+
+/* --- Custom Checkbox Container --- */
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1.5);
+    padding: var(--spacing-unit);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    transition: background-color var(--transition-speed-fast) ease;
+    outline: none; /* We'll use box-shadow for focus */
+}
+
+.checkbox-container:hover,
+.checkbox-container:focus-visible {
+    background-color: var(--color-surface-alt);
+}
+
+.checkbox-container:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.checkbox-icon {
+    flex-shrink: 0;
+    color: var(--color-border-hover);
+    transition: color var(--transition-speed-fast) ease;
+}
+
+.checkbox-container .checkbox-icon.checked {
+    color: var(--color-primary);
+}
+
+.checkbox-container .config-label {
+    cursor: pointer; /* Inherit cursor from parent */
+    font-weight: 500;
+}

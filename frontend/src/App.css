@@ -17,6 +17,7 @@
 @import url('./style/Layout/QuickStartButton.css');
 
 @import url('./style/Environments/UiManagementPage.css');
+@import url('./style/Environments/InstallUiModal.css');
 
 @import url('./style/Files/FolderSelector.css');
 @import url('./style/Files/ConfigurationsPage.css');
