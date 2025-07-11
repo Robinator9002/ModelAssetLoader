@@ -34,6 +34,7 @@ import {
     type UiNameType,
     type ConfigurationMode,
     type UiProfileType,
+    type UiInstallRequest,
 } from './api/api';
 import appIcon from '/icon.png';
 
@@ -77,6 +78,7 @@ function App() {
     // --- Download & Task Management State ---
     const [activeDownloads, setActiveDownloads] = useState<Map<string, DownloadStatus>>(new Map());
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
+    const [tasksToAutoConfigure, setTasksToAutoConfigure] = useState<Set<string>>(new Set());
     const ws = useRef<WebSocket | null>(null);
 
     // --- UI Environment Management State ---
@@ -93,6 +95,44 @@ function App() {
         }
     }, []);
 
+    const handleAutoConfigureUi = useCallback(
+        async (uiName: UiNameType) => {
+            const uiInfo = availableUis.find((ui) => ui.ui_name === uiName);
+            if (!uiInfo) {
+                logger.error(`Cannot auto-configure: UI info for '${uiName}' not found.`);
+                return;
+            }
+
+            logger.info(`Auto-configuring settings for newly installed UI: ${uiName}`);
+            try {
+                const response = await configurePathsAPI({
+                    config_mode: 'automatic',
+                    automatic_mode_ui: uiName,
+                    profile: uiInfo.default_profile_name,
+                });
+
+                if (response.success && response.current_config) {
+                    const newConfig = response.current_config;
+                    handlePathConfigurationUpdate(
+                        {
+                            basePath: newConfig.base_path,
+                            uiProfile: newConfig.profile,
+                            customPaths: newConfig.custom_model_type_paths || {},
+                            configMode: newConfig.config_mode || 'automatic',
+                            automaticModeUi: newConfig.automatic_mode_ui || null,
+                        },
+                        newConfig.color_theme || theme,
+                    );
+                } else {
+                    throw new Error(response.error || 'Failed to auto-configure paths.');
+                }
+            } catch (error) {
+                logger.error('Failed during auto-configuration:', error);
+            }
+        },
+        [availableUis, theme], // Dependency on availableUis to find profile info
+    );
+
     // Effect to establish and manage the WebSocket connection for real-time updates.
     useEffect(() => {
         if (ws.current) return;
@@ -100,14 +140,14 @@ function App() {
         logger.info('Setting up WebSocket for download and task tracking...');
         const handleWsMessage = (data: any) => {
             switch (data.type) {
-                case 'initial_state': {
-                    const initialMap = new Map<string, DownloadStatus>(
-                        (data.downloads || []).map((s: DownloadStatus) => [s.download_id, s]),
+                case 'initial_state':
+                    setActiveDownloads(
+                        new Map(
+                            (data.downloads || []).map((s: DownloadStatus) => [s.download_id, s]),
+                        ),
                     );
-                    setActiveDownloads(initialMap);
                     break;
-                }
-                case 'update': {
+                case 'update':
                     const status: DownloadStatus = data.data;
                     if (status?.download_id) {
                         setActiveDownloads((prev) => new Map(prev).set(status.download_id, status));
@@ -117,11 +157,20 @@ function App() {
                                 `Installation for '${status.filename}' completed. Refreshing UI statuses.`,
                             );
                             fetchUiData();
+
+                            // Check if this task was marked for auto-configuration
+                            if (tasksToAutoConfigure.has(status.download_id)) {
+                                handleAutoConfigureUi(status.filename as UiNameType);
+                                setTasksToAutoConfigure((prev) => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(status.download_id);
+                                    return newSet;
+                                });
+                            }
                         }
                     }
                     break;
-                }
-                case 'remove': {
+                case 'remove':
                     if (data.download_id) {
                         setActiveDownloads((prev) => {
                             const newMap = new Map(prev);
@@ -130,7 +179,6 @@ function App() {
                         });
                     }
                     break;
-                }
             }
         };
         ws.current = connectToDownloadTracker(handleWsMessage);
@@ -139,19 +187,38 @@ function App() {
             if (ws.current?.readyState === WebSocket.OPEN) ws.current.close();
             ws.current = null;
         };
-    }, [fetchUiData]);
+    }, [fetchUiData, tasksToAutoConfigure, handleAutoConfigureUi]);
 
-    // --- Handlers for various UI actions ---
+    const handleInstallUi = useCallback(async (request: UiInstallRequest) => {
+        try {
+            const response = await installUiAPI(request);
+            if (response.success && response.set_as_active_on_completion) {
+                setTasksToAutoConfigure((prev) => new Set(prev).add(response.task_id));
+            }
+            setDownloadsSidebarOpen(true);
+        } catch (error) {
+            logger.error(`Failed to start installation for ${request.ui_name}:`, error);
+        }
+    }, []);
+
+    const handlePathConfigurationUpdate = useCallback(
+        (updatedConfig: AppPathConfig, updatedTheme?: ColorThemeType) => {
+            setPathConfig(updatedConfig);
+            if (updatedTheme) setTheme(updatedTheme);
+            fetchUiData();
+        },
+        [fetchUiData],
+    );
+
+    // --- Other handlers remain largely the same ---
     const handleToggleDownloadsSidebar = useCallback(() => setDownloadsSidebarOpen((p) => !p), []);
     const handleCloseDownloadsSidebar = useCallback(() => setDownloadsSidebarOpen(false), []);
-
     const handleDownloadsStarted = useCallback(() => {
         setIsDownloadModalOpen(false);
         setModelForDownload(null);
         setSpecificFileForDownload(null);
         setDownloadsSidebarOpen(true);
     }, []);
-
     const openDownloadModal = useCallback(
         (modelDetails: ModelDetails, specificFile?: ModelFile) => {
             setModelForDownload(modelDetails);
@@ -160,22 +227,11 @@ function App() {
         },
         [],
     );
-
     const closeDownloadModal = useCallback(() => {
         setIsDownloadModalOpen(false);
         setModelForDownload(null);
         setSpecificFileForDownload(null);
     }, []);
-
-    const handleInstallUi = useCallback(async (uiName: UiNameType) => {
-        try {
-            await installUiAPI(uiName);
-            setDownloadsSidebarOpen(true);
-        } catch (error) {
-            logger.error(`Failed to start installation for ${uiName}:`, error);
-        }
-    }, []);
-
     const handleRunUi = useCallback(async (uiName: UiNameType) => {
         try {
             await runUiAPI(uiName);
@@ -184,7 +240,6 @@ function App() {
             logger.error(`Failed to start UI ${uiName}:`, error);
         }
     }, []);
-
     const handleStopUi = useCallback(async (taskId: string) => {
         try {
             await stopUiAPI(taskId);
@@ -192,7 +247,6 @@ function App() {
             logger.error(`Failed to stop UI task ${taskId}:`, error);
         }
     }, []);
-
     const handleDeleteUi = useCallback(
         async (uiName: UiNameType) => {
             try {
@@ -204,7 +258,6 @@ function App() {
         },
         [fetchUiData],
     );
-
     const isUiBusy = useCallback(
         (uiName: UiNameType): boolean => {
             return Array.from(activeDownloads.values()).some(
@@ -214,7 +267,6 @@ function App() {
         },
         [activeDownloads],
     );
-
     const loadInitialConfig = useCallback(async () => {
         setIsConfigLoading(true);
         try {
@@ -234,15 +286,12 @@ function App() {
             setIsConfigLoading(false);
         }
     }, [fetchUiData]);
-
     useEffect(() => {
         loadInitialConfig();
     }, [loadInitialConfig]);
-
     useEffect(() => {
         document.body.className = theme === 'light' ? 'light-theme' : '';
     }, [theme]);
-
     const handleThemeToggleAndSave = useCallback(async () => {
         const newTheme = theme === 'light' ? 'dark' : 'light';
         setTheme(newTheme);
@@ -252,16 +301,6 @@ function App() {
             logger.error('Failed to save theme to backend:', error);
         }
     }, [theme]);
-
-    const handlePathConfigurationUpdate = useCallback(
-        (updatedConfig: AppPathConfig, updatedTheme?: ColorThemeType) => {
-            setPathConfig(updatedConfig);
-            if (updatedTheme) setTheme(updatedTheme);
-            fetchUiData();
-        },
-        [fetchUiData],
-    );
-
     const handleDismissDownload = useCallback((downloadId: string) => {
         setActiveDownloads((prev) => {
             const newMap = new Map(prev);
@@ -272,7 +311,6 @@ function App() {
             logger.error(`Failed to dismiss download ${downloadId}:`, error),
         );
     }, []);
-
     const downloadSummaryStatus = useMemo((): DownloadSummaryStatus => {
         const statuses = Array.from(activeDownloads.values());
         if (statuses.length === 0) return 'idle';
@@ -286,8 +324,6 @@ function App() {
             return 'downloading';
         return 'completed';
     }, [activeDownloads]);
-
-    // Combine available UI info with their live status for easier prop drilling.
     const combinedManagedUis = useMemo(() => {
         const availableMap = new Map(availableUis.map((ui) => [ui.ui_name, ui]));
         return uiStatuses.map((status) => ({
@@ -295,18 +331,14 @@ function App() {
             ...availableMap.get(status.ui_name),
         }));
     }, [availableUis, uiStatuses]);
-
-    // Determine the active UI for the "Quick Start" button based on config mode.
     const activeUiForQuickStart = useMemo(() => {
         const targetUiName =
             pathConfig.configMode === 'automatic'
                 ? pathConfig.automaticModeUi
                 : pathConfig.uiProfile;
-
         if (!targetUiName || targetUiName === 'Custom') return null;
         return combinedManagedUis.find((s) => s.ui_name === targetUiName) || null;
     }, [pathConfig, combinedManagedUis]);
-
     const handleQuickStart = useCallback(() => {
         if (!activeUiForQuickStart) return;
         if (activeUiForQuickStart.is_running && activeUiForQuickStart.running_task_id) {
@@ -422,6 +454,7 @@ function App() {
                 specificFileToDownload={specificFileForDownload}
                 onDownloadsStarted={handleDownloadsStarted}
             />
+            {/* The InstallUiModal is now managed by the UiManagementPage */}
         </div>
     );
 }

@@ -126,6 +126,7 @@ export interface DownloadStatus {
     error_message?: string | null;
     status_text?: string | null;
     target_path?: string | null;
+    set_as_active_on_completion?: boolean;
 }
 
 // --- Host Directory Scanning Interfaces ---
@@ -173,6 +174,12 @@ export interface AvailableUiItem {
     default_profile_name: UiProfileType;
 }
 
+export interface UiInstallRequest {
+    ui_name: UiNameType;
+    custom_install_path?: string | null;
+    set_as_active: boolean;
+}
+
 export interface ManagedUiStatus {
     ui_name: UiNameType;
     is_installed: boolean;
@@ -189,11 +196,27 @@ export interface UiActionResponse {
     success: boolean;
     message: string;
     task_id: string;
+    set_as_active_on_completion: boolean;
 }
 
 // --- API Functions ---
-// The actual function implementations remain the same, as they correctly
-// pass through the data structures defined above.
+
+export const installUiAPI = async (request: UiInstallRequest): Promise<UiActionResponse> => {
+    try {
+        // The endpoint now takes the entire request object in the body.
+        const response = await apiClient.post<UiActionResponse>('/uis/install', request);
+        return response.data;
+    } catch (error) {
+        console.error(`Error starting installation for ${request.ui_name}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+// Other API functions remain unchanged as their contracts were not affected.
 
 export const searchModels = async (
     params: SearchModelParams,
@@ -352,7 +375,7 @@ export const deleteManagedItemAPI = async (
     relativePath: string,
 ): Promise<{ success: boolean; message: string }> => {
     try {
-        const response = await apiClient.delete<{ success: boolean; message: string }>(
+        const response = await apiClient.delete<{ success: boolean; message:string }>(
             '/filemanager/files',
             { data: { path: relativePath } },
         );
@@ -400,20 +423,6 @@ export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
     } catch (error) {
         console.error('Error fetching UI statuses:', error);
         return { items: [] };
-    }
-};
-
-export const installUiAPI = async (uiName: UiNameType): Promise<UiActionResponse> => {
-    try {
-        const response = await apiClient.post<UiActionResponse>(`/uis/${uiName}/install`);
-        return response.data;
-    } catch (error) {
-        console.error(`Error starting installation for ${uiName}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
     }
 };
 
