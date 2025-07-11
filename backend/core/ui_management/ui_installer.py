@@ -4,7 +4,7 @@ import logging
 import pathlib
 import sys
 import re
-from typing import Callable, Coroutine, Any, Optional, Literal
+from typing import Callable, Coroutine, Any, Optional, Literal, List
 
 # --- Type Definitions ---
 StreamCallback = Callable[[str], Coroutine[Any, Any, None]]
@@ -101,6 +101,7 @@ async def install_dependencies(
     requirements_file: str,
     stream_callback: Optional[StreamCallback] = None,
     progress_callback: Optional[PipProgressCallback] = None,
+    extra_packages: Optional[List[str]] = None,
 ) -> bool:
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
@@ -115,6 +116,22 @@ async def install_dependencies(
 
     logger.info(f"Installing dependencies from '{req_path}'...")
 
+    pip_command = [
+        str(venv_python),
+        "-m",
+        "pip",
+        "install",
+        "--timeout",
+        "600",
+        "-r",
+        str(req_path),
+        "--no-cache-dir",
+    ]
+
+    if extra_packages:
+        logger.info(f"Installing extra packages: {extra_packages}")
+        pip_command.extend(extra_packages)
+
     phase: PipPhase = "collecting"
     try:
         with open(req_path, "r", encoding="utf-8") as f:
@@ -122,6 +139,8 @@ async def install_dependencies(
                 line.strip() for line in f if line.strip() and not line.startswith("#")
             ]
             top_level_total = len(top_level_packages)
+            if extra_packages:
+                top_level_total += len(extra_packages)
     except Exception:
         top_level_total = 1
 
@@ -176,15 +195,7 @@ async def install_dependencies(
                     asyncio.create_task(progress_ticker())
 
     process = await asyncio.create_subprocess_exec(
-        str(venv_python),
-        "-m",
-        "pip",
-        "install",
-        "--timeout",
-        "600",
-        "-r",
-        str(req_path),
-        "--no-cache-dir",
+        *pip_command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

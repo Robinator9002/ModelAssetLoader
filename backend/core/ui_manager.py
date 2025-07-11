@@ -185,6 +185,27 @@ class UiManager:
                 task_id, 5, status_text="Process is running...", new_status="running"
             )
 
+            # Capture and stream stdout/stderr to see why a process might be failing.
+            async def read_stream(stream, stream_name):
+                while not stream.at_eof():
+                    try:
+                        line_bytes = await stream.readline()
+                        if not line_bytes:
+                            break
+                        line = line_bytes.decode("utf-8", errors="replace").strip()
+                        if line:
+                            # Log to backend console and broadcast to frontend
+                            logger.info(f"[{ui_name}:{stream_name}] {line}")
+                            await self._stream_progress_to_tracker(task_id, line)
+                    except Exception as e:
+                        logger.warning(f"Error reading stream from {ui_name}: {e}")
+                        break
+
+            await asyncio.gather(
+                read_stream(process.stdout, "stdout"),
+                read_stream(process.stderr, "stderr"),
+            )
+
             await process.wait()
             return_code = process.returncode
 

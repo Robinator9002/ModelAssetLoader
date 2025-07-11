@@ -5,7 +5,7 @@ import asyncio
 import uuid
 import os
 import shutil
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 # Import specialized managers and helpers
 from .file_management.config_manager import ConfigManager
@@ -52,22 +52,23 @@ class FileManager:
         custom_model_type_paths: Optional[Dict[str, str]] = None,
         color_theme: Optional[ColorThemeType] = None,
         config_mode: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        automatic_mode_ui: Optional[str] = None,
+    ) -> Tuple[bool, str]:
         """
         Configures the application paths and settings.
         """
+        # Note: This assumes `self.config.update_configuration` in ConfigManager
+        # has also been updated to accept `automatic_mode_ui`.
         changed, message = self.config.update_configuration(
-            base_path_str, profile, custom_model_type_paths, color_theme, config_mode
+            base_path_str,
+            profile,
+            custom_model_type_paths,
+            color_theme,
+            config_mode,
+            automatic_mode_ui,
         )
         success = "failed" not in message
-        response = {
-            "success": success,
-            "message": message,
-            "configured_base_path": (str(self.config.base_path) if self.config.base_path else None),
-        }
-        if not success:
-            response["error"] = message
-        return response
+        return success, message
 
     def start_download_model_file(
         self,

@@ -82,6 +82,7 @@ UI_REPOSITORIES: Dict[UiNameType, Dict[str, Any]] = {
         "start_script": "main.py",
         "python_version": "3.10",
         "default_profile_name": "ComfyUI",
+        "extra_packages": ["pyyaml"],
     },
     "A1111": {
         "git_url": "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git",
