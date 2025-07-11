@@ -82,13 +82,11 @@ class MalFullConfiguration(BaseModel):
     Represents the full, current configuration of the application, as sent to the frontend.
     """
 
-    # The effective base path, dynamically resolved by the backend.
     base_path: Optional[str]
     ui_profile: Optional[UiProfileTypePydantic] = Field(None, alias="profile")
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
     config_mode: Optional[ConfigurationModePydantic]
-    # The name of the managed UI selected in 'automatic' mode.
     automatic_mode_ui: Optional[UiNameTypePydantic] = Field(None)
 
     class Config:
@@ -113,7 +111,6 @@ class PathConfigurationResponse(BaseModel):
 
     success: bool
     message: Optional[str] = None
-    # The full, updated configuration state to sync the frontend.
     current_config: Optional[MalFullConfiguration] = None
 
 
@@ -214,6 +211,16 @@ class AvailableUiItem(BaseModel):
     )
 
 
+class UiInstallRequest(BaseModel):
+    """Request model for installing a UI environment."""
+
+    ui_name: UiNameTypePydantic
+    # An optional user-provided absolute path for the installation.
+    custom_install_path: Optional[str] = Field(None)
+    # If true, the frontend will be signaled to set this UI as active after success.
+    set_as_active: bool = Field(False)
+
+
 class ManagedUiStatus(BaseModel):
     """Represents the status of a single managed UI environment."""
 
@@ -240,6 +247,8 @@ class UiActionResponse(BaseModel):
     success: bool
     message: str
     task_id: str = Field(..., description="The unique ID for tracking the task via WebSocket.")
+    # This field signals the frontend to perform a follow-up action on completion.
+    set_as_active_on_completion: bool = Field(False)
 
 
 class UiStopRequest(BaseModel):

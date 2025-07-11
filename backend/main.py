@@ -6,9 +6,11 @@ from fastapi import (
     status,
     WebSocket,
     WebSocketDisconnect,
+    Body,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
+from typing import List, Optional, Dict
+import pathlib
 
 import logging
 import json
@@ -27,7 +29,7 @@ from backend.core.source_manager import SourceManager
 from backend.core.file_manager import FileManager
 from backend.core.ui_manager import UiManager
 from backend.core.file_management.download_tracker import download_tracker
-from backend.core.constants.constants import UI_REPOSITORIES
+from backend.core.constants.constants import UI_REPOSITORIES, MANAGED_UIS_ROOT_PATH, UiNameType
 
 # --- API Model Imports ---
 from backend.api.models import (
@@ -47,6 +49,7 @@ from backend.api.models import (
     AllUiStatusResponse,
     UiActionResponse,
     UiStopRequest,
+    UiInstallRequest,
     UiNameTypePydantic,
 )
 
@@ -55,7 +58,7 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.4.0",
+    version="1.5.0",
 )
 
 # --- CORS Middleware ---
@@ -112,30 +115,31 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     await manager.connect(websocket)
 
-    # Define the callback function for broadcasting status updates.
     async def broadcast_status_update(data: dict):
         await manager.broadcast(json.dumps(data, default=str))
 
-    # Set the callback on the singleton trackers.
     download_tracker.set_broadcast_callback(broadcast_status_update)
     ui_manager.broadcast_callback = broadcast_status_update
 
     try:
-        # Send the initial state of all tracked tasks to the new client.
         initial_statuses = download_tracker.get_all_statuses()
         await websocket.send_text(
             json.dumps({"type": "initial_state", "downloads": initial_statuses})
         )
-        # Keep the connection alive.
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        # If this was the last client, clear the callbacks to prevent unnecessary work.
         if not manager.active_connections:
             download_tracker.set_broadcast_callback(None)
             ui_manager.broadcast_callback = None
             logger.info("Last WebSocket client disconnected, clearing broadcast callbacks.")
+
+
+# --- Helper Functions ---
+def _get_default_managed_ui_paths() -> Dict[UiNameType, pathlib.Path]:
+    """Constructs a dictionary of the default installation paths for all known UIs."""
+    return {ui_name: MANAGED_UIS_ROOT_PATH / ui_name for ui_name in UI_REPOSITORIES}
 
 
 # --- API Endpoints ---
@@ -208,7 +212,6 @@ async def get_model_details(source: str, model_id: str):
     summary="Get Current FileManager Configuration",
 )
 async def get_file_manager_configuration():
-    # Retrieve the dynamically resolved configuration.
     config = file_manager.get_current_configuration()
     return MalFullConfiguration(**config)
 
@@ -220,10 +223,6 @@ async def get_file_manager_configuration():
     summary="Configure FileManager Paths and Settings",
 )
 async def configure_file_manager_paths_endpoint(config_request: PathConfigurationRequest):
-    """
-    Updates the application's core configuration based on the provided settings.
-    This now handles both 'automatic' and 'manual' configuration modes.
-    """
     success, message = file_manager.configure_paths(
         base_path_str=config_request.base_path,
         profile=config_request.profile,
@@ -234,8 +233,6 @@ async def configure_file_manager_paths_endpoint(config_request: PathConfiguratio
     )
     if not success:
         raise HTTPException(status_code=400, detail=message)
-
-    # On success, return the full, updated configuration state.
     updated_config_dict = file_manager.get_current_configuration()
     return PathConfigurationResponse(
         success=True,
@@ -304,54 +301,6 @@ async def scan_host_directories_endpoint(
     return ScanHostDirectoriesResponse(**scan_result)
 
 
-@app.get(
-    "/api/filemanager/files",
-    response_model=FileManagerListResponse,
-    tags=["FileManager"],
-    summary="List Files with Smart Navigation",
-)
-async def list_managed_files_endpoint(
-    path: Optional[str] = Query(None),
-    mode: str = Query("models", enum=["explorer", "models"]),
-):
-    if not file_manager.base_path:
-        raise HTTPException(status_code=400, detail="Base path is not configured.")
-    result = file_manager.list_managed_files(relative_path_str=path, mode=mode)
-    return result
-
-
-@app.delete(
-    "/api/filemanager/files",
-    status_code=status.HTTP_200_OK,
-    tags=["FileManager"],
-    summary="Delete a Managed File or Directory",
-)
-async def delete_managed_item_endpoint(request: LocalFileActionRequest):
-    if not file_manager.base_path:
-        raise HTTPException(status_code=400, detail="Base path is not configured.")
-    result = file_manager.delete_managed_item(relative_path_str=request.path)
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Failed to delete item."))
-    return result
-
-
-@app.get(
-    "/api/filemanager/files/preview",
-    response_model=LocalFileContentResponse,
-    tags=["FileManager"],
-    summary="Get Content of a Text File",
-)
-async def get_managed_file_preview_endpoint(path: str = Query(...)):
-    if not file_manager.base_path:
-        raise HTTPException(status_code=400, detail="Base path is not configured.")
-    result = file_manager.get_file_preview(relative_path_str=path)
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=400, detail=result.get("error", "Failed to get file preview.")
-        )
-    return result
-
-
 # === UI Environment Management Endpoints ===
 @app.get(
     "/api/uis",
@@ -360,7 +309,6 @@ async def get_managed_file_preview_endpoint(path: str = Query(...)):
     summary="List Available UIs for Installation",
 )
 async def list_available_uis():
-    """Returns a list of all UIs that M.A.L. knows how to install."""
     available_uis = [
         AvailableUiItem(
             ui_name=name,
@@ -379,27 +327,47 @@ async def list_available_uis():
     summary="Get Status of All Managed UIs",
 )
 async def get_all_ui_statuses():
-    status_items = await ui_manager.get_all_statuses()
+    # For now, we only check for UIs in the default managed location.
+    # This can be expanded later to include "adopted" UIs.
+    managed_paths = _get_default_managed_ui_paths()
+    status_items = await ui_manager.get_all_statuses(managed_paths)
     return AllUiStatusResponse(items=status_items)
 
 
 @app.post(
-    "/api/uis/{ui_name}/install",
+    "/api/uis/install",
     response_model=UiActionResponse,
     tags=["UIs"],
     summary="Install a UI Environment",
 )
-async def install_ui_environment(ui_name: UiNameTypePydantic):
-    """Triggers the background installation process for a specified UI."""
+async def install_ui_environment(request: UiInstallRequest = Body(...)):
+    """Triggers the background installation of a UI with custom options."""
+    ui_name = request.ui_name
+    install_path: pathlib.Path
+
+    if request.custom_install_path:
+        # User has provided a custom path.
+        install_path = pathlib.Path(request.custom_install_path)
+        if not install_path.parent.exists():
+            raise HTTPException(
+                status_code=400, detail="The parent of the custom install path does not exist."
+            )
+    else:
+        # Default path logic.
+        install_path = MANAGED_UIS_ROOT_PATH / ui_name
+
     task_id = str(uuid.uuid4())
     download_tracker.start_tracking(
         download_id=task_id,
         repo_id="UI Installation",
         filename=ui_name,
-        task=asyncio.create_task(ui_manager.install_ui_environment(ui_name, task_id)),
+        task=asyncio.create_task(ui_manager.install_ui_environment(ui_name, install_path, task_id)),
     )
     return UiActionResponse(
-        success=True, message=f"Installation for {ui_name} started.", task_id=task_id
+        success=True,
+        message=f"Installation for {ui_name} started.",
+        task_id=task_id,
+        set_as_active_on_completion=request.set_as_active,
     )
 
 
@@ -410,7 +378,13 @@ async def install_ui_environment(ui_name: UiNameTypePydantic):
     summary="Delete a UI Environment",
 )
 async def delete_ui_environment_endpoint(ui_name: UiNameTypePydantic):
-    success = await ui_manager.delete_environment(ui_name=ui_name)
+    # This assumes deletion only for default-managed UIs for now.
+    managed_paths = _get_default_managed_ui_paths()
+    install_path = managed_paths.get(ui_name)
+    if not install_path or not install_path.exists():
+        raise HTTPException(status_code=404, detail=f"Installation for {ui_name} not found.")
+
+    success = await ui_manager.delete_environment(install_path=install_path)
     if not success:
         raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
     return {"success": True, "message": f"{ui_name} environment deleted successfully."}
@@ -424,9 +398,14 @@ async def delete_ui_environment_endpoint(ui_name: UiNameTypePydantic):
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def run_ui(ui_name: UiNameTypePydantic):
-    """Triggers a background task to start a managed UI."""
+    # This assumes running only default-managed UIs for now.
+    managed_paths = _get_default_managed_ui_paths()
+    install_path = managed_paths.get(ui_name)
+    if not install_path or not install_path.exists():
+        raise HTTPException(status_code=404, detail=f"Installation for {ui_name} not found.")
+
     task_id = str(uuid.uuid4())
-    ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
+    ui_manager.run_ui(ui_name=ui_name, install_path=install_path, task_id=task_id)
     return UiActionResponse(
         success=True, message=f"Request to run {ui_name} accepted.", task_id=task_id
     )
