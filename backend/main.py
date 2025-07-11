@@ -301,6 +301,53 @@ async def scan_host_directories_endpoint(
     return ScanHostDirectoriesResponse(**scan_result)
 
 
+@app.get(
+    "/api/filemanager/files",
+    response_model=FileManagerListResponse,
+    tags=["FileManager"],
+    summary="List Files and Directories in Managed Path",
+)
+async def list_managed_files_endpoint(
+    path: Optional[str] = Query(None),
+    mode: str = Query("explorer", enum=["explorer", "models"]),
+):
+    if not file_manager.base_path:
+        # This case is important for when the app is first started.
+        raise HTTPException(status_code=404, detail="File manager base path not configured.")
+    contents = file_manager.list_managed_files(relative_path_str=path, mode=mode)
+    return FileManagerListResponse(**contents)
+
+
+@app.delete(
+    "/api/filemanager/files",
+    tags=["FileManager"],
+    summary="Delete a File or Directory",
+    status_code=status.HTTP_200_OK,
+)
+async def delete_managed_item_endpoint(request: LocalFileActionRequest):
+    if not file_manager.base_path:
+        raise HTTPException(status_code=404, detail="File manager not configured.")
+    result = file_manager.delete_managed_item(request.path)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Deletion failed."))
+    return result
+
+
+@app.get(
+    "/api/filemanager/files/preview",
+    response_model=LocalFileContentResponse,
+    tags=["FileManager"],
+    summary="Get Text File Content",
+)
+async def get_managed_file_content_endpoint(path: str = Query(...)):
+    if not file_manager.base_path:
+        raise HTTPException(status_code=404, detail="File manager not configured.")
+    result = file_manager.get_file_preview(path)
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "Cannot get file content."))
+    return LocalFileContentResponse(**result)
+
+
 # === UI Environment Management Endpoints ===
 @app.get(
     "/api/uis",
