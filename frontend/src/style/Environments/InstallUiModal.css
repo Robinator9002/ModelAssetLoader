@@ -1,98 +1,214 @@
 /*
  * =================================================================
- * M.A.L. - InstallUiModal Component Styles
+ * M.A.L. - InstallUiModal Component Styles (Refactored)
  * =================================================================
- * This file styles the modal used for configuring UI installations.
- * It inherits from global.css and Modals.css.
+ * This file styles ONLY the unique elements of the Install UI Modal.
+ * It inherits shared styles (e.g., .config-label, .config-hint)
+ * from other stylesheets like ConfigurationsPage.css, which are
+ * imported globally via App.css.
 */
 
-/* --- Modal Body & Layout --- */
+/* --- Modal Content & Body --- */
 .install-modal-content {
-    max-width: 550px;
+    max-width: 600px; /* Wider for the new two-column layout */
 }
 
 .install-modal-body {
-    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3)
+    padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 4)
         calc(var(--spacing-unit) * 4);
     display: flex;
     flex-direction: column;
-    gap: calc(var(--spacing-unit) * 3);
+    gap: calc(var(--spacing-unit) * 3.5);
+    /* Subtle background texture for depth */
+    background-image: radial-gradient(
+        circle at 1px 1px,
+        rgba(var(--color-primary-rgb), 0.04) 1px,
+        transparent 0
+    );
+    background-size: 25px 25px;
+}
+
+.modal-header-content {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1.5);
+}
+
+.modal-header .header-icon {
+    color: var(--color-primary);
 }
 
 .modal-description {
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: var(--color-text-secondary);
     text-align: center;
-    margin-bottom: var(--spacing-unit);
+    margin-bottom: 0;
 }
 
 .modal-description strong {
     color: var(--color-text-primary);
-}
-
-/* --- Form Section Styling --- */
-.form-section {
-    display: flex;
-    flex-direction: column;
-    gap: calc(var(--spacing-unit) * 1);
-}
-
-/* Reusing config-label and config-hint from ConfigurationsPage styles */
-.config-label {
     font-weight: 600;
-    font-size: 1rem;
-    color: var(--color-text-primary);
 }
 
-.config-hint {
-    font-size: 0.85rem;
-    color: var(--color-text-placeholder);
-    margin: 0;
-    line-height: 1.5;
+/* --- Installation Option Cards --- */
+.install-option-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: calc(var(--spacing-unit) * 2.5);
 }
 
-/* Reusing base-path-selector for consistency */
-.base-path-selector {
+.install-option-card {
     display: flex;
-    gap: var(--spacing-unit);
-}
-
-.base-path-selector .path-input {
-    flex-grow: 1;
-}
-
-/* --- Custom Checkbox Container --- */
-.checkbox-container {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing-unit) * 1.5);
-    padding: var(--spacing-unit);
-    border-radius: var(--border-radius-md);
+    align-items: flex-start;
+    gap: calc(var(--spacing-unit) * 2);
+    padding: calc(var(--spacing-unit) * 2.5);
+    border: 2px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
     cursor: pointer;
-    transition: background-color var(--transition-speed-fast) ease;
-    outline: none; /* We'll use box-shadow for focus */
+    transition: all var(--transition-speed-normal) ease;
+    background-color: var(--color-surface);
+    position: relative;
+    overflow: hidden;
 }
 
-.checkbox-container:hover,
-.checkbox-container:focus-visible {
-    background-color: var(--color-surface-alt);
+.install-option-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-border-hover);
 }
 
-.checkbox-container:focus-visible {
-    box-shadow: 0 0 0 2px var(--color-primary);
+.install-option-card:focus-visible {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.25);
 }
 
-.checkbox-icon {
+.install-option-card.selected {
+    border-color: var(--color-primary);
+    background-color: rgba(var(--color-primary-rgb), 0.08);
+    box-shadow: 0 0 15px rgba(var(--color-primary-rgb), 0.2), var(--shadow-inset);
+    transform: translateY(-2px);
+}
+
+.option-card-icon {
     flex-shrink: 0;
-    color: var(--color-border-hover);
-    transition: color var(--transition-speed-fast) ease;
+    margin-top: 4px;
+    color: var(--color-text-secondary);
+    transition: color var(--transition-speed-normal) ease;
 }
 
-.checkbox-container .checkbox-icon.checked {
+.install-option-card.selected .option-card-icon {
     color: var(--color-primary);
 }
 
-.checkbox-container .config-label {
-    cursor: pointer; /* Inherit cursor from parent */
-    font-weight: 500;
+.option-card-text .config-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+    transition: color var(--transition-speed-normal) ease;
+}
+
+.install-option-card.selected .config-label {
+    color: var(--color-text-primary);
+}
+
+.option-card-text .config-hint {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--color-text-placeholder);
+}
+
+/* --- Custom Path Section --- */
+.custom-path-section {
+    animation: slideDownFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top;
+}
+
+@keyframes slideDownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scaleY(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+    }
+}
+
+/* --- 'Set Active' Toggle Switch --- */
+.set-active-section {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 2);
+    padding: calc(var(--spacing-unit) * 2);
+    background-color: var(--color-surface-alt);
+    border-radius: var(--border-radius-lg);
+}
+
+.toggle-label-group {
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-surface);
+    border: 2px solid var(--color-border-hover);
+    border-radius: 28px;
+    transition: all var(--transition-speed-normal) ease;
+}
+
+.slider:before {
+    position: absolute;
+    content: '';
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--color-text-secondary);
+    border-radius: 50%;
+    transition: all var(--transition-speed-normal) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toggle-switch input:checked + .slider {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.toggle-switch input:checked + .slider:before {
+    transform: translateX(22px);
+    background-color: white;
+}
+
+.toggle-switch input:focus-visible + .slider {
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.3);
+}
+
+/* --- Generic Form Section --- */
+/* This class is intentionally kept for semantic grouping in the TSX, */
+/* but its styling is inherited from other stylesheets. */
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 1.5);
 }
