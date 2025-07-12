@@ -64,7 +64,7 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.7.0",  # Version bump for adoption feature
+    version="1.7.1",  # Version bump for cancel endpoint fix
 )
 
 # --- CORS Middleware ---
@@ -265,6 +265,26 @@ async def download_model_file_endpoint(download_request: FileDownloadRequest):
     return FileDownloadResponse(**result)
 
 
+@app.post(
+    "/api/filemanager/download/cancel",
+    status_code=status.HTTP_200_OK,
+    tags=["FileManager"],
+    summary="Cancel a running download task",
+)
+async def cancel_download_endpoint(payload: dict = Body(...)):
+    """
+    Cancels a download task by its ID. This applies to file downloads, not
+    running UI processes, which should be stopped via the /uis/stop endpoint.
+    """
+    download_id = payload.get("download_id")
+    if not download_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="download_id is required."
+        )
+    await file_manager.cancel_download(download_id)
+    return {"success": True, "message": f"Cancellation request for {download_id} sent."}
+
+
 # === UI Environment Management Endpoints ===
 @app.get(
     "/api/uis",
@@ -306,10 +326,14 @@ async def get_all_ui_statuses():
 async def install_ui_environment(request: UiInstallRequest = Body(...)):
     """Triggers the background installation of a UI."""
     task_id = str(uuid.uuid4())
-    ui_manager.install_ui_environment(
-        ui_name=request.ui_name,
-        install_path=pathlib.Path(request.custom_install_path),
-        task_id=task_id,
+    # This function is not awaited because it runs in the background.
+    asyncio.create_task(
+        ui_manager.install_ui_environment(
+            ui_name=request.ui_name,
+            # The custom path is now expected to be a string from the frontend.
+            install_path=pathlib.Path(request.custom_install_path),
+            task_id=task_id,
+        )
     )
     return UiActionResponse(
         success=True,
