@@ -14,6 +14,7 @@ dist-ssr
 
 # Project Data Folder
 config
+managed_uis
 
 # Editor directories and files
 .vscode/*
