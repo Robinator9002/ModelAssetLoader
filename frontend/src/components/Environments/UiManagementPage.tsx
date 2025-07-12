@@ -1,17 +1,31 @@
 // frontend/src/components/Environments/UiManagementPage.tsx
 import React, { useState } from 'react';
 import {
+    // Type definitions
     type AvailableUiItem,
     type ManagedUiStatus,
     type UiNameType,
     type UiInstallRequest,
 } from '../../api/api';
-import { Layers, Download, Trash2, Play, CheckCircle, Loader2, StopCircle } from 'lucide-react';
+import {
+    // Icons
+    Layers,
+    Download,
+    Trash2,
+    Play,
+    CheckCircle,
+    Loader2,
+    StopCircle,
+    ClipboardCheck,
+} from 'lucide-react';
+// Component Imports
 import InstallUiModal from './InstallUiModal';
 import ConfirmModal from '../Layout/ConfirmModal';
+import AdoptUiModal from './AdoptUiModal'; // Import the new adoption modal
 
 /**
  * Props for the UiManagementPage component.
+ * Updated to include handlers for the adoption workflow.
  */
 interface UiManagementPageProps {
     availableUis: AvailableUiItem[];
@@ -21,6 +35,9 @@ interface UiManagementPageProps {
     onStop: (taskId: string) => void;
     onDelete: (uiName: UiNameType) => void;
     isBusy: (uiName: UiNameType) => boolean;
+    // Handlers for the adoption process, to be passed from App.tsx
+    onRepair: (uiName: UiNameType, path: string, issues: string[]) => void;
+    onFinalizeAdoption: (uiName: UiNameType, path: string) => void;
 }
 
 /**
@@ -34,12 +51,16 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
     onStop,
     onDelete,
     isBusy,
+    onRepair,
+    onFinalizeAdoption,
 }) => {
     // --- State for Modals ---
     const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
     const [uiToInstall, setUiToInstall] = useState<AvailableUiItem | null>(null);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [uiToDelete, setUiToDelete] = useState<UiNameType | null>(null);
+    // State for the new adoption modal
+    const [isAdoptModalOpen, setIsAdoptModalOpen] = useState(false);
 
     // --- Modal Handlers ---
     const handleOpenInstallModal = (ui: AvailableUiItem) => {
@@ -91,8 +112,14 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
         <>
             <div className="ui-management-page">
                 <div className="config-header">
-                    <h1>UI Environments</h1>
-                    <p>Install, run, and manage supported AI user interfaces.</p>
+                    <div className="config-header-text">
+                        <h1>UI Environments</h1>
+                        <p>Install, run, and manage supported AI user interfaces.</p>
+                    </div>
+                    {/* Button to trigger the new adoption modal */}
+                    <button className="button" onClick={() => setIsAdoptModalOpen(true)}>
+                        <ClipboardCheck size={18} /> Adopt Existing UI
+                    </button>
                 </div>
 
                 <div className="ui-management-grid">
@@ -165,7 +192,7 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                                                 onClick={() => handleRequestDelete(ui.ui_name)}
                                                 title="Delete the managed installation."
                                             >
-                                                <Trash2 size={18} /> Delete
+                                                <Trash2 size={18} />
                                             </button>
                                             {ui.is_running && ui.running_task_id ? (
                                                 <button
@@ -192,6 +219,8 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                     })}
                 </div>
             </div>
+
+            {/* Render the modals */}
             <InstallUiModal
                 isOpen={isInstallModalOpen}
                 onClose={handleCloseInstallModal}
@@ -202,6 +231,13 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                     isBusy(uiToInstall.ui_name) &&
                     !uiStatuses.find((s) => s.ui_name === uiToInstall.ui_name)?.is_installed
                 }
+            />
+            <AdoptUiModal
+                isOpen={isAdoptModalOpen}
+                onClose={() => setIsAdoptModalOpen(false)}
+                availableUis={availableUis}
+                onConfirmRepair={onRepair}
+                onConfirmFinalize={onFinalizeAdoption}
             />
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}
