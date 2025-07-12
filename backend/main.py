@@ -18,7 +18,6 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 
 # --- API Model Imports ---
-# This includes the newly defined models for the adoption workflow.
 from backend.api.models import (
     AdoptionAnalysisResponse,
     AllUiStatusResponse,
@@ -30,7 +29,6 @@ from backend.api.models import (
     LocalFileContentResponse,
     MalFullConfiguration,
     ModelDetails,
-    ModelListItem,
     PaginatedModelListResponse,
     PathConfigurationRequest,
     PathConfigurationResponse,
@@ -42,10 +40,12 @@ from backend.api.models import (
     UiInstallRequest,
     UiNameTypePydantic,
     UiStopRequest,
+    ModelListItem,
 )
 
 # --- Core Service Imports ---
-from backend.core.constants.constants import UI_REPOSITORIES
+# MODIFIED: Added MANAGED_UIS_ROOT_PATH for default installations
+from backend.core.constants.constants import MANAGED_UIS_ROOT_PATH, UI_REPOSITORIES
 from backend.core.file_manager import FileManager
 from backend.core.file_management.download_tracker import download_tracker
 from backend.core.source_manager import SourceManager
@@ -64,7 +64,7 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.7.1",  # Version bump for cancel endpoint fix
+    version="1.7.4",  # Version bump for install path fix
 )
 
 # --- CORS Middleware ---
@@ -78,7 +78,6 @@ app.add_middleware(
 )
 
 # --- Service Instances ---
-# These are singletons for the application's lifecycle.
 source_manager = SourceManager()
 file_manager = FileManager()
 ui_manager = UiManager()
@@ -102,7 +101,6 @@ class ConnectionManager:
             logger.info(f"WebSocket client disconnected: {websocket.client}")
 
     async def broadcast(self, message: str):
-        # Broadcasts a message to all connected clients.
         for connection in list(self.active_connections):
             try:
                 await connection.send_text(message)
@@ -122,22 +120,18 @@ async def websocket_endpoint(websocket: WebSocket):
     async def broadcast_status_update(data: dict):
         await manager.broadcast(json.dumps(data, default=str))
 
-    # Register the broadcast callback with the managers
     download_tracker.set_broadcast_callback(broadcast_status_update)
     ui_manager.broadcast_callback = broadcast_status_update
 
     try:
-        # Send the current state of all tasks to the newly connected client
         initial_statuses = download_tracker.get_all_statuses()
         await websocket.send_text(
             json.dumps({"type": "initial_state", "downloads": initial_statuses})
         )
-        # Keep the connection alive
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        # If no clients are connected, clear the callback to prevent unnecessary work
         if not manager.active_connections:
             download_tracker.set_broadcast_callback(None)
             ui_manager.broadcast_callback = None
@@ -154,7 +148,7 @@ async def websocket_endpoint(websocket: WebSocket):
     tags=["Models"],
     summary="Search Models from a Source",
 )
-async def search_models(
+async def search_models_endpoint(
     source: str = Query("huggingface"),
     search: Optional[str] = Query(None),
     author: Optional[str] = Query(None),
@@ -193,7 +187,7 @@ async def search_models(
     tags=["Models"],
     summary="Get Model Details from a Source",
 )
-async def get_model_details(source: str, model_id: str):
+async def get_model_details_endpoint(source: str, model_id: str):
     try:
         details_data = source_manager.get_model_details(model_id=model_id, source=source)
         if not details_data:
@@ -213,9 +207,8 @@ async def get_model_details(source: str, model_id: str):
     tags=["FileManager"],
     summary="Get Current FileManager Configuration",
 )
-async def get_file_manager_configuration():
-    config = file_manager.get_current_configuration()
-    return MalFullConfiguration(**config)
+async def get_config_endpoint():
+    return MalFullConfiguration(**file_manager.get_current_configuration())
 
 
 @app.post(
@@ -224,7 +217,7 @@ async def get_file_manager_configuration():
     tags=["FileManager"],
     summary="Configure FileManager Paths and Settings",
 )
-async def configure_file_manager_paths_endpoint(config_request: PathConfigurationRequest):
+async def configure_paths_endpoint(config_request: PathConfigurationRequest):
     success, message = file_manager.configure_paths(
         base_path_str=config_request.base_path,
         profile=config_request.profile,
@@ -235,11 +228,10 @@ async def configure_file_manager_paths_endpoint(config_request: PathConfiguratio
     )
     if not success:
         raise HTTPException(status_code=400, detail=message)
-    updated_config_dict = file_manager.get_current_configuration()
     return PathConfigurationResponse(
         success=True,
         message=message,
-        current_config=MalFullConfiguration(**updated_config_dict),
+        current_config=MalFullConfiguration(**file_manager.get_current_configuration()),
     )
 
 
@@ -249,7 +241,7 @@ async def configure_file_manager_paths_endpoint(config_request: PathConfiguratio
     tags=["FileManager"],
     summary="Download a Model File",
 )
-async def download_model_file_endpoint(download_request: FileDownloadRequest):
+async def download_file_endpoint(download_request: FileDownloadRequest):
     if not file_manager.base_path:
         raise HTTPException(status_code=400, detail="Base path not configured.")
     result = file_manager.start_download_model_file(
@@ -272,17 +264,74 @@ async def download_model_file_endpoint(download_request: FileDownloadRequest):
     summary="Cancel a running download task",
 )
 async def cancel_download_endpoint(payload: dict = Body(...)):
-    """
-    Cancels a download task by its ID. This applies to file downloads, not
-    running UI processes, which should be stopped via the /uis/stop endpoint.
-    """
     download_id = payload.get("download_id")
     if not download_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="download_id is required."
-        )
+        raise HTTPException(status_code=400, detail="download_id is required.")
     await file_manager.cancel_download(download_id)
     return {"success": True, "message": f"Cancellation request for {download_id} sent."}
+
+
+@app.get(
+    "/api/filemanager/scan-host-directories",
+    response_model=ScanHostDirectoriesResponse,
+    tags=["FileManager"],
+    summary="Scan Host System Directories",
+)
+async def scan_host_directories_endpoint(
+    path: Optional[str] = Query(None), max_depth: int = Query(1, ge=1, le=5)
+):
+    try:
+        result = file_manager.list_host_directories(path_to_scan_str=path, max_depth=max_depth)
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=400, detail=result.get("error", "Failed to scan directories.")
+            )
+        return ScanHostDirectoriesResponse(**result)
+    except Exception as e:
+        logger.error(f"Error scanning host directories: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="An internal server error occurred while scanning directories."
+        )
+
+
+@app.get(
+    "/api/filemanager/files",
+    response_model=FileManagerListResponse,
+    tags=["FileManager"],
+    summary="List Files and Directories in Managed Path",
+)
+async def list_managed_files_endpoint(
+    path: Optional[str] = Query(None), mode: str = Query("models", enum=["models", "explorer"])
+):
+    if not file_manager.base_path:
+        raise HTTPException(status_code=400, detail="Base path not configured.")
+    return file_manager.list_managed_files(relative_path_str=path, mode=mode)
+
+
+@app.delete(
+    "/api/filemanager/files",
+    status_code=status.HTTP_200_OK,
+    tags=["FileManager"],
+    summary="Delete a File or Directory",
+)
+async def delete_managed_item_endpoint(request: LocalFileActionRequest):
+    result = file_manager.delete_managed_item(relative_path_str=request.path)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Deletion failed."))
+    return result
+
+
+@app.get(
+    "/api/filemanager/files/preview",
+    response_model=LocalFileContentResponse,
+    tags=["FileManager"],
+    summary="Get Content of a Text File for Preview",
+)
+async def get_file_preview_endpoint(path: str = Query(...)):
+    result = file_manager.get_file_preview(relative_path_str=path)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Preview failed."))
+    return result
 
 
 # === UI Environment Management Endpoints ===
@@ -292,9 +341,8 @@ async def cancel_download_endpoint(payload: dict = Body(...)):
     tags=["UIs"],
     summary="List Available UIs for Installation",
 )
-async def list_available_uis():
-    """Lists all UIs defined in the constants, regardless of installation status."""
-    available_uis = [
+async def list_available_uis_endpoint():
+    return [
         AvailableUiItem(
             ui_name=name,
             git_url=details["git_url"],
@@ -302,7 +350,6 @@ async def list_available_uis():
         )
         for name, details in UI_REPOSITORIES.items()
     ]
-    return available_uis
 
 
 @app.get(
@@ -311,10 +358,8 @@ async def list_available_uis():
     tags=["UIs"],
     summary="Get Status of All Registered UIs",
 )
-async def get_all_ui_statuses():
-    """Gets the status of all UIs that have been installed and registered."""
-    status_items = await ui_manager.get_all_statuses()
-    return AllUiStatusResponse(items=status_items)
+async def get_all_ui_statuses_endpoint():
+    return AllUiStatusResponse(items=await ui_manager.get_all_statuses())
 
 
 @app.post(
@@ -323,15 +368,35 @@ async def get_all_ui_statuses():
     tags=["UIs"],
     summary="Install a UI Environment",
 )
-async def install_ui_environment(request: UiInstallRequest = Body(...)):
-    """Triggers the background installation of a UI."""
+async def install_ui_endpoint(request: UiInstallRequest = Body(...)):
+    """
+    Triggers the background installation of a UI. It handles both default
+    and custom installation paths.
+    """
     task_id = str(uuid.uuid4())
-    # This function is not awaited because it runs in the background.
+
+    # Determine the installation path based on user choice
+    install_path: pathlib.Path
+    if request.custom_install_path:
+        # User provided a custom path
+        install_path = pathlib.Path(request.custom_install_path)
+    else:
+        # User chose default installation. Construct the path from constants.
+        install_path = MANAGED_UIS_ROOT_PATH / request.ui_name
+
+    # Basic security check to prevent installing in weird places.
+    # Also ensures the parent directory exists before the task starts.
+    try:
+        install_path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Failed to create or access install directory {install_path.parent}: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid installation path: {install_path}")
+
+    # This must not be awaited, as it runs as a background task
     asyncio.create_task(
         ui_manager.install_ui_environment(
             ui_name=request.ui_name,
-            # The custom path is now expected to be a string from the frontend.
-            install_path=pathlib.Path(request.custom_install_path),
+            install_path=install_path,
             task_id=task_id,
         )
     )
@@ -348,10 +413,8 @@ async def install_ui_environment(request: UiInstallRequest = Body(...)):
     response_model=UiActionResponse,
     tags=["UIs"],
     summary="Run an Installed UI",
-    status_code=status.HTTP_202_ACCEPTED,
 )
-async def run_ui(ui_name: UiNameTypePydantic):
-    """Runs a UI by its name. The manager finds the registered path."""
+async def run_ui_endpoint(ui_name: UiNameTypePydantic):
     task_id = str(uuid.uuid4())
     ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
     return UiActionResponse(
@@ -368,8 +431,7 @@ async def run_ui(ui_name: UiNameTypePydantic):
     tags=["UIs"],
     summary="Stop a Running UI Process",
 )
-async def stop_ui(request: UiStopRequest):
-    """Stops a UI process by its task ID."""
+async def stop_ui_endpoint(request: UiStopRequest):
     await ui_manager.stop_ui(task_id=request.task_id)
     return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
 
@@ -380,32 +442,27 @@ async def stop_ui(request: UiStopRequest):
     tags=["UIs"],
     summary="Delete a Registered UI Environment",
 )
-async def delete_ui_environment_endpoint(ui_name: UiNameTypePydantic):
-    """Deletes a UI environment by its name."""
-    success = await ui_manager.delete_environment(ui_name=ui_name)
-    if not success:
+async def delete_ui_endpoint(ui_name: UiNameTypePydantic):
+    if not await ui_manager.delete_environment(ui_name=ui_name):
         raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
     return {"success": True, "message": f"{ui_name} environment deleted successfully."}
 
 
 # --- UI Adoption Endpoints ---
-
-
 @app.post(
     "/api/uis/adopt/analyze",
     response_model=AdoptionAnalysisResponse,
     tags=["UIs", "Adoption"],
     summary="Analyze a Directory for UI Adoption",
 )
-async def analyze_adoption_candidate(request: UiAdoptionAnalysisRequest):
-    """Analyzes a user-provided directory to check if it's a valid UI installation."""
+async def analyze_adoption_endpoint(request: UiAdoptionAnalysisRequest):
     try:
-        path = pathlib.Path(request.path)
-        analysis_result = ui_manager.analyze_adoption_candidate(request.ui_name, path)
-        return AdoptionAnalysisResponse(**analysis_result)
+        return AdoptionAnalysisResponse(
+            **ui_manager.analyze_adoption_candidate(request.ui_name, pathlib.Path(request.path))
+        )
     except Exception as e:
         logger.error(f"Error during adoption analysis: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An unexpected error occurred during analysis.")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
 
 @app.post(
@@ -414,8 +471,7 @@ async def analyze_adoption_candidate(request: UiAdoptionAnalysisRequest):
     tags=["UIs", "Adoption"],
     summary="Repair and Adopt a UI Environment",
 )
-async def repair_and_adopt_ui_endpoint(request: UiAdoptionRepairRequest):
-    """Starts a background task to repair a UI installation and adopt it upon completion."""
+async def repair_and_adopt_endpoint(request: UiAdoptionRepairRequest):
     task_id = str(uuid.uuid4())
     ui_manager.repair_and_adopt_ui(
         ui_name=request.ui_name,
@@ -427,7 +483,7 @@ async def repair_and_adopt_ui_endpoint(request: UiAdoptionRepairRequest):
         success=True,
         message=f"Repair process for {request.ui_name} started.",
         task_id=task_id,
-        set_as_active_on_completion=True,  # Adopted UIs are often intended to be active
+        set_as_active_on_completion=True,
     )
 
 
@@ -438,9 +494,7 @@ async def repair_and_adopt_ui_endpoint(request: UiAdoptionRepairRequest):
     summary="Finalize Adoption of a UI without Repairs",
 )
 async def finalize_adoption_endpoint(request: UiAdoptionFinalizeRequest):
-    """Directly registers a UI installation without performing any repairs."""
-    success = ui_manager.finalize_adoption(ui_name=request.ui_name, path=pathlib.Path(request.path))
-    if not success:
+    if not ui_manager.finalize_adoption(request.ui_name, pathlib.Path(request.path)):
         raise HTTPException(status_code=500, detail="Failed to finalize adoption.")
     return {"success": True, "message": f"{request.ui_name} adopted successfully."}
 
