@@ -84,6 +84,7 @@ class UiManager:
 
         git_url = ui_info["git_url"]
         req_file = ui_info.get("requirements_file")
+        extra_packages = ui_info.get("extra_packages")
 
         if not req_file:
             msg = f"Installation failed: 'requirements_file' not defined for {ui_name}."
@@ -116,7 +117,9 @@ class UiManager:
             ):
                 """Callback to translate pip output into smooth progress bar updates."""
                 if phase == "collecting":
-                    estimated_total = total * 3 if total > 0 else 1
+                    # Heuristic: collecting is usually faster than installing.
+                    # We can make the total seem larger to slow down the progress bar here.
+                    estimated_total = total * 2 if total > 0 else 1
                     fraction = min(current / estimated_total, 1.0)
                     progress = COLLECT_START + (fraction * COLLECT_RANGE)
                     await download_tracker.update_task_progress(
@@ -131,7 +134,7 @@ class UiManager:
                 task_id, VENV_END, "Resolving dependencies..."
             )
             if not await ui_installer.install_dependencies(
-                install_path, req_file, streamer, pip_progress_updater
+                install_path, req_file, streamer, pip_progress_updater, extra_packages
             ):
                 raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
 
@@ -185,7 +188,10 @@ class UiManager:
                 task_id, 5, status_text="Process is running...", new_status="running"
             )
 
-            # Capture and stream stdout/stderr to see why a process might be failing.
+            # --- FIX STARTS HERE ---
+            output_lines = []  # List to accumulate all output for logging on failure
+
+            # Capture and stream stdout/stderr
             async def read_stream(stream, stream_name):
                 while not stream.at_eof():
                     try:
@@ -194,9 +200,10 @@ class UiManager:
                             break
                         line = line_bytes.decode("utf-8", errors="replace").strip()
                         if line:
-                            # Log to backend console and broadcast to frontend
+                            # Log to backend console, broadcast to frontend, and save for later
                             logger.info(f"[{ui_name}:{stream_name}] {line}")
                             await self._stream_progress_to_tracker(task_id, line)
+                            output_lines.append(line)
                     except Exception as e:
                         logger.warning(f"Error reading stream from {ui_name}: {e}")
                         break
@@ -212,9 +219,15 @@ class UiManager:
             if return_code == 0:
                 await download_tracker.complete_download(task_id, f"{ui_name} finished.")
             else:
+                # If the process failed, log the complete output we collected
+                combined_output = "\n".join(output_lines)
+                error_message = f"{ui_name} exited with code {return_code}."
+                logger.error(f"{error_message} Full Output:\n{combined_output}")
                 await download_tracker.fail_download(
-                    task_id, f"{ui_name} exited with code {return_code}."
+                    task_id, f"{error_message} Check backend logs for details."
                 )
+            # --- FIX ENDS HERE ---
+
         except Exception as e:
             await download_tracker.fail_download(task_id, str(e))
         finally:

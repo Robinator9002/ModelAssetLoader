@@ -95,6 +95,7 @@ async def run_ui(
     try:
         process = await asyncio.create_subprocess_exec(
             str(venv_python),
+            "-u",
             str(script_path),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
