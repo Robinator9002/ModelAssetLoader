@@ -215,10 +215,13 @@ class UiInstallRequest(BaseModel):
     """Request model for installing a UI environment."""
 
     ui_name: UiNameTypePydantic
-    # An optional user-provided absolute path for the installation.
-    custom_install_path: Optional[str] = Field(None)
-    # If true, the frontend will be signaled to set this UI as active after success.
-    set_as_active: bool = Field(False)
+    custom_install_path: Optional[str] = Field(
+        None, description="An optional user-provided absolute path for the installation."
+    )
+    set_as_active: bool = Field(
+        False,
+        description="If true, the frontend will be signaled to set this UI as active after success.",
+    )
 
 
 class ManagedUiStatus(BaseModel):
@@ -242,16 +245,77 @@ class AllUiStatusResponse(BaseModel):
 
 
 class UiActionResponse(BaseModel):
-    """Standard response for actions that trigger a background task (install, run)."""
+    """Standard response for actions that trigger a background task (install, run, repair)."""
 
     success: bool
     message: str
     task_id: str = Field(..., description="The unique ID for tracking the task via WebSocket.")
-    # This field signals the frontend to perform a follow-up action on completion.
-    set_as_active_on_completion: bool = Field(False)
+    set_as_active_on_completion: bool = Field(
+        False,
+        description="This field signals the frontend to perform a follow-up action on completion.",
+    )
 
 
 class UiStopRequest(BaseModel):
     """Request model for stopping a running UI process."""
 
     task_id: str = Field(..., description="The task_id of the running process to be stopped.")
+
+
+# --- UI Environment Adoption Models ---
+
+
+class UiAdoptionAnalysisRequest(BaseModel):
+    """Request model for analyzing a potential UI installation for adoption."""
+
+    ui_name: UiNameTypePydantic
+    path: str = Field(..., description="The absolute path to the directory to be analyzed.")
+
+
+class AdoptionIssue(BaseModel):
+    """Describes a single issue found during the adoption analysis."""
+
+    code: str = Field(
+        ..., description="A machine-readable code for the issue (e.g., 'VENV_MISSING')."
+    )
+    message: str = Field(..., description="A human-readable description of the issue.")
+    is_fixable: bool = Field(..., description="Indicates if M.A.L. can attempt to fix this issue.")
+    fix_description: str = Field(
+        ..., description="A human-readable description of the proposed fix."
+    )
+    default_fix_enabled: bool = Field(
+        ..., description="Whether the fix should be enabled by default in the UI."
+    )
+
+
+class AdoptionAnalysisResponse(BaseModel):
+    """The result of a UI adoption analysis, detailing the health of the installation."""
+
+    is_adoptable: bool = Field(
+        ...,
+        description="Overall status indicating if the installation can be adopted (i.e., has no unfixable critical issues).",
+    )
+    is_healthy: bool = Field(
+        ...,
+        description="Indicates if the installation is in a perfect, ready-to-run state with no issues.",
+    )
+    issues: List[AdoptionIssue] = Field(
+        ..., description="A list of all issues found during the analysis."
+    )
+
+
+class UiAdoptionRepairRequest(BaseModel):
+    """Request model to trigger a repair process for an adoption candidate."""
+
+    ui_name: UiNameTypePydantic
+    path: str = Field(..., description="The absolute path to the directory to be repaired.")
+    issues_to_fix: List[str] = Field(
+        ..., description="A list of issue codes to be addressed by the repair process."
+    )
+
+
+class UiAdoptionFinalizeRequest(BaseModel):
+    """Request model to finalize the adoption of a UI, adding it to the registry."""
+
+    ui_name: UiNameTypePydantic
+    path: str = Field(..., description="The absolute path to the directory to be adopted.")
