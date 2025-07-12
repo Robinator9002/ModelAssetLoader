@@ -37,7 +37,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Add functionality to download and manage the AI UIs themselves (ComfyUI, A1111, etc.).
 
-    [ ] Rework the Configuration and Installation Mechanics to fit the new Automation System.
+    [x] Rework the Configuration and Installation Mechanics to fit the new Automation System.
 
     [ ] Add Adoption Mechanic for Installation
 
