@@ -387,7 +387,7 @@ export const finalizeAdoptionAPI = async (
     }
 };
 
-// --- Other API Functions (Unchanged) ---
+// --- Other API Functions ---
 
 export const searchModels = async (
     params: SearchModelParams,
@@ -427,6 +427,29 @@ export const downloadFileAPI = async (
         const axiosError = error as any;
         if (axiosError.response && axiosError.response.data) {
             return axiosError.response.data;
+        }
+        throw error;
+    }
+};
+
+/**
+ * Sends a request to the backend to cancel a running download task.
+ * @param {string} downloadId The ID of the download to cancel.
+ * @returns A promise that resolves with the server's response.
+ */
+export const cancelDownloadAPI = async (
+    downloadId: string,
+): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.post('/filemanager/download/cancel', {
+            download_id: downloadId,
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Error cancelling download ${downloadId}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
         }
         throw error;
     }
