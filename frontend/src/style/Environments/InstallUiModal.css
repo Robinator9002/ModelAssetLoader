@@ -1,6 +1,6 @@
 /*
  * =================================================================
- * M.A.L. - InstallUiModal Component Styles (Refactored)
+ * M.A.L. - InstallUiModal Component Styles (Refined)
  * =================================================================
  * This file styles ONLY the unique elements of the Install UI Modal.
  * It inherits shared styles (e.g., .config-label, .config-hint)
@@ -38,11 +38,16 @@
     color: var(--color-primary);
 }
 
+/* --- FIX: Tighter line-height for main description --- */
 .modal-description {
     font-size: 1.1rem;
     color: var(--color-text-secondary);
     text-align: center;
     margin-bottom: 0;
+    line-height: 1.45; /* Reduced from the global 1.65 to prevent awkward spacing */
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .modal-description strong {
@@ -101,10 +106,17 @@
     color: var(--color-primary);
 }
 
+.option-card-text {
+    /* NEW: This ensures the contents are laid out cleanly */
+    display: flex;
+    flex-direction: column;
+}
+
 .option-card-text .config-label {
     font-size: 1.1rem;
     font-weight: 600;
-    margin-bottom: calc(var(--spacing-unit) * 0.5);
+    /* FIX: Reduced bottom margin to bring hint text closer */
+    margin-bottom: calc(var(--spacing-unit) * 0.25);
     transition: color var(--transition-speed-normal) ease;
 }
 
@@ -112,10 +124,12 @@
     color: var(--color-text-primary);
 }
 
+/* --- FIX: Tighter line-height for hint text to prevent overlap --- */
 .option-card-text .config-hint {
     font-size: 0.9rem;
-    line-height: 1.4;
+    line-height: 1.4; /* Corrected line-height */
     color: var(--color-text-placeholder);
+    margin: 0; /* Removed all margins from the hint itself */
 }
 
 /* --- Custom Path Section --- */
@@ -143,12 +157,29 @@
     padding: calc(var(--spacing-unit) * 2);
     background-color: var(--color-surface-alt);
     border-radius: var(--border-radius-lg);
+    /* POLISH: Added transition for a subtle hover effect */
+    transition: background-color var(--transition-speed-normal) ease;
+}
+.set-active-section:hover {
+    background-color: var(--color-surface-hover);
 }
 
 .toggle-label-group {
     display: flex;
     flex-direction: column;
     cursor: pointer;
+    /* FIX: Added a small gap to separate the label and hint */
+    gap: calc(var(--spacing-unit) * 0.25);
+}
+
+.toggle-label-group .config-label {
+    margin-bottom: 0; /* Remove margin from the label inside this group */
+}
+
+/* --- FIX: Apply same tight line-height to this hint text --- */
+.toggle-label-group .config-hint {
+    line-height: 1.4;
+    margin: 0;
 }
 
 .toggle-switch {
@@ -205,8 +236,6 @@
 }
 
 /* --- Generic Form Section --- */
-/* This class is intentionally kept for semantic grouping in the TSX, */
-/* but its styling is inherited from other stylesheets. */
 .form-section {
     display: flex;
     flex-direction: column;
