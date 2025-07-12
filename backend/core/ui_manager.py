@@ -4,50 +4,59 @@ import logging
 import pathlib
 from typing import Optional, Dict, List
 
-from .constants.constants import UI_REPOSITORIES, UiNameType
-from .ui_management import ui_installer, ui_operator
-
-# --- NEW IMPORT ---
-# We now import the UiRegistry to manage persistent storage of install paths.
-from .ui_management.ui_registry import UiRegistry
-from .file_management.download_tracker import download_tracker, BroadcastCallable
 from backend.api.models import ManagedUiStatus
+from backend.core.constants.constants import UI_REPOSITORIES, UiNameType
+from backend.core.file_management.download_tracker import download_tracker, BroadcastCallable
+from backend.core.ui_management import ui_installer, ui_operator
+from backend.core.ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
+from backend.core.ui_management.ui_registry import UiRegistry
+
 
 logger = logging.getLogger(__name__)
 
 
 class UiManager:
     """
-    Manages the lifecycle of UI environments by coordinating with the UI Registry
-    for path information and operators for execution.
+    Manages the lifecycle of UI environments.
+
+    This class serves as the central orchestrator for installing, running, deleting,
+    and adopting UI environments. It coordinates with the UiRegistry for path
+    persistence and delegates specific tasks to operators and installers.
     """
 
     def __init__(self, broadcast_callback: Optional[BroadcastCallable] = None):
-        """Initializes the UiManager and its connection to the UI Registry."""
+        """
+        Initializes the UiManager.
+
+        Args:
+            broadcast_callback: An optional async function to broadcast real-time
+                                status updates, typically to a WebSocket.
+        """
         self.broadcast_callback = broadcast_callback
         self.running_processes: Dict[str, asyncio.subprocess.Process] = {}
         self.running_ui_tasks: Dict[UiNameType, str] = {}
-        # --- NEW: Instantiate the registry ---
-        # The UiManager now has a direct line to our persistent storage.
         self.registry = UiRegistry()
         logger.info("UiManager initialized and connected to UI Registry.")
 
     async def get_all_statuses(self) -> List[ManagedUiStatus]:
         """
-        Retrieves the current status for all UIs based on the registry,
-        making it the single source of truth.
+        Retrieves the current status for all registered UI environments.
+
+        This method acts as the single source of truth for the state of all UIs
+        known to the application. It performs a health check and will automatically
+        unregister any installations whose directories have been manually deleted.
+
+        Returns:
+            A list of ManagedUiStatus objects representing each registered UI.
         """
         statuses: List[ManagedUiStatus] = []
-        # --- MODIFIED: Get all known paths directly from the registry ---
         registered_paths = self.registry.get_all_paths()
 
-        # We check the status of every UI the registry knows about.
         for ui_name, install_path in registered_paths.items():
             is_installed = install_path.is_dir()
             running_task_id = self.running_ui_tasks.get(ui_name)
             is_running = running_task_id is not None
 
-            # If a directory was deleted manually, we should unregister it.
             if not is_installed:
                 logger.warning(
                     f"Installation for '{ui_name}' at '{install_path}' not found. Unregistering."
@@ -66,89 +75,47 @@ class UiManager:
             )
         return statuses
 
-    async def _get_ui_info(self, ui_name: UiNameType, task_id: str) -> Optional[dict]:
-        """Helper to retrieve UI metadata from constants."""
-        ui_info = UI_REPOSITORIES.get(ui_name)
-        if not ui_info:
-            logger.error(f"Unknown UI '{ui_name}'. Cannot proceed.")
-            await download_tracker.fail_download(
-                task_id, f"Unknown UI '{ui_name}'. Action aborted."
-            )
-        return ui_info
-
-    async def _stream_progress_to_tracker(self, task_id: str, line: str):
-        """Streams log lines from subprocesses to the frontend via the tracker."""
-        if self.broadcast_callback:
-            await self.broadcast_callback({"type": "log", "task_id": task_id, "message": line})
-
     async def install_ui_environment(
         self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str
     ):
         """
-        Orchestrates the installation and, on success, registers the new path.
+        Orchestrates the complete installation of a new UI environment.
+
+        This process involves cloning the repository, creating a virtual environment,
+        installing dependencies, and finally registering the installation.
+
+        Args:
+            ui_name: The name of the UI to install.
+            install_path: The target directory for the installation.
+            task_id: The unique ID for tracking this task.
         """
         ui_info = await self._get_ui_info(ui_name, task_id)
         if not ui_info:
             return
 
-        git_url = ui_info["git_url"]
-        req_file = ui_info.get("requirements_file")
-        extra_packages = ui_info.get("extra_packages")
-
-        if not req_file:
-            msg = f"Installation failed: 'requirements_file' not defined for {ui_name}."
-            logger.error(msg)
-            await download_tracker.fail_download(task_id, msg)
-            return
-
-        CLONE_END, VENV_END = 15.0, 25.0
-        COLLECT_START, COLLECT_END = 25.0, 70.0
-        INSTALL_START, INSTALL_END = 70.0, 95.0
-        COLLECT_RANGE = COLLECT_END - COLLECT_START
-        INSTALL_RANGE = INSTALL_END - INSTALL_START
-
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
 
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
-            if not await ui_installer.clone_repo(git_url, install_path, streamer):
+            if not await ui_installer.clone_repo(ui_info["git_url"], install_path, streamer):
                 raise RuntimeError(f"Failed to clone repository for {ui_name}.")
 
             await download_tracker.update_task_progress(
-                task_id, CLONE_END, "Creating virtual environment..."
+                task_id, 15.0, "Creating virtual environment..."
             )
             if not await ui_installer.create_venv(install_path, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
-            async def pip_progress_updater(
-                phase: ui_installer.PipPhase, current: int, total: int, status_text: str
-            ):
-                if phase == "collecting":
-                    estimated_total = total * 2 if total > 0 else 1
-                    fraction = min(current / estimated_total, 1.0)
-                    progress = COLLECT_START + (fraction * COLLECT_RANGE)
-                    await download_tracker.update_task_progress(
-                        task_id, progress, f"Collecting: {status_text}"
-                    )
-                elif phase == "installing":
-                    fraction = current / total if total > 0 else 0
-                    progress = INSTALL_START + (fraction * INSTALL_RANGE)
-                    await download_tracker.update_task_progress(task_id, progress, status_text)
-
-            await download_tracker.update_task_progress(
-                task_id, VENV_END, "Resolving dependencies..."
-            )
+            await download_tracker.update_task_progress(task_id, 25.0, "Installing dependencies...")
             if not await ui_installer.install_dependencies(
-                install_path, req_file, streamer, pip_progress_updater, extra_packages
+                install_path,
+                ui_info["requirements_file"],
+                streamer,
+                extra_packages=ui_info.get("extra_packages"),
             ):
                 raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
 
-            await download_tracker.update_task_progress(
-                task_id, INSTALL_END, "Finalizing installation..."
-            )
-
-            # --- MODIFIED: Register the installation on success ---
-            # This is the crucial step that records the custom path.
+            await download_tracker.update_task_progress(task_id, 95.0, "Finalizing installation...")
             self.registry.add_installation(ui_name, install_path)
             await download_tracker.complete_download(task_id, str(install_path))
 
@@ -157,45 +124,161 @@ class UiManager:
             logger.error(error_message, exc_info=True)
             await download_tracker.fail_download(task_id, error_message)
 
-    async def delete_environment(self, ui_name: UiNameType) -> bool:
-        """Deletes the UI environment folder and removes it from the registry."""
-        install_path = self.registry.get_path(ui_name)
-        if not install_path:
-            logger.warning(f"Cannot delete '{ui_name}', not found in registry.")
-            return False
-
-        if await ui_operator.delete_ui_environment(install_path):
-            # --- MODIFIED: Unregister on successful deletion ---
-            self.registry.remove_installation(ui_name)
-            return True
-        return False
-
     def run_ui(self, ui_name: UiNameType, task_id: str):
-        """Starts a UI process using its registered path."""
-        # --- MODIFIED: Get the path from the registry ---
+        """
+        Starts a registered UI environment as a background process.
+
+        Args:
+            ui_name: The name of the UI to run.
+            task_id: The unique ID for tracking this task.
+        """
         install_path = self.registry.get_path(ui_name)
         if not install_path or not install_path.exists():
-            # Fail fast if the UI is registered but the path is gone.
-            async def fail_task():
-                error_msg = f"Installation path for {ui_name} not found or is invalid."
-                logger.error(error_msg)
-                await download_tracker.fail_download(task_id, error_msg)
-
-            download_tracker.start_tracking(
-                download_id=task_id,
-                repo_id="UI Process",
-                filename=ui_name,
-                task=asyncio.create_task(fail_task()),
+            self._fail_task_fast(
+                task_id, ui_name, f"Installation path for {ui_name} not found or is invalid."
             )
             return
 
-        # The rest of the function proceeds as before, now with a reliable path.
         download_tracker.start_tracking(
             download_id=task_id,
             repo_id="UI Process",
             filename=ui_name,
             task=asyncio.create_task(self._run_and_manage_process(ui_name, install_path, task_id)),
         )
+
+    async def stop_ui(self, task_id: str):
+        """
+        Stops a running UI process by its task ID.
+
+        Args:
+            task_id: The ID of the running task to terminate.
+        """
+        process = self.running_processes.get(task_id)
+        if not process:
+            return
+
+        logger.info(f"Terminating process {process.pid} for task {task_id}.")
+        try:
+            process.terminate()
+            await asyncio.wait_for(process.wait(), timeout=10)
+        except asyncio.TimeoutError:
+            logger.warning(f"Process {process.pid} did not terminate gracefully. Killing.")
+            process.kill()
+
+    async def delete_environment(self, ui_name: UiNameType) -> bool:
+        """
+        Deletes a UI environment's directory and removes it from the registry.
+
+        Args:
+            ui_name: The name of the UI to delete.
+
+        Returns:
+            True if deletion was successful, False otherwise.
+        """
+        install_path = self.registry.get_path(ui_name)
+        if not install_path:
+            logger.warning(f"Cannot delete '{ui_name}', not found in registry.")
+            return False
+
+        if await ui_operator.delete_ui_environment(install_path):
+            self.registry.remove_installation(ui_name)
+            return True
+        return False
+
+    def analyze_adoption_candidate(
+        self, ui_name: UiNameType, path: pathlib.Path
+    ) -> AdoptionAnalysisResult:
+        """
+        Analyzes a directory to determine if it's a valid, adoptable UI installation.
+
+        Args:
+            ui_name: The type of UI to check for.
+            path: The path to the directory to analyze.
+
+        Returns:
+            An AdoptionAnalysisResult dictionary with the findings.
+        """
+        adopter = UiAdopter(ui_name, path)
+        return adopter.analyze()
+
+    def repair_and_adopt_ui(
+        self, ui_name: UiNameType, path: pathlib.Path, issues_to_fix: List[str], task_id: str
+    ):
+        """
+        Creates a background task to repair a UI environment and then adopt it.
+
+        Args:
+            ui_name: The name of the UI being repaired.
+            path: The path to the UI installation.
+            issues_to_fix: A list of issue codes to be addressed.
+            task_id: The unique ID for tracking this repair task.
+        """
+        download_tracker.start_tracking(
+            download_id=task_id,
+            repo_id="UI Adoption Repair",
+            filename=ui_name,
+            task=asyncio.create_task(
+                self._run_repair_process(ui_name, path, issues_to_fix, task_id)
+            ),
+        )
+
+    def finalize_adoption(self, ui_name: UiNameType, path: pathlib.Path) -> bool:
+        """
+        Directly adopts a UI by adding it to the registry without repairs.
+
+        Args:
+            ui_name: The name of the UI to adopt.
+            path: The path to the UI installation.
+
+        Returns:
+            True if adoption was successful, False otherwise.
+        """
+        logger.info(f"Finalizing adoption for '{ui_name}' at '{path}' without repairs.")
+        try:
+            self.registry.add_installation(ui_name, path)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to finalize adoption for {ui_name}: {e}", exc_info=True)
+            return False
+
+    async def _run_repair_process(
+        self, ui_name: UiNameType, path: pathlib.Path, issues_to_fix: List[str], task_id: str
+    ):
+        """The core async method that performs the repair actions."""
+        logger.info(f"Starting repair process for '{ui_name}'. Issues: {issues_to_fix}")
+        ui_info = await self._get_ui_info(ui_name, task_id)
+        if not ui_info:
+            return
+
+        try:
+            streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
+
+            if "VENV_MISSING" in issues_to_fix or "VENV_INCOMPLETE" in issues_to_fix:
+                await download_tracker.update_task_progress(
+                    task_id, 10, "Creating virtual environment..."
+                )
+                if not await ui_installer.create_venv(path, streamer):
+                    raise RuntimeError("Failed to create virtual environment.")
+
+                await download_tracker.update_task_progress(
+                    task_id, 50, "Installing dependencies..."
+                )
+                if not await ui_installer.install_dependencies(
+                    path,
+                    ui_info["requirements_file"],
+                    streamer,
+                    extra_packages=ui_info.get("extra_packages"),
+                ):
+                    raise RuntimeError("Failed to install dependencies.")
+
+            await download_tracker.update_task_progress(task_id, 95, "Finalizing adoption...")
+            self.registry.add_installation(ui_name, path)
+            await download_tracker.complete_download(
+                task_id, f"Successfully repaired and adopted {ui_name}."
+            )
+
+        except Exception as e:
+            await download_tracker.fail_download(task_id, f"Repair process failed: {e}")
 
     async def _run_and_manage_process(
         self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str
@@ -266,16 +349,25 @@ class UiManager:
             if self.running_ui_tasks.get(ui_name) == task_id:
                 self.running_ui_tasks.pop(ui_name, None)
 
-    async def stop_ui(self, task_id: str):
-        """Stops a running UI process by its task ID."""
-        process = self.running_processes.get(task_id)
-        if not process:
-            return
+    async def _get_ui_info(
+        self, ui_name: UiNameType, task_id: Optional[str] = None
+    ) -> Optional[dict]:
+        """Helper to retrieve UI metadata from constants."""
+        ui_info = UI_REPOSITORIES.get(ui_name)
+        if not ui_info and task_id:
+            await self._fail_task_fast(task_id, ui_name, f"Unknown UI '{ui_name}'.")
+        return ui_info
 
-        try:
-            logger.info(f"Terminating process {process.pid} for task {task_id}.")
-            process.terminate()
-            await asyncio.wait_for(process.wait(), timeout=10)
-        except asyncio.TimeoutError:
-            logger.warning(f"Process {process.pid} did not terminate gracefully. Killing.")
-            process.kill()
+    def _fail_task_fast(self, task_id: str, ui_name: UiNameType, message: str):
+        """Helper to quickly fail a task that cannot even start."""
+        logger.error(message)
+
+        async def fail_task():
+            await download_tracker.fail_download(task_id, message)
+
+        download_tracker.start_tracking(
+            download_id=task_id,
+            repo_id="UI Process",
+            filename=ui_name,
+            task=asyncio.create_task(fail_task()),
+        )
