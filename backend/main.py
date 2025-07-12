@@ -58,11 +58,11 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.5.0",
+    version="1.6.0",  # Version bump for new feature
 )
 
 # --- CORS Middleware ---
-origins = ["http://localhost:5173"]
+origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -72,7 +72,6 @@ app.add_middleware(
 )
 
 # --- Service Instances ---
-# Initialize the core managers for the application.
 source_manager = SourceManager()
 file_manager = FileManager()
 ui_manager = UiManager()
@@ -109,10 +108,7 @@ manager = ConnectionManager()
 # --- WebSocket Endpoint for Real-time Updates ---
 @app.websocket("/ws/downloads")
 async def websocket_endpoint(websocket: WebSocket):
-    """
-    Handles WebSocket connections for sending real-time updates on downloads
-    and other background tasks.
-    """
+    """Handles WebSocket connections for real-time updates."""
     await manager.connect(websocket)
 
     async def broadcast_status_update(data: dict):
@@ -126,6 +122,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.send_text(
             json.dumps({"type": "initial_state", "downloads": initial_statuses})
         )
+        # Keep the connection alive by waiting for messages (or use a sleep loop)
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
@@ -134,12 +131,6 @@ async def websocket_endpoint(websocket: WebSocket):
             download_tracker.set_broadcast_callback(None)
             ui_manager.broadcast_callback = None
             logger.info("Last WebSocket client disconnected, clearing broadcast callbacks.")
-
-
-# --- Helper Functions ---
-def _get_default_managed_ui_paths() -> Dict[UiNameType, pathlib.Path]:
-    """Constructs a dictionary of the default installation paths for all known UIs."""
-    return {ui_name: MANAGED_UIS_ROOT_PATH / ui_name for ui_name in UI_REPOSITORIES}
 
 
 # --- API Endpoints ---
@@ -156,7 +147,7 @@ async def search_models(
     source: str = Query("huggingface"),
     search: Optional[str] = Query(None),
     author: Optional[str] = Query(None),
-    tags: Optional[List[str]] = Query(None),
+    tags: Optional[List[str]] = Query(None, alias="tags[]"),
     sort: Optional[str] = Query("lastModified"),
     direction: Optional[int] = Query(-1, enum=[-1, 1]),
     limit: int = Query(30, ge=1, le=100),
@@ -312,7 +303,6 @@ async def list_managed_files_endpoint(
     mode: str = Query("explorer", enum=["explorer", "models"]),
 ):
     if not file_manager.base_path:
-        # This case is important for when the app is first started.
         raise HTTPException(status_code=404, detail="File manager base path not configured.")
     contents = file_manager.list_managed_files(relative_path_str=path, mode=mode)
     return FileManagerListResponse(**contents)
@@ -356,6 +346,7 @@ async def get_managed_file_content_endpoint(path: str = Query(...)):
     summary="List Available UIs for Installation",
 )
 async def list_available_uis():
+    """Lists all UIs defined in the constants, regardless of installation status."""
     available_uis = [
         AvailableUiItem(
             ui_name=name,
@@ -371,13 +362,14 @@ async def list_available_uis():
     "/api/uis/status",
     response_model=AllUiStatusResponse,
     tags=["UIs"],
-    summary="Get Status of All Managed UIs",
+    summary="Get Status of All Registered UIs",
 )
 async def get_all_ui_statuses():
-    # For now, we only check for UIs in the default managed location.
-    # This can be expanded later to include "adopted" UIs.
-    managed_paths = _get_default_managed_ui_paths()
-    status_items = await ui_manager.get_all_statuses(managed_paths)
+    """
+    Gets the status of all UIs that have been installed and registered.
+    This is now the single source of truth for the frontend.
+    """
+    status_items = await ui_manager.get_all_statuses()
     return AllUiStatusResponse(items=status_items)
 
 
@@ -388,7 +380,7 @@ async def get_all_ui_statuses():
     summary="Install a UI Environment",
 )
 async def install_ui_environment(request: UiInstallRequest = Body(...)):
-    """Triggers the background installation of a UI with custom options."""
+    """Triggers the background installation of a UI."""
     ui_name = request.ui_name
     install_path: pathlib.Path
 
@@ -400,10 +392,11 @@ async def install_ui_environment(request: UiInstallRequest = Body(...)):
                 status_code=400, detail="The parent of the custom install path does not exist."
             )
     else:
-        # Default path logic.
+        # Default path logic is a fallback if no custom path is given.
         install_path = MANAGED_UIS_ROOT_PATH / ui_name
 
     task_id = str(uuid.uuid4())
+    # The task now correctly calls the manager, which will handle registration on success.
     download_tracker.start_tracking(
         download_id=task_id,
         repo_id="UI Installation",
@@ -422,16 +415,11 @@ async def install_ui_environment(request: UiInstallRequest = Body(...)):
     "/api/uis/{ui_name}",
     status_code=status.HTTP_200_OK,
     tags=["UIs"],
-    summary="Delete a UI Environment",
+    summary="Delete a Registered UI Environment",
 )
 async def delete_ui_environment_endpoint(ui_name: UiNameTypePydantic):
-    # This assumes deletion only for default-managed UIs for now.
-    managed_paths = _get_default_managed_ui_paths()
-    install_path = managed_paths.get(ui_name)
-    if not install_path or not install_path.exists():
-        raise HTTPException(status_code=404, detail=f"Installation for {ui_name} not found.")
-
-    success = await ui_manager.delete_environment(install_path=install_path)
+    """Deletes a UI environment by telling the manager its name."""
+    success = await ui_manager.delete_environment(ui_name=ui_name)
     if not success:
         raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
     return {"success": True, "message": f"{ui_name} environment deleted successfully."}
@@ -445,16 +433,15 @@ async def delete_ui_environment_endpoint(ui_name: UiNameTypePydantic):
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def run_ui(ui_name: UiNameTypePydantic):
-    # This assumes running only default-managed UIs for now.
-    managed_paths = _get_default_managed_ui_paths()
-    install_path = managed_paths.get(ui_name)
-    if not install_path or not install_path.exists():
-        raise HTTPException(status_code=404, detail=f"Installation for {ui_name} not found.")
-
+    """Runs a UI by telling the manager its name. The manager finds the path."""
     task_id = str(uuid.uuid4())
-    ui_manager.run_ui(ui_name=ui_name, install_path=install_path, task_id=task_id)
+    # The manager now finds the path from the registry itself.
+    ui_manager.run_ui(ui_name=ui_name, task_id=task_id)
     return UiActionResponse(
-        success=True, message=f"Request to run {ui_name} accepted.", task_id=task_id
+        success=True,
+        message=f"Request to run {ui_name} accepted.",
+        task_id=task_id,
+        set_as_active_on_completion=False,
     )
 
 
@@ -465,6 +452,7 @@ async def run_ui(ui_name: UiNameTypePydantic):
     summary="Stop a Running UI Process",
 )
 async def stop_ui(request: UiStopRequest):
+    """Stops a UI process by its task ID."""
     await ui_manager.stop_ui(task_id=request.task_id)
     return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
 
@@ -474,4 +462,4 @@ if __name__ == "__main__":
     import uvicorn
 
     logger.info(f"Starting M.A.L. API server (v{app.version}) for development...")
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True, workers=1)
