@@ -7,7 +7,8 @@ import os
 import shutil
 from typing import Dict, Any, Optional, List, Tuple
 
-# Import specialized managers and helpers
+# --- MODIFIED: Import UiRegistry to pass it down ---
+from .ui_management.ui_registry import UiRegistry
 from .file_management.config_manager import ConfigManager
 from .file_management.path_resolver import PathResolver
 from .file_management.model_downloader import ModelDownloader
@@ -29,8 +30,15 @@ class FileManager:
     """
 
     def __init__(self):
-        """Initializes all the specialized manager components."""
-        self.config = ConfigManager()
+        """
+        Initializes all the specialized manager components in the correct order,
+        ensuring dependencies like UiRegistry are passed correctly.
+        """
+        # 1. Create the single source of truth for UI paths.
+        self.ui_registry = UiRegistry()
+        # 2. Give the ConfigManager access to it.
+        self.config = ConfigManager(ui_registry=self.ui_registry)
+        # 3. The rest of the components can now be initialized.
         self.paths = PathResolver(self.config)
         self.downloader = ModelDownloader()
         self.scanner = HostScanner()
@@ -40,9 +48,11 @@ class FileManager:
 
     @property
     def base_path(self) -> Optional[pathlib.Path]:
+        """Returns the dynamically resolved base path from the config manager."""
         return self.config.base_path
 
     def get_current_configuration(self) -> Dict[str, Any]:
+        """Gets the full, current application configuration."""
         return self.config.get_current_configuration()
 
     def configure_paths(
@@ -54,11 +64,7 @@ class FileManager:
         config_mode: Optional[str] = None,
         automatic_mode_ui: Optional[str] = None,
     ) -> Tuple[bool, str]:
-        """
-        Configures the application paths and settings.
-        """
-        # Note: This assumes `self.config.update_configuration` in ConfigManager
-        # has also been updated to accept `automatic_mode_ui`.
+        """Configures the application paths and settings."""
         changed, message = self.config.update_configuration(
             base_path_str,
             profile,
@@ -79,6 +85,7 @@ class FileManager:
         custom_sub_path: Optional[str] = None,
         revision: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Starts a model file download as a background task."""
         if source != "huggingface":
             return {
                 "success": False,
@@ -127,18 +134,20 @@ class FileManager:
         await download_tracker.cancel_and_remove(download_id)
 
     async def dismiss_download(self, download_id: str):
-        """Removes a finished (completed/error/cancelled) download from the tracker."""
+        """Removes a finished download from the tracker."""
         logger.info(f"Dismiss request received for download {download_id}.")
         await download_tracker.remove_download(download_id)
 
     def list_host_directories(
         self, path_to_scan_str: Optional[str] = None, max_depth: int = 1
     ) -> Dict[str, Any]:
+        """Lists directories on the host system."""
         return self.scanner.list_host_directories(path_to_scan_str, max_depth)
 
     def _resolve_and_validate_path(
         self, relative_path_str: Optional[str]
     ) -> Optional[pathlib.Path]:
+        """Resolves a relative path against the base_path and validates it."""
         if not self.base_path:
             return None
         if not relative_path_str:
@@ -158,6 +167,7 @@ class FileManager:
             return None
 
     def _has_models_recursive(self, directory: pathlib.Path) -> bool:
+        """Checks if a directory or its subdirectories contain model files."""
         try:
             for entry in os.scandir(directory):
                 if entry.is_file(follow_symlinks=False):
@@ -171,8 +181,21 @@ class FileManager:
         return False
 
     def _get_directory_contents(self, directory: pathlib.Path, mode: str) -> List[Dict[str, Any]]:
+        """Gets the contents of a directory, filtered by mode."""
         items = []
         for p in directory.iterdir():
+            # --- NEU: Ausschluss der 'venv' im Automatikmodus ---
+            # Wenn wir uns im Stammverzeichnis des base_path befinden und der Modus automatisch ist,
+            # überspringen wir das 'venv'-Verzeichnis, um unnötiges Scannen zu vermeiden.
+            if (
+                self.config.config_mode == "automatic"
+                and p.is_dir()
+                and p.name == "venv"
+                and p.parent == self.base_path
+            ):
+                logger.info("Skipping 'venv' directory at base path root in automatic mode.")
+                continue
+
             try:
                 is_dir = p.is_dir()
                 item_data = {
@@ -197,13 +220,14 @@ class FileManager:
     def list_managed_files(
         self, relative_path_str: Optional[str], mode: str = "explorer"
     ) -> Dict[str, Any]:
+        """Lists files in the managed path, with smart navigation for 'models' mode."""
         current_path = self._resolve_and_validate_path(relative_path_str)
         if not current_path or not current_path.is_dir():
             return {"path": relative_path_str, "items": []}
 
         if mode == "models":
-            # Limit the drill-down to prevent infinite loops with symlinks, etc.
-            for _ in range(10):  # Max drill-down depth of 10
+            # Smart drill-down for models view
+            for _ in range(10):  # Max drill-down depth
                 items = self._get_directory_contents(current_path, mode="models")
                 if len(items) == 1 and items[0]["item_type"] == "directory":
                     new_path_str = items[0]["path"]
@@ -229,6 +253,7 @@ class FileManager:
         return {"path": final_relative_path, "items": final_items}
 
     def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
+        """Deletes a file or directory within the managed base path."""
         target_path = self._resolve_and_validate_path(relative_path_str)
         if not target_path or not target_path.exists():
             return {"success": False, "error": "Path not found."}
@@ -244,14 +269,15 @@ class FileManager:
             return {"success": False, "error": str(e)}
 
     def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
+        """Gets the content of a text file for previewing."""
         target_path = self._resolve_and_validate_path(relative_path_str)
         if not target_path or not target_path.is_file():
             return {"success": False, "error": "Not a file."}
         allowed_extensions = {".txt", ".md", ".json", ".yaml", ".yml", ".py"}
         if target_path.suffix.lower() not in allowed_extensions:
-            return {"success": False, "error": "Preview not allowed."}
-        if target_path.stat().st_size > 1024 * 1024:
-            return {"success": False, "error": "File too large."}
+            return {"success": False, "error": "Preview not allowed for this file type."}
+        if target_path.stat().st_size > 1024 * 1024:  # 1MB limit
+            return {"success": False, "error": "File is too large to preview."}
         try:
             content = target_path.read_text(encoding="utf-8")
             return {"success": True, "path": relative_path_str, "content": content}
