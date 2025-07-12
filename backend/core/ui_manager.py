@@ -38,6 +38,21 @@ class UiManager:
         self.registry = UiRegistry()
         logger.info("UiManager initialized and connected to UI Registry.")
 
+    async def _stream_progress_to_tracker(self, task_id: str, line: str):
+        """
+        Helper method to stream text updates to the download tracker for a given task.
+        This keeps the frontend informed of detailed progress without changing the
+        overall percentage progress bar.
+        """
+        if task_id in download_tracker.active_downloads:
+            status = download_tracker.active_downloads[task_id]
+            # We only update the status text, preserving the last known progress percentage.
+            await download_tracker.update_task_progress(
+                task_id,
+                progress=status.progress,
+                status_text=line,
+            )
+
     async def get_all_statuses(self) -> List[ManagedUiStatus]:
         """
         Retrieves the current status for all registered UI environments.
@@ -94,6 +109,7 @@ class UiManager:
             return
 
         try:
+            # Correctly define the streamer to use the new helper method
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
 
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")

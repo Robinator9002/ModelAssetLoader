@@ -44,7 +44,6 @@ from backend.api.models import (
 )
 
 # --- Core Service Imports ---
-# MODIFIED: Added MANAGED_UIS_ROOT_PATH for default installations
 from backend.core.constants.constants import MANAGED_UIS_ROOT_PATH, UI_REPOSITORIES
 from backend.core.file_manager import FileManager
 from backend.core.file_management.download_tracker import download_tracker
@@ -64,7 +63,7 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.7.4",  # Version bump for install path fix
+    version="1.7.5",  # Version bump for installation tracking fix
 )
 
 # --- CORS Middleware ---
@@ -375,31 +374,34 @@ async def install_ui_endpoint(request: UiInstallRequest = Body(...)):
     """
     task_id = str(uuid.uuid4())
 
-    # Determine the installation path based on user choice
     install_path: pathlib.Path
     if request.custom_install_path:
-        # User provided a custom path
         install_path = pathlib.Path(request.custom_install_path)
     else:
-        # User chose default installation. Construct the path from constants.
         install_path = MANAGED_UIS_ROOT_PATH / request.ui_name
 
-    # Basic security check to prevent installing in weird places.
-    # Also ensures the parent directory exists before the task starts.
     try:
         install_path.parent.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         logger.error(f"Failed to create or access install directory {install_path.parent}: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid installation path: {install_path}")
 
-    # This must not be awaited, as it runs as a background task
-    asyncio.create_task(
-        ui_manager.install_ui_environment(
-            ui_name=request.ui_name,
-            install_path=install_path,
-            task_id=task_id,
-        )
+    # Create the coroutine and the task that will run it
+    install_coro = ui_manager.install_ui_environment(
+        ui_name=request.ui_name,
+        install_path=install_path,
+        task_id=task_id,
     )
+    background_task = asyncio.create_task(install_coro)
+
+    # Immediately register the task with the tracker so the UI sees it
+    download_tracker.start_tracking(
+        download_id=task_id,
+        repo_id="UI Installation",  # A clear identifier for the task type
+        filename=request.ui_name,
+        task=background_task,
+    )
+
     return UiActionResponse(
         success=True,
         message=f"Installation for {request.ui_name} started.",

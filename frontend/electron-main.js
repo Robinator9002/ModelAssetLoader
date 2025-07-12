@@ -29,8 +29,6 @@ function createWindow() {
 		},
 	});
 
-	mainWindow.setMenu(null); // Entfernt das Standardmenü
-
 	if (isDev) {
 		// Im Entwicklungsmodus: Lade die URL vom Vite Dev Server
 		mainWindow.loadURL("http://localhost:5173");
