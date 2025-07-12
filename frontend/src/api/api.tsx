@@ -176,7 +176,7 @@ export interface AvailableUiItem {
 
 export interface UiInstallRequest {
     ui_name: UiNameType;
-    custom_install_path?: string | null;
+    custom_install_path: string;
     set_as_active: boolean;
 }
 
@@ -199,15 +199,82 @@ export interface UiActionResponse {
     set_as_active_on_completion: boolean;
 }
 
+// --- UI Environment Adoption Interfaces ---
+
+/**
+ * Represents a single issue found during the adoption analysis of a UI environment.
+ */
+export interface AdoptionIssue {
+    code: string;
+    message: string;
+    is_fixable: boolean;
+    fix_description: string;
+    default_fix_enabled: boolean;
+}
+
+/**
+ * The full analysis report returned from the backend after inspecting a directory.
+ */
+export interface AdoptionAnalysisResponse {
+    is_adoptable: boolean;
+    is_healthy: boolean;
+    issues: AdoptionIssue[];
+}
+
+/**
+ * The request payload for analyzing a potential UI installation for adoption.
+ */
+export interface UiAdoptionAnalysisRequest {
+    ui_name: UiNameType;
+    path: string;
+}
+
+/**
+ * The request payload to trigger a repair process for an adoption candidate.
+ */
+export interface UiAdoptionRepairRequest {
+    ui_name: UiNameType;
+    path: string;
+    issues_to_fix: string[];
+}
+
+/**
+ * The request payload to finalize the adoption of a UI without repairs.
+ */
+export interface UiAdoptionFinalizeRequest {
+    ui_name: UiNameType;
+    path: string;
+}
+
 // --- API Functions ---
+
+// --- UI Management API Functions ---
+
+export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
+    try {
+        const response = await apiClient.get<AvailableUiItem[]>('/uis');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching available UIs:', error);
+        throw error;
+    }
+};
+
+export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
+    try {
+        const response = await apiClient.get<AllUiStatusResponse>('/uis/status');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching UI statuses:', error);
+        return { items: [] };
+    }
+};
 
 export const installUiAPI = async (request: UiInstallRequest): Promise<UiActionResponse> => {
     try {
-        // The endpoint now takes the entire request object in the body.
         const response = await apiClient.post<UiActionResponse>('/uis/install', request);
         return response.data;
     } catch (error) {
-        console.error(`Error starting installation for ${request.ui_name}:`, error);
         const axiosError = error as any;
         if (axiosError.response?.data?.detail) {
             throw new Error(axiosError.response.data.detail);
@@ -216,7 +283,111 @@ export const installUiAPI = async (request: UiInstallRequest): Promise<UiActionR
     }
 };
 
-// Other API functions remain unchanged as their contracts were not affected.
+export const runUiAPI = async (uiName: UiNameType): Promise<UiActionResponse> => {
+    try {
+        const response = await apiClient.post<UiActionResponse>(`/uis/${uiName}/run`);
+        return response.data;
+    } catch (error) {
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.post('/uis/stop', { task_id: taskId });
+        return response.data;
+    } catch (error) {
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+export const deleteUiAPI = async (
+    uiName: UiNameType,
+): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.delete(`/uis/${uiName}`);
+        return response.data;
+    } catch (error) {
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+// --- UI Adoption API Functions ---
+
+/**
+ * Sends a directory path to the backend for analysis as a potential UI installation.
+ * @param request The UI name and path to analyze.
+ * @returns An analysis report detailing any issues found.
+ */
+export const analyzeUiForAdoptionAPI = async (
+    request: UiAdoptionAnalysisRequest,
+): Promise<AdoptionAnalysisResponse> => {
+    try {
+        const response = await apiClient.post<AdoptionAnalysisResponse>(
+            '/uis/adopt/analyze',
+            request,
+        );
+        return response.data;
+    } catch (error) {
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+/**
+ * Requests the backend to start a background task to repair a UI installation.
+ * @param request The UI name, path, and list of issues to fix.
+ * @returns A standard action response with a task ID for tracking.
+ */
+export const repairUiAPI = async (request: UiAdoptionRepairRequest): Promise<UiActionResponse> => {
+    try {
+        const response = await apiClient.post<UiActionResponse>('/uis/adopt/repair', request);
+        return response.data;
+    } catch (error) {
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+/**
+ * Finalizes the adoption of a UI, adding it to the registry without repairs.
+ * @param request The UI name and path to finalize.
+ * @returns A simple success or failure message.
+ */
+export const finalizeAdoptionAPI = async (
+    request: UiAdoptionFinalizeRequest,
+): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.post('/uis/adopt/finalize', request);
+        return response.data;
+    } catch (error) {
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+// --- Other API Functions (Unchanged) ---
 
 export const searchModels = async (
     params: SearchModelParams,
@@ -257,31 +428,6 @@ export const downloadFileAPI = async (
         if (axiosError.response && axiosError.response.data) {
             return axiosError.response.data;
         }
-        throw error;
-    }
-};
-
-export const cancelDownloadAPI = async (
-    downloadId: string,
-): Promise<{ success: boolean; message?: string }> => {
-    try {
-        const response = await apiClient.post(`/filemanager/downloads/${downloadId}/cancel`);
-        return { success: true, ...response.data };
-    } catch (error) {
-        console.error(`Failed to cancel download ${downloadId}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
-    }
-};
-
-export const dismissDownloadAPI = async (downloadId: string): Promise<void> => {
-    try {
-        await apiClient.delete(`/filemanager/downloads/${downloadId}`);
-    } catch (error) {
-        console.error(`Failed to dismiss download ${downloadId}:`, error);
         throw error;
     }
 };
@@ -375,7 +521,7 @@ export const deleteManagedItemAPI = async (
     relativePath: string,
 ): Promise<{ success: boolean; message: string }> => {
     try {
-        const response = await apiClient.delete<{ success: boolean; message:string }>(
+        const response = await apiClient.delete<{ success: boolean; message: string }>(
             '/filemanager/files',
             { data: { path: relativePath } },
         );
@@ -401,70 +547,6 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
         const axiosError = error as any;
         if (axiosError.response?.data) {
             return { success: false, path: relativePath, error: axiosError.response.data.detail };
-        }
-        throw error;
-    }
-};
-
-export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
-    try {
-        const response = await apiClient.get<AvailableUiItem[]>('/uis');
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching available UIs:', error);
-        throw error;
-    }
-};
-
-export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
-    try {
-        const response = await apiClient.get<AllUiStatusResponse>('/uis/status');
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching UI statuses:', error);
-        return { items: [] };
-    }
-};
-
-export const deleteUiAPI = async (
-    uiName: UiNameType,
-): Promise<{ success: boolean; message: string }> => {
-    try {
-        const response = await apiClient.delete(`/uis/${uiName}`);
-        return response.data;
-    } catch (error) {
-        console.error(`Error deleting UI environment ${uiName}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
-    }
-};
-
-export const runUiAPI = async (uiName: UiNameType): Promise<UiActionResponse> => {
-    try {
-        const response = await apiClient.post<UiActionResponse>(`/uis/${uiName}/run`);
-        return response.data;
-    } catch (error) {
-        console.error(`Error starting UI ${uiName}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
-    }
-};
-
-export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; message: string }> => {
-    try {
-        const response = await apiClient.post('/uis/stop', { task_id: taskId });
-        return response.data;
-    } catch (error) {
-        console.error(`Error stopping UI task ${taskId}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
         }
         throw error;
     }
