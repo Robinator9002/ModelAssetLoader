@@ -200,10 +200,6 @@ export interface UiActionResponse {
 }
 
 // --- UI Environment Adoption Interfaces ---
-
-/**
- * Represents a single issue found during the adoption analysis of a UI environment.
- */
 export interface AdoptionIssue {
     code: string;
     message: string;
@@ -212,35 +208,23 @@ export interface AdoptionIssue {
     default_fix_enabled: boolean;
 }
 
-/**
- * The full analysis report returned from the backend after inspecting a directory.
- */
 export interface AdoptionAnalysisResponse {
     is_adoptable: boolean;
     is_healthy: boolean;
     issues: AdoptionIssue[];
 }
 
-/**
- * The request payload for analyzing a potential UI installation for adoption.
- */
 export interface UiAdoptionAnalysisRequest {
     ui_name: UiNameType;
     path: string;
 }
 
-/**
- * The request payload to trigger a repair process for an adoption candidate.
- */
 export interface UiAdoptionRepairRequest {
     ui_name: UiNameType;
     path: string;
     issues_to_fix: string[];
 }
 
-/**
- * The request payload to finalize the adoption of a UI without repairs.
- */
 export interface UiAdoptionFinalizeRequest {
     ui_name: UiNameType;
     path: string;
@@ -309,6 +293,24 @@ export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; mes
     }
 };
 
+export const cancelUiTaskAPI = async (
+    taskId: string,
+): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.post('/uis/cancel', {
+            task_id: taskId,
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Error cancelling UI task ${taskId}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
 export const deleteUiAPI = async (
     uiName: UiNameType,
 ): Promise<{ success: boolean; message: string }> => {
@@ -326,11 +328,6 @@ export const deleteUiAPI = async (
 
 // --- UI Adoption API Functions ---
 
-/**
- * Sends a directory path to the backend for analysis as a potential UI installation.
- * @param request The UI name and path to analyze.
- * @returns An analysis report detailing any issues found.
- */
 export const analyzeUiForAdoptionAPI = async (
     request: UiAdoptionAnalysisRequest,
 ): Promise<AdoptionAnalysisResponse> => {
@@ -349,11 +346,6 @@ export const analyzeUiForAdoptionAPI = async (
     }
 };
 
-/**
- * Requests the backend to start a background task to repair a UI installation.
- * @param request The UI name, path, and list of issues to fix.
- * @returns A standard action response with a task ID for tracking.
- */
 export const repairUiAPI = async (request: UiAdoptionRepairRequest): Promise<UiActionResponse> => {
     try {
         const response = await apiClient.post<UiActionResponse>('/uis/adopt/repair', request);
@@ -367,11 +359,6 @@ export const repairUiAPI = async (request: UiAdoptionRepairRequest): Promise<UiA
     }
 };
 
-/**
- * Finalizes the adoption of a UI, adding it to the registry without repairs.
- * @param request The UI name and path to finalize.
- * @returns A simple success or failure message.
- */
 export const finalizeAdoptionAPI = async (
     request: UiAdoptionFinalizeRequest,
 ): Promise<{ success: boolean; message: string }> => {
@@ -432,11 +419,6 @@ export const downloadFileAPI = async (
     }
 };
 
-/**
- * Sends a request to the backend to cancel a running download task.
- * @param {string} downloadId The ID of the download to cancel.
- * @returns A promise that resolves with the server's response.
- */
 export const cancelDownloadAPI = async (
     downloadId: string,
 ): Promise<{ success: boolean; message: string }> => {

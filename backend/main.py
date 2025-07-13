@@ -63,7 +63,7 @@ app = FastAPI(
     title="M.A.L. - Model Asset Loader API",
     description="API for searching external model sources, managing local model files, "
     "and configuring/managing AI UI environments.",
-    version="1.7.5",  # Version bump for installation tracking fix
+    version="1.7.6",
 )
 
 # --- CORS Middleware ---
@@ -260,7 +260,7 @@ async def download_file_endpoint(download_request: FileDownloadRequest):
     "/api/filemanager/download/cancel",
     status_code=status.HTTP_200_OK,
     tags=["FileManager"],
-    summary="Cancel a running download task",
+    summary="Cancel a running model file download task",
 )
 async def cancel_download_endpoint(payload: dict = Body(...)):
     download_id = payload.get("download_id")
@@ -386,7 +386,6 @@ async def install_ui_endpoint(request: UiInstallRequest = Body(...)):
         logger.error(f"Failed to create or access install directory {install_path.parent}: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid installation path: {install_path}")
 
-    # Create the coroutine and the task that will run it
     install_coro = ui_manager.install_ui_environment(
         ui_name=request.ui_name,
         install_path=install_path,
@@ -394,10 +393,9 @@ async def install_ui_endpoint(request: UiInstallRequest = Body(...)):
     )
     background_task = asyncio.create_task(install_coro)
 
-    # Immediately register the task with the tracker so the UI sees it
     download_tracker.start_tracking(
         download_id=task_id,
-        repo_id="UI Installation",  # A clear identifier for the task type
+        repo_id="UI Installation",
         filename=request.ui_name,
         task=background_task,
     )
@@ -436,6 +434,20 @@ async def run_ui_endpoint(ui_name: UiNameTypePydantic):
 async def stop_ui_endpoint(request: UiStopRequest):
     await ui_manager.stop_ui(task_id=request.task_id)
     return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
+
+
+@app.post(
+    "/api/uis/cancel",
+    status_code=status.HTTP_200_OK,
+    tags=["UIs"],
+    summary="Cancel a running UI installation or repair task",
+)
+async def cancel_ui_task_endpoint(payload: dict = Body(...)):
+    task_id = payload.get("task_id")
+    if not task_id:
+        raise HTTPException(status_code=400, detail="task_id is required.")
+    await ui_manager.cancel_ui_task(task_id)
+    return {"success": True, "message": f"Cancellation request for UI task {task_id} sent."}
 
 
 @app.delete(
