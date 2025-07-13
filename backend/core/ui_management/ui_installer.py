@@ -6,13 +6,15 @@ import sys
 import re
 import json
 import tempfile
-from typing import Callable, Coroutine, Any, Optional, Literal, List, Dict
+from typing import Callable, Coroutine, Any, Optional, Literal, List, Dict, Tuple
 
 # --- Type Definitions ---
 StreamCallback = Callable[[str], Coroutine[Any, Any, None]]
 PipPhase = Literal["collecting", "installing"]
-# The callback now includes an optional size for the specific item being processed.
 PipProgressCallback = Callable[[PipPhase, int, int, str, Optional[int]], Coroutine[Any, Any, None]]
+# A callback to signal that a process has been created, passing the process object.
+ProcessCreatedCallback = Callable[[asyncio.subprocess.Process], None]
+
 
 logger = logging.getLogger(__name__)
 
@@ -162,8 +164,6 @@ async def _get_dependency_report(
                     if not line:
                         continue
 
-                    # Only parse the stderr stream for "Collecting" lines.
-                    # Both streams must be drained to prevent deadlock.
                     if is_stderr and progress_callback:
                         collect_match = collect_regex.match(line)
                         if collect_match:
@@ -181,7 +181,6 @@ async def _get_dependency_report(
                     logger.warning(f"Error reading pip analysis stream line: {e}")
                     break
 
-        # Concurrently consume both stdout and stderr to prevent the process from blocking.
         await asyncio.gather(
             read_analysis_stream(process.stdout, is_stderr=False),
             read_analysis_stream(process.stderr, is_stderr=True),
@@ -217,11 +216,24 @@ async def install_dependencies(
     stream_callback: Optional[StreamCallback] = None,
     progress_callback: Optional[PipProgressCallback] = None,
     extra_packages: Optional[List[str]] = None,
+    process_created_callback: Optional[ProcessCreatedCallback] = None,
 ) -> bool:
     """
-    Installs dependencies, using a two-stage process to provide accurate,
-    size-weighted progress. First, it generates a report to calculate the total
-    download size, then it installs the packages while tracking progress against that total.
+    Installs dependencies from a requirements file into a venv.
+
+    This function uses a two-stage process to provide accurate, size-weighted
+    progress. First, it generates a report to calculate the total download size,
+    then it installs the packages while tracking progress against that total.
+
+    Args:
+        ui_dir: The root directory of the UI environment.
+        requirements_file: The name of the requirements file (e.g., 'requirements.txt').
+        stream_callback: An async callback to stream raw process output.
+        progress_callback: An async callback for structured progress updates.
+        extra_packages: A list of additional packages to install.
+        process_created_callback: A callback that receives the process object
+                                  immediately after it's created, allowing the
+                                  caller to manage or terminate it.
     """
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
@@ -234,7 +246,6 @@ async def install_dependencies(
         logger.error(f"Venv or requirements file not found for {ui_dir.name}.")
         return False
 
-    # --- Stage 1: Generate report to get package sizes ---
     report = await _get_dependency_report(venv_python, req_path, extra_packages, progress_callback)
     install_targets = report.get("install", [])
 
@@ -256,7 +267,6 @@ async def install_dependencies(
     }
     total_download_size = sum(info["size"] for info in package_info.values())
 
-    # --- Stage 2: Run the actual installation ---
     pip_command = [
         str(venv_python),
         "-m",
@@ -276,6 +286,11 @@ async def install_dependencies(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
+
+    # Immediately pass the created process object to the caller if a callback is provided.
+    # This is crucial for allowing the caller to terminate the process if needed.
+    if process_created_callback:
+        process_created_callback(process)
 
     logger.info(
         f"Starting actual pip install ({process.pid}) with a total download size of {total_download_size} bytes."
@@ -303,7 +318,6 @@ async def install_dependencies(
                         package_name = collect_match.group(1).lower().replace("_", "-")
                         info = package_info.get(package_name)
                         if info:
-                            # Use the size from the report to advance progress.
                             bytes_processed += info["size"]
                             await progress_callback(
                                 "collecting",
@@ -316,8 +330,6 @@ async def install_dependencies(
                 logger.warning(f"Error reading pip stream line: {e}")
                 break
 
-    # If all packages are cached (total_download_size is 0), we won't get Collecting
-    # lines. In this case, we can provide a rapid, count-based progress update.
     if total_download_size == 0 and progress_callback:
         logger.info("All packages seem to be cached. Simulating collection progress.")
         total_packages = len(package_info)
@@ -327,9 +339,9 @@ async def install_dependencies(
                 i + 1,
                 total_packages,
                 f"{name.capitalize()} {info['version']}",
-                0,  # Size is 0 for cached
+                0,
             )
-            await asyncio.sleep(0.01)  # Tiny sleep to allow UI to update
+            await asyncio.sleep(0.01)
 
     await asyncio.gather(
         read_and_parse_stream(process.stdout), read_and_parse_stream(process.stderr)
