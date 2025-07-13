@@ -43,8 +43,6 @@ class UiManager:
         Helper method to stream raw text updates for detailed logging, without
         affecting the main progress bar or status text.
         """
-        # This is now primarily for debugging if needed, the main UI is driven by the
-        # structured progress callback. We can simply log the lines here.
         logger.debug(f"[{task_id}] STREAM: {line}")
 
     async def _pip_progress_callback(
@@ -68,20 +66,29 @@ class UiManager:
         base_progress = 25.0
         progress_range = 70.0  # (95 - 25)
 
+        # We'll split the 70% range: 30% for collecting, 70% for installing.
+        # This is because 'collecting' is often faster (especially with caching)
+        # than the disk and cpu-intensive 'installing' phase.
+        collecting_range = progress_range * 0.3  # 21 percentage points
+        installing_range = progress_range * 0.7  # 49 percentage points
+
         current_progress = base_progress
         status_text = "Installing dependencies..."
 
         if total > 0:
-            # We'll split the 70% range: 50% for collecting, 50% for installing.
             if phase == "collecting":
-                phase_percent = (processed / total) * (progress_range / 2)
+                phase_percent = (processed / total) * collecting_range
                 current_progress = base_progress + phase_percent
                 status_text = f"Collecting {processed}/{total}: {item_name}"
             else:  # 'installing' phase
-                # Start this phase's progress after the 'collecting' phase is done.
-                phase_percent = (progress_range / 2) + (processed / total) * (progress_range / 2)
-                current_progress = base_progress + phase_percent
-                status_text = f"Installing {processed}/{total}"
+                # The 'installing' phase begins after the 'collecting' phase's range.
+                installing_base_progress = base_progress + collecting_range
+                phase_percent = (processed / total) * installing_range
+                current_progress = installing_base_progress + phase_percent
+                status_text = f"Installing {processed}/{total}: {item_name}"
+
+        # Clamp progress to the max of the dependencies phase to prevent overflow.
+        current_progress = min(current_progress, base_progress + progress_range)
 
         await download_tracker.update_task_progress(
             task_id, progress=current_progress, status_text=status_text
@@ -129,15 +136,13 @@ class UiManager:
 
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            # Create the new structured progress callback
             pip_progress_cb = lambda phase, processed, total, name: self._pip_progress_callback(
                 task_id, phase, processed, total, name
             )
 
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
             if not await ui_installer.clone_repo(ui_info["git_url"], install_path, streamer):
-                # If cloning fails because it exists, we still proceed.
-                # A hard failure would raise an exception.
+                # A soft failure (e.g., directory exists) is logged but we proceed.
                 logger.warning(f"Could not clone {ui_name}, but proceeding as it may exist.")
 
             await download_tracker.update_task_progress(
@@ -147,12 +152,11 @@ class UiManager:
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
             await download_tracker.update_task_progress(task_id, 25.0, "Installing dependencies...")
-            # Pass both the raw streamer and the new structured progress callback
             if not await ui_installer.install_dependencies(
                 install_path,
                 ui_info["requirements_file"],
                 stream_callback=streamer,
-                progress_callback=pip_progress_cb,  # This is the crucial fix
+                progress_callback=pip_progress_cb,
                 extra_packages=ui_info.get("extra_packages"),
             ):
                 raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
