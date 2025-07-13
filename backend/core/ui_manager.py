@@ -15,6 +15,19 @@ from backend.core.ui_management.ui_registry import UiRegistry
 logger = logging.getLogger(__name__)
 
 
+def _format_bytes(size_bytes: int) -> str:
+    """Formats a size in bytes to a human-readable string (KB, MB, GB)."""
+    if size_bytes is None:
+        return ""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    if size_bytes < 1024**2:
+        return f"{size_bytes/1024:.1f} KB"
+    if size_bytes < 1024**3:
+        return f"{size_bytes/1024**2:.1f} MB"
+    return f"{size_bytes/1024**3:.2f} GB"
+
+
 class UiManager:
     """
     Manages the lifecycle of UI environments.
@@ -52,6 +65,7 @@ class UiManager:
         processed: int,
         total: int,
         item_name: str,
+        item_size: Optional[int],
     ):
         """
         Translates structured progress from the pip installer into a percentage
@@ -62,42 +76,37 @@ class UiManager:
         # We allocate percentages to each major step:
         # 0-15%:    Cloning repository
         # 15-25%:   Creating virtual environment
-        # 25-60%:   Collecting dependencies (35 percentage points)
-        # 60-95%:   Installing dependencies (35 percentage points)
-        # 95-100%:  Finalizing
+        # 25-75%:   Collecting dependencies (downloading) (50 percentage points)
+        # 75-90%:   Installing dependencies (from cache) (15 percentage points)
+        # 90-100%:  Finalizing
         collecting_start_progress = 25.0
-        collecting_range = 35.0
+        collecting_range = 50.0
 
-        installing_start_progress = collecting_start_progress + collecting_range  # 60.0
-        installing_range = 35.0
+        installing_start_progress = collecting_start_progress + collecting_range  # 75.0
+        installing_range = 15.0
 
         current_progress = 0.0
         status_text = ""
 
         if phase == "collecting":
-            # For the collecting phase, the total number of packages is not known
-            # upfront. We use a heuristic approach for a smooth progress bar.
-            # We assume a moderate number of packages (e.g., 50) would fill the bar.
-            # Each collected package contributes a small, fixed amount to the progress.
-            # A 'total' of -1 is used as a signal for this heuristic mode.
-            if total == -1:
-                # Each package is worth a fraction of the total collecting_range.
-                # e.g., 35.0 / 50 = 0.7 points per package.
-                phase_progress = min(processed * 0.7, collecting_range)
-                current_progress = collecting_start_progress + phase_progress
-            else: # Fallback to standard percentage if total is known.
-                phase_percent = (processed / total) * collecting_range if total > 0 else 0
-                current_progress = collecting_start_progress + phase_percent
-            status_text = f"Collecting: {item_name}"
+            # The 'collecting' phase progress is now weighted by download size.
+            # 'processed' is the cumulative bytes downloaded, 'total' is the total bytes.
+            phase_percent = (processed / total) * collecting_range if total > 0 else 0
+            current_progress = collecting_start_progress + phase_percent
+
+            size_str = (
+                f"({_format_bytes(item_size)})" if item_size is not None and item_size > 0 else ""
+            )
+            status_text = f"Collecting: {item_name} {size_str}".strip()
 
         elif phase == "installing":
-            # The installing phase has a known total based on the collected packages.
+            # The 'installing' phase is a simple, count-based simulation after downloads are complete.
             phase_percent = (processed / total) * installing_range if total > 0 else 0
             current_progress = installing_start_progress + phase_percent
-            status_text = f"Installing: {item_name}"
+            status_text = item_name
 
         # Clamp progress to the maximum allocated for the dependencies phase.
-        final_dependencies_progress = installing_start_progress + installing_range  # 95.0
+        final_dependencies_progress = installing_start_progress + installing_range  # 90.0
         current_progress = min(current_progress, final_dependencies_progress)
 
         await download_tracker.update_task_progress(
@@ -140,8 +149,6 @@ class UiManager:
         """
         Orchestrates the complete installation of a new UI environment.
         """
-        # Add a small delay to prevent a race condition where the frontend
-        # WebSocket is not yet ready to receive the initial progress updates.
         await asyncio.sleep(0.5)
 
         ui_info = await self._get_ui_info(ui_name, task_id)
@@ -150,8 +157,11 @@ class UiManager:
 
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            pip_progress_cb = lambda phase, processed, total, name: self._pip_progress_callback(
-                task_id, phase, processed, total, name
+            # The callback now expects the item_size argument.
+            pip_progress_cb = (
+                lambda phase, processed, total, name, size: self._pip_progress_callback(
+                    task_id, phase, processed, total, name, size
+                )
             )
 
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
@@ -164,7 +174,6 @@ class UiManager:
             if not await ui_installer.create_venv(install_path, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
-            # Explicitly update the status before starting the dependency analysis.
             await download_tracker.update_task_progress(task_id, 25.0, "Analyzing dependencies...")
             if not await ui_installer.install_dependencies(
                 install_path,
@@ -175,9 +184,9 @@ class UiManager:
             ):
                 raise RuntimeError(f"Failed to install dependencies for {ui_name}.")
 
-            await download_tracker.update_task_progress(task_id, 95.0, "Finalizing installation...")
+            await download_tracker.update_task_progress(task_id, 90.0, "Finalizing installation...")
             self.registry.add_installation(ui_name, install_path)
-            await download_tracker.complete_download(task_id, str(install_path))
+            await download_tracker.complete_download(task_id, f"Successfully installed {ui_name}.")
 
         except Exception as e:
             error_message = f"Installation failed for {ui_name}: {e}"
@@ -279,8 +288,10 @@ class UiManager:
 
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            pip_progress_cb = lambda phase, processed, total, name: self._pip_progress_callback(
-                task_id, phase, processed, total, name
+            pip_progress_cb = (
+                lambda phase, processed, total, name, size: self._pip_progress_callback(
+                    task_id, phase, processed, total, name, size
+                )
             )
 
             if "VENV_MISSING" in issues_to_fix or "VENV_INCOMPLETE" in issues_to_fix:

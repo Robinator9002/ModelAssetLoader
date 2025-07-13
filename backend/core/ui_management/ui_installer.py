@@ -4,12 +4,15 @@ import logging
 import pathlib
 import sys
 import re
-from typing import Callable, Coroutine, Any, Optional, Literal, List
+import json
+import tempfile
+from typing import Callable, Coroutine, Any, Optional, Literal, List, Dict
 
 # --- Type Definitions ---
 StreamCallback = Callable[[str], Coroutine[Any, Any, None]]
 PipPhase = Literal["collecting", "installing"]
-PipProgressCallback = Callable[[PipPhase, int, int, str], Coroutine[Any, Any, None]]
+# The callback now includes an optional size for the specific item being processed.
+PipProgressCallback = Callable[[PipPhase, int, int, str, Optional[int]], Coroutine[Any, Any, None]]
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +113,51 @@ async def create_venv(
     return return_code == 0
 
 
+async def _get_dependency_report(
+    venv_python: pathlib.Path,
+    req_path: pathlib.Path,
+    extra_packages: Optional[List[str]]
+) -> Dict[str, Any]:
+    """
+    Runs a pip dry-run with a JSON report to get a list of all dependencies
+    and their metadata, including download size, without actually installing them.
+    """
+    report = {}
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as tmp_report_file:
+        report_path = pathlib.Path(tmp_report_file.name)
+    
+    try:
+        command = [
+            str(venv_python), "-m", "pip", "install", "--dry-run",
+            "--no-cache-dir", "-r", str(req_path), "--report", str(report_path)
+        ]
+        if extra_packages:
+            command.extend(extra_packages)
+        
+        logger.info(f"Generating dependency report with command: {' '.join(command)}")
+        process = await asyncio.create_subprocess_exec(
+            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            logger.error(f"Failed to generate dependency report. Stderr: {stderr.decode()}")
+            return {}
+
+        if report_path.exists() and report_path.stat().st_size > 0:
+            with open(report_path, "r") as f:
+                report = json.load(f)
+            logger.info(f"Successfully generated dependency report with {len(report.get('install', []))} items.")
+        else:
+            logger.warning("Dependency report was not generated or is empty.")
+
+    finally:
+        if report_path.exists():
+            report_path.unlink()
+            
+    return report
+
+
 async def install_dependencies(
     ui_dir: pathlib.Path,
     requirements_file: str,
@@ -118,10 +166,9 @@ async def install_dependencies(
     extra_packages: Optional[List[str]] = None,
 ) -> bool:
     """
-    Installs dependencies from a requirements file into the virtual environment.
-    This function parses the output of the 'pip install' command in real-time
-    to provide accurate progress updates for both the 'collecting' and 'installing'
-    phases of the operation.
+    Installs dependencies, using a two-stage process to provide accurate,
+    size-weighted progress. First, it generates a report to calculate the total
+    download size, then it installs the packages while tracking progress against that total.
     """
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
@@ -130,24 +177,36 @@ async def install_dependencies(
     )
     req_path = ui_dir / requirements_file
 
-    if not venv_python.exists():
-        logger.error(f"Virtual environment Python executable not found for {ui_dir.name}.")
-        return False
-    if not req_path.exists():
-        logger.error(f"Requirements file '{requirements_file}' not found in {ui_dir.name}.")
+    if not venv_python.exists() or not req_path.exists():
+        logger.error(f"Venv or requirements file not found for {ui_dir.name}.")
         return False
 
-    # The single command for installation. Its output will be parsed directly.
+    # --- Stage 1: Generate report and calculate total size ---
+    if progress_callback:
+        await progress_callback("collecting", 0, 1, "Analyzing package sizes...", None)
+
+    report = await _get_dependency_report(venv_python, req_path, extra_packages)
+    install_targets = report.get("install", [])
+    
+    package_info = {
+        item['metadata']['name'].lower(): {
+            "size": item.get('download_info', {}).get('archive_info', {}).get('size', 0),
+            "version": item['metadata']['version']
+        }
+        for item in install_targets if item.get('download_info')
+    }
+    total_download_size = sum(info['size'] for info in package_info.values())
+    
+    if total_download_size == 0:
+        logger.warning("No packages to download, or sizes could not be determined. Skipping install.")
+        if progress_callback:
+            await progress_callback("installing", 1, 1, "Dependencies already satisfied.", 0)
+        return True
+
+    # --- Stage 2: Run the actual installation ---
     pip_command = [
-        str(venv_python),
-        "-m",
-        "pip",
-        "install",
-        "--no-cache-dir",
-        "--timeout",
-        "600",
-        "-r",
-        str(req_path),
+        str(venv_python), "-m", "pip", "install", "--no-cache-dir", "--timeout", "600",
+        "-r", str(req_path),
     ]
     if extra_packages:
         pip_command.extend(extra_packages)
@@ -158,71 +217,50 @@ async def install_dependencies(
         stderr=asyncio.subprocess.PIPE,
     )
 
-    logger.info(f"Starting pip install ({process.pid}) and parsing output in real-time.")
+    logger.info(f"Starting actual pip install ({process.pid}) with a total download size of {total_download_size} bytes.")
 
-    # Regex patterns to parse pip's output.
     collect_regex = re.compile(r"^\s*Collecting\s+([a-zA-Z0-9-_.]+)", re.IGNORECASE)
-    install_regex = re.compile(r"^\s*Installing collected packages:.*", re.IGNORECASE)
-
-    collected_packages = []
-    in_install_phase = False
+    bytes_processed = 0
 
     async def read_and_parse_stream(stream):
-        """Reads and parses a stream (stdout/stderr) line-by-line for progress."""
-        nonlocal in_install_phase
-
+        nonlocal bytes_processed
         while not stream.at_eof():
             try:
                 line_bytes = await stream.readline()
-                if not line_bytes:
-                    break
+                if not line_bytes: break
                 line = line_bytes.decode("utf-8", errors="replace").strip()
-                if not line:
-                    continue
-
-                if stream_callback:
-                    await stream_callback(line)
+                if not line: continue
+                if stream_callback: await stream_callback(line)
 
                 if progress_callback:
-                    # Phase 1: Collecting packages.
                     collect_match = collect_regex.match(line)
-                    if collect_match and not in_install_phase:
-                        package_name = collect_match.group(1)
-                        if package_name not in collected_packages:
-                            collected_packages.append(package_name)
-                            # Send the number of packages found so far, and -1 for the total
-                            # to signal that the total is not yet known.
+                    if collect_match:
+                        package_name = collect_match.group(1).lower().replace("_", "-")
+                        info = package_info.get(package_name)
+                        if info:
+                            bytes_processed += info['size']
                             await progress_callback(
-                                "collecting", len(collected_packages), -1, package_name
+                                "collecting",
+                                bytes_processed,
+                                total_download_size,
+                                f"{package_name.capitalize()} {info['version']}",
+                                info['size']
                             )
-                        continue
-
-                    # Phase 2: Transition to Installing packages.
-                    install_match = install_regex.match(line)
-                    if install_match and not in_install_phase:
-                        in_install_phase = True
-                        # Now we have the complete list of packages.
-                        # Signal the start of the installation phase with the correct total.
-                        await progress_callback(
-                            "installing", 0, len(collected_packages), "Starting installation..."
-                        )
-                        continue
-
             except Exception as e:
                 logger.warning(f"Error reading pip stream line: {e}")
                 break
 
-    # Process stdout and stderr concurrently.
     await asyncio.gather(
-        read_and_parse_stream(process.stdout), read_and_parse_stream(process.stderr)
+        read_and_parse_stream(process.stdout),
+        read_and_parse_stream(process.stderr)
     )
-
     await process.wait()
 
     if process.returncode == 0 and progress_callback:
-        # On success, send a final update to ensure the progress bar completes.
-        total = len(collected_packages) if collected_packages else 1
-        await progress_callback("installing", total, total, "Installation complete.")
+        # Simulate the brief "installing" phase after all downloads are complete.
+        await progress_callback("installing", 0, 1, "Finalizing installation...", 0)
+        await asyncio.sleep(1) # Give a moment for the user to see the message
+        await progress_callback("installing", 1, 1, "Installation complete.", 0)
         logger.info(f"Pip install process {process.pid} completed successfully.")
     elif process.returncode != 0:
         logger.error(f"Pip installation failed with exit code {process.returncode}.")
