@@ -31,7 +31,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Add an Download Sidebar, replacing the old Toasts, for better visibility and workflow.
 
-[ ] Phase 2: Environment Management (Near Finish)
+[x] Phase 2: Environment Management (Finished)
 
     [x] Implement a Local Library Manager to view, manage, and delete files you've already downloaded.
 
@@ -41,9 +41,17 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Add Adoption Mechanic for Installation.
 
-    [ ] Fix the Installation Modal for Ui Installations
+    [x] Fix the Installation Modal for Ui Installations
 
-[ ] Phase 3: The Platform (Coming Soon)
+[ ] Phase 2.5: Bugfixing (Active right now)
+
+    [ ] Get the Cancellation of UI Downloads to work
+    
+    [ ] Fix the Adoption Mechanics Analysis so it works for real now!
+
+    [ ] Test everything intensively to make sure everything works
+
+[ ] Phase 3: The Platform (Coming Soon, Very very Soon)
 
     [ ] Integrate more model sources, with CivitAI as the next major target.
 
