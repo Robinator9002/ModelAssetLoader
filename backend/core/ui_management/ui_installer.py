@@ -119,13 +119,8 @@ async def install_dependencies(
         logger.error(f"Venv or requirements file not found for {ui_dir.name}.")
         return False
 
-    # --- Step 1: Dry Run to get total package count for progress calculation ---
+    # --- Step 1: Dry Run to get the definitive list of packages to process ---
     logger.info("Performing pip dry run to determine dependency list...")
-
-    # Send an immediate status update BEFORE starting the potentially long dry run.
-    if progress_callback:
-        await progress_callback("collecting", 0, 1, "Analyzing dependencies...")
-
     dry_run_command = [str(venv_python), "-m", "pip", "install", "--dry-run", "-r", str(req_path)]
     if extra_packages:
         dry_run_command.extend(extra_packages)
@@ -136,20 +131,20 @@ async def install_dependencies(
     _, dry_run_output = await _stream_process(dry_run_process)
 
     collect_regex = re.compile(r"Collecting\s+([a-zA-Z0-9-_.]+)")
-    packages_from_dry_run = collect_regex.findall(dry_run_output)
-    total_packages_to_collect = len(packages_from_dry_run)
+    packages_to_process = collect_regex.findall(dry_run_output)
+    total_packages = len(packages_to_process)
 
-    if total_packages_to_collect == 0:
+    if total_packages == 0:
         logger.warning("Pip dry run found 0 packages to process. Assuming dependencies are met.")
         if progress_callback:
-            await progress_callback("collecting", 1, 1, "Done")
+            await progress_callback("collecting", 1, 1, "Dependencies already satisfied.")
             await progress_callback("installing", 1, 1, "Done")
         return True
 
-    logger.info(f"Dry run identified {total_packages_to_collect} packages to collect.")
+    logger.info(f"Dry run identified {total_packages} packages to process: {packages_to_process}")
 
-    # --- Step 2: Perform the actual installation and parse its output ---
-    logger.info(f"Installing dependencies from '{req_path}'...")
+    # --- Step 2: Run the REAL pip install in the background ---
+    logger.info(f"Starting actual installation for {total_packages} packages...")
     pip_command = [
         str(venv_python),
         "-m",
@@ -161,76 +156,36 @@ async def install_dependencies(
         str(req_path),
     ]
     if extra_packages:
-        logger.info(f"Installing extra packages: {extra_packages}")
         pip_command.extend(extra_packages)
 
-    phase: PipPhase = "collecting"
-    processed_collect_count = 0
-
-    using_cached_regex = re.compile(r"Using cached\s+([a-zA-Z0-9-._]+)")
-    installing_line_regex = re.compile(r"Installing collected packages:\s+(.*)")
-
-    async def pip_streamer(line: str):
-        nonlocal phase, processed_collect_count
-
-        if stream_callback:
-            await stream_callback(line)
-
-        if phase == "collecting":
-            collect_match = collect_regex.search(line)
-            cached_match = using_cached_regex.search(line)
-
-            package_name = None
-            if collect_match:
-                package_name = collect_match.group(1).strip()
-            elif cached_match:
-                package_name = cached_match.group(1).strip().split("-")[0]
-
-            if package_name:
-                processed_collect_count = min(
-                    processed_collect_count + 1, total_packages_to_collect
-                )
-                if progress_callback:
-                    await progress_callback(
-                        "collecting",
-                        processed_collect_count,
-                        total_packages_to_collect,
-                        package_name,
-                    )
-
-        installing_line_match = installing_line_regex.search(line)
-        if installing_line_match and phase == "collecting":
-            phase = "installing"
-
-            if progress_callback:
-                await progress_callback(
-                    "collecting", total_packages_to_collect, total_packages_to_collect, "Done"
-                )
-
-            packages_str = installing_line_match.group(1)
-            packages_to_install = [p.strip() for p in packages_str.split(",")]
-            install_packages_total = len(packages_to_install)
-
-            logger.info(
-                f"Switched to 'installing' phase. Found {install_packages_total} packages to install: {packages_to_install}"
-            )
-
-            async def intelligent_progress_ticker():
-                for i, pkg_name in enumerate(packages_to_install, 1):
-                    if process.returncode is not None:
-                        break
-                    if progress_callback:
-                        await progress_callback("installing", i, install_packages_total, pkg_name)
-                    await asyncio.sleep(0.3)
-
-            if install_packages_total > 0:
-                asyncio.create_task(intelligent_progress_ticker())
-
-    process = await asyncio.create_subprocess_exec(
+    install_process = await asyncio.create_subprocess_exec(
         *pip_command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
+    # Start a background task to consume the output for logging, but not for progress.
+    install_log_task = asyncio.create_task(_stream_process(install_process, stream_callback))
 
-    return_code, _ = await _stream_process(process, pip_streamer)
+    # --- Step 3: SIMULATE progress based on the plan from the dry run ---
+    if progress_callback:
+        # Simulate Collecting Phase
+        logger.info("Simulating 'collecting' phase progress...")
+        for i, package_name in enumerate(packages_to_process, 1):
+            await progress_callback("collecting", i, total_packages, package_name)
+            await asyncio.sleep(0.1)
+
+        # Simulate Installing Phase
+        logger.info("Simulating 'installing' phase progress...")
+        for i, package_name in enumerate(packages_to_process, 1):
+            await progress_callback("installing", i, total_packages, package_name)
+            await asyncio.sleep(0.3)
+
+    # --- Step 4: Wait for the actual installation to complete ---
+    logger.info("Waiting for actual pip install process to finish...")
+    return_code, install_logs = await install_log_task
+    logger.info(f"Actual pip install process finished with code {return_code}.")
+
+    if return_code != 0:
+        logger.error(f"Pip installation failed. Full logs:\n{install_logs}")
+
     return return_code == 0
