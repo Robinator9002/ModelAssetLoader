@@ -188,7 +188,9 @@ class UiManager:
             await download_tracker.update_task_progress(task_id, 90.0, "Finalizing installation...")
             self.registry.add_installation(ui_name, install_path)
             await download_tracker.complete_download(task_id, f"Successfully installed {ui_name}.")
-
+        except asyncio.CancelledError:
+            logger.warning(f"Installation task {task_id} for {ui_name} was cancelled.")
+            await download_tracker.fail_download(task_id, "Installation was cancelled by user.")
         except Exception as e:
             error_message = f"Installation failed for {ui_name}: {e}"
             logger.error(error_message, exc_info=True)
@@ -234,7 +236,8 @@ class UiManager:
 
     async def cancel_ui_task(self, task_id: str):
         """
-        Cancels a running UI installation or repair task by terminating its subprocess.
+        Cancels a running UI installation or repair task.
+        It handles both cancelling the parent asyncio task and terminating the installation subprocess.
         """
         logger.info(f"Received cancellation request for UI task {task_id}.")
 
@@ -247,14 +250,8 @@ class UiManager:
             except asyncio.TimeoutError:
                 logger.error(f"Process {process.pid} did not terminate gracefully. Killing it.")
                 process.kill()
-            finally:
-                if task_id in self.installation_processes:
-                    del self.installation_processes[task_id]
-                await download_tracker.fail_download(task_id, "Installation was cancelled by user.")
         else:
-            logger.warning(
-                f"Could not find a running installation process for task {task_id} to cancel."
-            )
+            logger.warning(f"No subprocess found for task {task_id}. Cancelling parent task.")
             await download_tracker.cancel_and_remove(task_id)
 
     async def delete_environment(self, ui_name: UiNameType) -> bool:
@@ -354,7 +351,9 @@ class UiManager:
             await download_tracker.complete_download(
                 task_id, f"Successfully repaired and adopted {ui_name}."
             )
-
+        except asyncio.CancelledError:
+            logger.warning(f"Repair task {task_id} for {ui_name} was cancelled.")
+            await download_tracker.fail_download(task_id, "Repair was cancelled by user.")
         except Exception as e:
             await download_tracker.fail_download(task_id, f"Repair process failed: {e}")
         finally:
