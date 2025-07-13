@@ -19,6 +19,8 @@ def _format_bytes(size_bytes: int) -> str:
     """Formats a size in bytes to a human-readable string (KB, MB, GB)."""
     if size_bytes is None:
         return ""
+    if size_bytes == 0:
+        return ""
     if size_bytes < 1024:
         return f"{size_bytes} B"
     if size_bytes < 1024**2:
@@ -89,15 +91,19 @@ class UiManager:
         status_text = ""
 
         if phase == "collecting":
-            # The 'collecting' phase progress is now weighted by download size.
-            # 'processed' is the cumulative bytes downloaded, 'total' is the total bytes.
-            phase_percent = (processed / total) * collecting_range if total > 0 else 0
-            current_progress = collecting_start_progress + phase_percent
-
-            size_str = (
-                f"({_format_bytes(item_size)})" if item_size is not None and item_size > 0 else ""
-            )
-            status_text = f"Collecting: {item_name} {size_str}".strip()
+            # The 'total' parameter distinguishes between the analysis and download phases.
+            if total == -1:
+                # ANALYSIS PHASE: 'processed' is the count of packages found.
+                # Use an asymptotic function for smooth progress toward the end of the range.
+                phase_progress = collecting_range * (1 - 1 / (processed + 1))
+                current_progress = collecting_start_progress + phase_progress
+                status_text = item_name  # Formatted as "Analyzing: <package>" by the installer
+            else:
+                # DOWNLOAD PHASE: 'processed' is bytes, 'total' is total bytes.
+                phase_percent = (processed / total) * collecting_range if total > 0 else 0
+                current_progress = collecting_start_progress + phase_percent
+                size_str = f"({_format_bytes(item_size)})"
+                status_text = f"Collecting: {item_name} {size_str}".strip()
 
         elif phase == "installing":
             # The 'installing' phase is a simple, count-based simulation after downloads are complete.
@@ -157,11 +163,8 @@ class UiManager:
 
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            # The callback now expects the item_size argument.
-            pip_progress_cb = (
-                lambda phase, processed, total, name, size: self._pip_progress_callback(
-                    task_id, phase, processed, total, name, size
-                )
+            pip_progress_cb = lambda phase, processed, total, name, size: self._pip_progress_callback(
+                task_id, phase, processed, total, name, size
             )
 
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
@@ -288,10 +291,8 @@ class UiManager:
 
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            pip_progress_cb = (
-                lambda phase, processed, total, name, size: self._pip_progress_callback(
-                    task_id, phase, processed, total, name, size
-                )
+            pip_progress_cb = lambda phase, processed, total, name, size: self._pip_progress_callback(
+                task_id, phase, processed, total, name, size
             )
 
             if "VENV_MISSING" in issues_to_fix or "VENV_INCOMPLETE" in issues_to_fix:
