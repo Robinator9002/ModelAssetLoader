@@ -55,40 +55,42 @@ class UiManager:
     ):
         """
         Translates structured progress from the pip installer into a percentage
-        and human-readable status for the frontend.
+        and human-readable status for the frontend. This provides a granular,
+        two-phase progress update for both collecting and installing dependencies.
         """
         # The overall installation is mapped to a 0-100% scale.
         # We allocate percentages to each major step:
-        # 0-15%: Cloning
-        # 15-25%: Creating venv
-        # 25-95%: Installing dependencies (this is the part we're mapping)
-        # 95-100%: Finalizing
-        base_progress = 25.0
-        progress_range = 70.0  # (95 - 25)
+        # 0-15%:    Cloning repository
+        # 15-25%:   Creating virtual environment
+        # 25-60%:   Collecting dependencies (35 percentage points)
+        # 60-95%:   Installing dependencies (35 percentage points)
+        # 95-100%:  Finalizing
+        collecting_start_progress = 25.0
+        collecting_range = 35.0
 
-        # We'll split the 70% range: 30% for collecting, 70% for installing.
-        # This is because 'collecting' is often faster (especially with caching)
-        # than the disk and cpu-intensive 'installing' phase.
-        collecting_range = progress_range * 0.3  # 21 percentage points
-        installing_range = progress_range * 0.7  # 49 percentage points
+        installing_start_progress = collecting_start_progress + collecting_range  # 60.0
+        installing_range = 35.0
 
-        current_progress = base_progress
-        status_text = "Installing dependencies..."
+        current_progress = 0.0
+        status_text = ""
 
         if total > 0:
             if phase == "collecting":
-                phase_percent = (processed / total) * collecting_range
-                current_progress = base_progress + phase_percent
-                status_text = f"Collecting {processed}/{total}: {item_name}"
+                # A special case for the initial "Analyzing..." message
+                if processed == 0 and total == 1:
+                    current_progress = collecting_start_progress
+                else:
+                    phase_percent = (processed / total) * collecting_range
+                    current_progress = collecting_start_progress + phase_percent
+                status_text = f"Collecting: {item_name}"
             else:  # 'installing' phase
-                # The 'installing' phase begins after the 'collecting' phase's range.
-                installing_base_progress = base_progress + collecting_range
                 phase_percent = (processed / total) * installing_range
-                current_progress = installing_base_progress + phase_percent
-                status_text = f"Installing {processed}/{total}: {item_name}"
+                current_progress = installing_start_progress + phase_percent
+                status_text = f"Installing: {item_name}"
 
-        # Clamp progress to the max of the dependencies phase to prevent overflow.
-        current_progress = min(current_progress, base_progress + progress_range)
+        # Clamp progress to the maximum allocated for the dependencies phase.
+        final_dependencies_progress = installing_start_progress + installing_range  # 95.0
+        current_progress = min(current_progress, final_dependencies_progress)
 
         await download_tracker.update_task_progress(
             task_id, progress=current_progress, status_text=status_text
@@ -130,6 +132,10 @@ class UiManager:
         """
         Orchestrates the complete installation of a new UI environment.
         """
+        # Add a small delay to prevent a race condition where the frontend
+        # WebSocket is not yet ready to receive the initial progress updates.
+        await asyncio.sleep(0.5)
+
         ui_info = await self._get_ui_info(ui_name, task_id)
         if not ui_info:
             return
@@ -142,7 +148,6 @@ class UiManager:
 
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
             if not await ui_installer.clone_repo(ui_info["git_url"], install_path, streamer):
-                # A soft failure (e.g., directory exists) is logged but we proceed.
                 logger.warning(f"Could not clone {ui_name}, but proceeding as it may exist.")
 
             await download_tracker.update_task_progress(
@@ -151,7 +156,10 @@ class UiManager:
             if not await ui_installer.create_venv(install_path, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
-            await download_tracker.update_task_progress(task_id, 25.0, "Installing dependencies...")
+            # Update status to indicate preparation for the dependency phase.
+            await download_tracker.update_task_progress(
+                task_id, 25.0, "Preparing dependency installation..."
+            )
             if not await ui_installer.install_dependencies(
                 install_path,
                 ui_info["requirements_file"],
