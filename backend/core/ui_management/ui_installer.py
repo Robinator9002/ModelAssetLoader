@@ -18,6 +18,10 @@ async def _stream_process(
     process: asyncio.subprocess.Process,
     stream_callback: Optional[StreamCallback] = None,
 ) -> tuple[int, str]:
+    """
+    Reads stdout and stderr from a process, streams it back via callback,
+    and returns the full combined output.
+    """
     output_lines = []
 
     async def read_stream(stream, stream_name):
@@ -27,11 +31,12 @@ async def _stream_process(
                 if not line_bytes:
                     break
                 line = line_bytes.decode("utf-8", errors="replace").strip()
-                output_lines.append(line)
-                log_line = f"[{process.pid}:{stream_name}] {line}"
-                logger.debug(log_line)
-                if stream_callback:
-                    await stream_callback(line)
+                if line:
+                    output_lines.append(line)
+                    log_line = f"[{process.pid}:{stream_name}] {line}"
+                    logger.debug(log_line)
+                    if stream_callback:
+                        await stream_callback(line)
             except Exception as e:
                 logger.warning(f"Error reading stream line: {e}")
                 break
@@ -114,8 +119,35 @@ async def install_dependencies(
         logger.error(f"Venv or requirements file not found for {ui_dir.name}.")
         return False
 
-    logger.info(f"Installing dependencies from '{req_path}'...")
+    # --- Step 1: Perform a dry run to get an accurate list and count of packages ---
+    logger.info("Performing pip dry run to determine dependency list...")
+    dry_run_command = [str(venv_python), "-m", "pip", "install", "--dry-run", "-r", str(req_path)]
+    if extra_packages:
+        dry_run_command.extend(extra_packages)
 
+    dry_run_process = await asyncio.create_subprocess_exec(
+        *dry_run_command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    _, dry_run_output = await _stream_process(dry_run_process)
+
+    collect_regex = re.compile(r"Collecting\s+([a-zA-Z0-9-_.]+)")
+    # This list contains all packages pip will download and install.
+    packages_to_process = collect_regex.findall(dry_run_output)
+    total_packages = len(packages_to_process)
+
+    if total_packages == 0:
+        logger.warning("Pip dry run found 0 packages to process. Assuming dependencies are met.")
+        # If a progress callback exists, notify it that we are done with this step.
+        if progress_callback:
+            # Send a final signal for both phases to complete the progress bar segment.
+            await progress_callback("collecting", 1, 1, "Done")
+            await progress_callback("installing", 1, 1, "Done")
+        return True
+
+    logger.info(f"Dry run identified {total_packages} packages to process.")
+
+    # --- Step 2: Perform the actual installation ---
+    logger.info(f"Installing dependencies from '{req_path}'...")
     pip_command = [
         str(venv_python),
         "-m",
@@ -125,74 +157,74 @@ async def install_dependencies(
         "600",
         "-r",
         str(req_path),
-        "--no-cache-dir",
     ]
-
     if extra_packages:
         logger.info(f"Installing extra packages: {extra_packages}")
         pip_command.extend(extra_packages)
 
     phase: PipPhase = "collecting"
-    try:
-        with open(req_path, "r", encoding="utf-8") as f:
-            top_level_packages = [
-                line.strip() for line in f if line.strip() and not line.startswith("#")
-            ]
-            top_level_total = len(top_level_packages)
-            if extra_packages:
-                top_level_total += len(extra_packages)
-    except Exception:
-        top_level_total = 1
+    processed_collect_count = 0
+    installing_regex = re.compile(r"Installing collected packages:")
 
-    processed_count = 0
+    # This task will simulate the 'installing' phase progress.
+    # It is started once the 'collecting' phase is detected as complete.
+    install_progress_ticker_task: Optional[asyncio.Task] = None
 
-    collect_regex = re.compile(r"Collecting\s+([a-zA-Z0-9-_.]+)")
-    installing_regex = re.compile(r"Installing collected packages:\s+(.*)")
+    async def intelligent_install_ticker():
+        """
+        Simulates installation progress by iterating through the full list of
+        packages identified in the dry run. This provides a smoother and more
+        representative progress bar for the user during the opaque installation phase.
+        """
+        # A short initial delay to allow the 'installing...' message to appear.
+        await asyncio.sleep(0.5)
+        for i, package_name in enumerate(packages_to_process, 1):
+            if process.returncode is not None:
+                logger.info("Installation process ended; stopping progress ticker.")
+                break  # Stop if the main process has already finished
+
+            if progress_callback:
+                await progress_callback("installing", i, total_packages, package_name)
+
+            # The delay simulates the time taken to install each package.
+            await asyncio.sleep(0.2)
+
+        # Ensure the progress reaches 100% for the installation phase
+        if progress_callback and (process.returncode is None):
+            await progress_callback("installing", total_packages, total_packages, "Finalizing...")
 
     async def pip_streamer(line: str):
-        nonlocal phase, processed_count
+        nonlocal phase, processed_collect_count, install_progress_ticker_task
 
         if stream_callback:
             await stream_callback(line)
 
+        # --- Collecting Phase ---
         if phase == "collecting":
-            collect_match = collect_regex.match(line)
+            collect_match = collect_regex.search(line)
             if collect_match:
-                processed_count += 1
+                processed_collect_count += 1
                 package_name = collect_match.group(1).strip()
                 if progress_callback:
                     await progress_callback(
-                        "collecting", processed_count, top_level_total, package_name
+                        "collecting", processed_collect_count, total_packages, package_name
                     )
 
-            installing_match = installing_regex.match(line)
-            if installing_match:
+            # --- Phase Transition ---
+            # When pip signals it's moving to installation, we switch our phase
+            # and start the simulated progress for the installation part.
+            if installing_regex.search(line):
                 phase = "installing"
-                packages_to_install = [p.strip() for p in installing_match.group(1).split(",")]
-                install_packages_total = len(packages_to_install)
-
                 logger.info(
-                    f"Switched to 'installing' phase. {install_packages_total} packages to install."
+                    f"Switched to 'installing' phase. Starting progress ticker for {total_packages} packages."
                 )
 
-                async def progress_ticker():
-                    """This ticker simulates the installation progress smoothly."""
-                    for i in range(1, install_packages_total + 1):
-                        if process.returncode is not None:
-                            break  # Stop if the main process has already finished
+                # Ensure the collecting phase shows 100% completion
+                if progress_callback:
+                    await progress_callback("collecting", total_packages, total_packages, "Done")
 
-                        # Update the frontend
-                        if progress_callback:
-                            status_text = f"Installing {i}/{install_packages_total}"
-                            await progress_callback(
-                                "installing", i, install_packages_total, status_text
-                            )
-
-                        # Calculate a short delay to make the progress bar move smoothly
-                        await asyncio.sleep(0.1)
-
-                if install_packages_total > 0:
-                    asyncio.create_task(progress_ticker())
+                # Start the background task for the simulated installation progress
+                install_progress_ticker_task = asyncio.create_task(intelligent_install_ticker())
 
     process = await asyncio.create_subprocess_exec(
         *pip_command,
@@ -201,4 +233,9 @@ async def install_dependencies(
     )
 
     return_code, _ = await _stream_process(process, pip_streamer)
+
+    # Clean up the ticker task if it's still running
+    if install_progress_ticker_task and not install_progress_ticker_task.done():
+        install_progress_ticker_task.cancel()
+
     return return_code == 0
