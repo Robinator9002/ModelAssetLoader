@@ -45,7 +45,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
 [ ] Phase 2.5: Bugfixing (Active right now)
 
-    [ ] Get the Cancellation of UI Downloads to work
+    [x] Get the Cancellation of UI Downloads to work
     
     [ ] Fix the Adoption Mechanics Analysis so it works for real now!
 
