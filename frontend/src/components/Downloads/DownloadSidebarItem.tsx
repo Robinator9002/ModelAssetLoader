@@ -1,7 +1,7 @@
 // frontend/src/components/Downloads/DownloadSidebarItem.tsx
 import React, { useState } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, X, Ban, Play } from 'lucide-react';
-import { cancelDownloadAPI, type DownloadStatus, stopUiAPI } from '../../api/api';
+import { cancelDownloadAPI, cancelUiTaskAPI, stopUiAPI, type DownloadStatus } from '../../api/api';
 import ConfirmModal from '../Layout/ConfirmModal';
 
 interface DownloadSidebarItemProps {
@@ -24,7 +24,7 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
 
     const isCancellable =
         taskStatus === 'pending' || taskStatus === 'downloading' || taskStatus === 'running';
-    const isUiInstallation = repo_id === 'UI Installation';
+    const isUiTask = repo_id === 'UI Installation' || repo_id === 'UI Adoption Repair';
     const isUiProcess = repo_id === 'UI Process';
 
     const getStatusIcon = () => {
@@ -52,6 +52,8 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
         try {
             if (isUiProcess && taskStatus === 'running') {
                 await stopUiAPI(download_id);
+            } else if (isUiTask) {
+                await cancelUiTaskAPI(download_id);
             } else {
                 await cancelDownloadAPI(download_id);
             }
@@ -75,10 +77,10 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
     const confirmModalMessage =
         isUiProcess && taskStatus === 'running'
             ? `Are you sure you want to stop the running process for "${filename}"?`
-            : `Are you sure you want to cancel the task for "${filename}"?`;
+            : `Are you sure you want to cancel the task for "${filename}"? This cannot be undone.`;
     const confirmText = isUiProcess && taskStatus === 'running' ? 'Yes, Stop' : 'Yes, Cancel';
 
-    const showStatusText = isUiInstallation && status_text && taskStatus !== 'completed';
+    const showStatusText = isUiTask && status_text && taskStatus !== 'completed';
 
     const renderBody = () => {
         if (taskStatus === 'error') {
@@ -101,7 +103,6 @@ const DownloadSidebarItem: React.FC<DownloadSidebarItemProps> = ({ status, onDis
                 </div>
             );
         }
-        // --- NEW: Custom display for running processes ---
         if (taskStatus === 'running' && isUiProcess) {
             return (
                 <div className="running-process-display">
