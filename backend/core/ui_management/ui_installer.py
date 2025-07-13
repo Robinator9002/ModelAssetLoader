@@ -117,7 +117,7 @@ async def _get_dependency_report(
     venv_python: pathlib.Path,
     req_path: pathlib.Path,
     extra_packages: Optional[List[str]],
-    progress_callback: Optional[PipProgressCallback]
+    progress_callback: Optional[PipProgressCallback],
 ) -> Dict[str, Any]:
     """
     Runs a pip dry-run with a JSON report. It parses the command's stderr in
@@ -126,15 +126,23 @@ async def _get_dependency_report(
     report = {}
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as tmp_report_file:
         report_path = pathlib.Path(tmp_report_file.name)
-    
+
     try:
         command = [
-            str(venv_python), "-m", "pip", "install", "--dry-run",
-            "--no-cache-dir", "-r", str(req_path), "--report", str(report_path)
+            str(venv_python),
+            "-m",
+            "pip",
+            "install",
+            "--dry-run",
+            "--no-cache-dir",
+            "-r",
+            str(req_path),
+            "--report",
+            str(report_path),
         ]
         if extra_packages:
             command.extend(extra_packages)
-        
+
         logger.info(f"Generating dependency report with command: {' '.join(command)}")
         process = await asyncio.create_subprocess_exec(
             *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -148,10 +156,12 @@ async def _get_dependency_report(
             while not stream.at_eof():
                 try:
                     line_bytes = await stream.readline()
-                    if not line_bytes: break
+                    if not line_bytes:
+                        break
                     line = line_bytes.decode("utf-8", errors="replace").strip()
-                    if not line: continue
-                    
+                    if not line:
+                        continue
+
                     # Only parse the stderr stream for "Collecting" lines.
                     # Both streams must be drained to prevent deadlock.
                     if is_stderr and progress_callback:
@@ -161,36 +171,43 @@ async def _get_dependency_report(
                             if package_name not in packages_found:
                                 packages_found.append(package_name)
                                 await progress_callback(
-                                    "collecting", len(packages_found), -1,
-                                    f"Analyzing: {package_name}", None
+                                    "collecting",
+                                    len(packages_found),
+                                    -1,
+                                    f"Analyzing: {package_name}",
+                                    None,
                                 )
                 except Exception as e:
                     logger.warning(f"Error reading pip analysis stream line: {e}")
                     break
-        
+
         # Concurrently consume both stdout and stderr to prevent the process from blocking.
         await asyncio.gather(
             read_analysis_stream(process.stdout, is_stderr=False),
-            read_analysis_stream(process.stderr, is_stderr=True)
+            read_analysis_stream(process.stderr, is_stderr=True),
         )
-        
+
         await process.wait()
 
         if process.returncode != 0:
-            logger.error(f"Failed to generate dependency report. Pip exited with code {process.returncode}.")
+            logger.error(
+                f"Failed to generate dependency report. Pip exited with code {process.returncode}."
+            )
             return {}
 
         if report_path.exists() and report_path.stat().st_size > 0:
             with open(report_path, "r") as f:
                 report = json.load(f)
-            logger.info(f"Successfully generated dependency report with {len(report.get('install', []))} items.")
+            logger.info(
+                f"Successfully generated dependency report with {len(report.get('install', []))} items."
+            )
         else:
             logger.warning("Dependency report was not generated or is empty.")
 
     finally:
         if report_path.exists():
             report_path.unlink()
-            
+
     return report
 
 
@@ -220,7 +237,7 @@ async def install_dependencies(
     # --- Stage 1: Generate report to get package sizes ---
     report = await _get_dependency_report(venv_python, req_path, extra_packages, progress_callback)
     install_targets = report.get("install", [])
-    
+
     if not install_targets:
         logger.info("Dependencies are already satisfied.")
         if progress_callback:
@@ -228,18 +245,28 @@ async def install_dependencies(
         return True
 
     package_info = {
-        item['metadata']['name'].lower().replace("_", "-"): {
-            "size": item.get('download_info', {}).get('archive_info', {}).get('size', 0),
-            "version": item['metadata']['version']
+        item["metadata"]["name"]
+        .lower()
+        .replace("_", "-"): {
+            "size": item.get("download_info", {}).get("archive_info", {}).get("size", 0),
+            "version": item["metadata"]["version"],
         }
-        for item in install_targets if item.get('download_info')
+        for item in install_targets
+        if item.get("metadata")
     }
-    total_download_size = sum(info['size'] for info in package_info.values())
-    
+    total_download_size = sum(info["size"] for info in package_info.values())
+
     # --- Stage 2: Run the actual installation ---
     pip_command = [
-        str(venv_python), "-m", "pip", "install", "--no-cache-dir", "--timeout", "600",
-        "-r", str(req_path),
+        str(venv_python),
+        "-m",
+        "pip",
+        "install",
+        "--no-cache-dir",
+        "--timeout",
+        "600",
+        "-r",
+        str(req_path),
     ]
     if extra_packages:
         pip_command.extend(extra_packages)
@@ -250,7 +277,9 @@ async def install_dependencies(
         stderr=asyncio.subprocess.PIPE,
     )
 
-    logger.info(f"Starting actual pip install ({process.pid}) with a total download size of {total_download_size} bytes.")
+    logger.info(
+        f"Starting actual pip install ({process.pid}) with a total download size of {total_download_size} bytes."
+    )
 
     collect_regex = re.compile(r"^\s*Collecting\s+([a-zA-Z0-9-_.]+)", re.IGNORECASE)
     bytes_processed = 0
@@ -260,10 +289,13 @@ async def install_dependencies(
         while not stream.at_eof():
             try:
                 line_bytes = await stream.readline()
-                if not line_bytes: break
+                if not line_bytes:
+                    break
                 line = line_bytes.decode("utf-8", errors="replace").strip()
-                if not line: continue
-                if stream_callback: await stream_callback(line)
+                if not line:
+                    continue
+                if stream_callback:
+                    await stream_callback(line)
 
                 if progress_callback and total_download_size > 0:
                     collect_match = collect_regex.match(line)
@@ -272,21 +304,35 @@ async def install_dependencies(
                         info = package_info.get(package_name)
                         if info:
                             # Use the size from the report to advance progress.
-                            bytes_processed += info['size']
+                            bytes_processed += info["size"]
                             await progress_callback(
                                 "collecting",
                                 bytes_processed,
                                 total_download_size,
                                 f"{package_name.capitalize()} {info['version']}",
-                                info['size']
+                                info["size"],
                             )
             except Exception as e:
                 logger.warning(f"Error reading pip stream line: {e}")
                 break
 
+    # If all packages are cached (total_download_size is 0), we won't get Collecting
+    # lines. In this case, we can provide a rapid, count-based progress update.
+    if total_download_size == 0 and progress_callback:
+        logger.info("All packages seem to be cached. Simulating collection progress.")
+        total_packages = len(package_info)
+        for i, (name, info) in enumerate(package_info.items()):
+            await progress_callback(
+                "collecting",
+                i + 1,
+                total_packages,
+                f"{name.capitalize()} {info['version']}",
+                0,  # Size is 0 for cached
+            )
+            await asyncio.sleep(0.01)  # Tiny sleep to allow UI to update
+
     await asyncio.gather(
-        read_and_parse_stream(process.stdout),
-        read_and_parse_stream(process.stderr)
+        read_and_parse_stream(process.stdout), read_and_parse_stream(process.stderr)
     )
     await process.wait()
 

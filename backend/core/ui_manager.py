@@ -163,8 +163,10 @@ class UiManager:
 
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            pip_progress_cb = lambda phase, processed, total, name, size: self._pip_progress_callback(
-                task_id, phase, processed, total, name, size
+            pip_progress_cb = (
+                lambda phase, processed, total, name, size: self._pip_progress_callback(
+                    task_id, phase, processed, total, name, size
+                )
             )
 
             await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
@@ -291,8 +293,10 @@ class UiManager:
 
         try:
             streamer = lambda line: self._stream_progress_to_tracker(task_id, line)
-            pip_progress_cb = lambda phase, processed, total, name, size: self._pip_progress_callback(
-                task_id, phase, processed, total, name, size
+            pip_progress_cb = (
+                lambda phase, processed, total, name, size: self._pip_progress_callback(
+                    task_id, phase, processed, total, name, size
+                )
             )
 
             if "VENV_MISSING" in issues_to_fix or "VENV_INCOMPLETE" in issues_to_fix:
