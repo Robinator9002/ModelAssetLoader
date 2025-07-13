@@ -76,12 +76,8 @@ class UiManager:
 
         if total > 0:
             if phase == "collecting":
-                # A special case for the initial "Analyzing..." message
-                if processed == 0 and total == 1:
-                    current_progress = collecting_start_progress
-                else:
-                    phase_percent = (processed / total) * collecting_range
-                    current_progress = collecting_start_progress + phase_percent
+                phase_percent = (processed / total) * collecting_range
+                current_progress = collecting_start_progress + phase_percent
                 status_text = f"Collecting: {item_name}"
             else:  # 'installing' phase
                 phase_percent = (processed / total) * installing_range
@@ -156,10 +152,8 @@ class UiManager:
             if not await ui_installer.create_venv(install_path, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
-            # Update status to indicate preparation for the dependency phase.
-            await download_tracker.update_task_progress(
-                task_id, 25.0, "Preparing dependency installation..."
-            )
+            # Explicitly update the status before starting the dependency analysis.
+            await download_tracker.update_task_progress(task_id, 25.0, "Analyzing dependencies...")
             if not await ui_installer.install_dependencies(
                 install_path,
                 ui_info["requirements_file"],
