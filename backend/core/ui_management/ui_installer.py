@@ -20,7 +20,8 @@ async def _stream_process(
 ) -> tuple[int, str]:
     """
     Reads stdout and stderr from a process, streams it back via callback,
-    and returns the full combined output.
+    and returns the full combined output. This is used for general command
+    output like git clone or venv creation.
     """
     output_lines = []
 
@@ -55,6 +56,10 @@ async def clone_repo(
     target_dir: pathlib.Path,
     stream_callback: Optional[StreamCallback] = None,
 ) -> bool:
+    """
+    Clones a git repository into a specified target directory.
+    Skips cloning if the directory already exists and is not empty.
+    """
     if target_dir.exists() and any(target_dir.iterdir()):
         logger.warning(f"Target directory {target_dir} already exists. Skipping clone.")
         if stream_callback:
@@ -81,6 +86,10 @@ async def clone_repo(
 async def create_venv(
     ui_dir: pathlib.Path, stream_callback: Optional[StreamCallback] = None
 ) -> bool:
+    """
+    Creates a Python virtual environment in the specified directory.
+    Skips creation if a 'venv' directory already exists.
+    """
     venv_path = ui_dir / "venv"
     if venv_path.exists():
         logger.info(f"Virtual environment already exists at '{venv_path}'. Skipping.")
@@ -108,6 +117,12 @@ async def install_dependencies(
     progress_callback: Optional[PipProgressCallback] = None,
     extra_packages: Optional[List[str]] = None,
 ) -> bool:
+    """
+    Installs dependencies from a requirements file into the virtual environment.
+    This function parses the output of the 'pip install' command in real-time
+    to provide accurate progress updates for both the 'collecting' and 'installing'
+    phases of the operation.
+    """
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
         if sys.platform == "win32"
@@ -115,41 +130,20 @@ async def install_dependencies(
     )
     req_path = ui_dir / requirements_file
 
-    if not venv_python.exists() or not req_path.exists():
-        logger.error(f"Venv or requirements file not found for {ui_dir.name}.")
+    if not venv_python.exists():
+        logger.error(f"Virtual environment Python executable not found for {ui_dir.name}.")
+        return False
+    if not req_path.exists():
+        logger.error(f"Requirements file '{requirements_file}' not found in {ui_dir.name}.")
         return False
 
-    # --- Step 1: Dry Run to get the definitive list of packages to process ---
-    logger.info("Performing pip dry run to determine dependency list...")
-    dry_run_command = [str(venv_python), "-m", "pip", "install", "--dry-run", "-r", str(req_path)]
-    if extra_packages:
-        dry_run_command.extend(extra_packages)
-
-    dry_run_process = await asyncio.create_subprocess_exec(
-        *dry_run_command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
-    _, dry_run_output = await _stream_process(dry_run_process)
-
-    collect_regex = re.compile(r"Collecting\s+([a-zA-Z0-9-_.]+)")
-    packages_to_process = collect_regex.findall(dry_run_output)
-    total_packages = len(packages_to_process)
-
-    if total_packages == 0:
-        logger.warning("Pip dry run found 0 packages to process. Assuming dependencies are met.")
-        if progress_callback:
-            await progress_callback("collecting", 1, 1, "Dependencies already satisfied.")
-            await progress_callback("installing", 1, 1, "Done")
-        return True
-
-    logger.info(f"Dry run identified {total_packages} packages to process: {packages_to_process}")
-
-    # --- Step 2: Run the REAL pip install in the background ---
-    logger.info(f"Starting actual installation for {total_packages} packages...")
+    # The single command for installation. Its output will be parsed directly.
     pip_command = [
         str(venv_python),
         "-m",
         "pip",
         "install",
+        "--no-cache-dir",
         "--timeout",
         "600",
         "-r",
@@ -158,34 +152,79 @@ async def install_dependencies(
     if extra_packages:
         pip_command.extend(extra_packages)
 
-    install_process = await asyncio.create_subprocess_exec(
+    process = await asyncio.create_subprocess_exec(
         *pip_command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    # Start a background task to consume the output for logging, but not for progress.
-    install_log_task = asyncio.create_task(_stream_process(install_process, stream_callback))
 
-    # --- Step 3: SIMULATE progress based on the plan from the dry run ---
-    if progress_callback:
-        # Simulate Collecting Phase
-        logger.info("Simulating 'collecting' phase progress...")
-        for i, package_name in enumerate(packages_to_process, 1):
-            await progress_callback("collecting", i, total_packages, package_name)
-            await asyncio.sleep(0.1)
+    logger.info(f"Starting pip install ({process.pid}) and parsing output in real-time.")
 
-        # Simulate Installing Phase
-        logger.info("Simulating 'installing' phase progress...")
-        for i, package_name in enumerate(packages_to_process, 1):
-            await progress_callback("installing", i, total_packages, package_name)
-            await asyncio.sleep(0.3)
+    # Regex patterns to parse pip's output.
+    collect_regex = re.compile(r"^\s*Collecting\s+([a-zA-Z0-9-_.]+)", re.IGNORECASE)
+    install_regex = re.compile(r"^\s*Installing collected packages:.*", re.IGNORECASE)
 
-    # --- Step 4: Wait for the actual installation to complete ---
-    logger.info("Waiting for actual pip install process to finish...")
-    return_code, install_logs = await install_log_task
-    logger.info(f"Actual pip install process finished with code {return_code}.")
+    collected_packages = []
+    in_install_phase = False
 
-    if return_code != 0:
-        logger.error(f"Pip installation failed. Full logs:\n{install_logs}")
+    async def read_and_parse_stream(stream):
+        """Reads and parses a stream (stdout/stderr) line-by-line for progress."""
+        nonlocal in_install_phase
 
-    return return_code == 0
+        while not stream.at_eof():
+            try:
+                line_bytes = await stream.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+
+                if stream_callback:
+                    await stream_callback(line)
+
+                if progress_callback:
+                    # Phase 1: Collecting packages.
+                    collect_match = collect_regex.match(line)
+                    if collect_match and not in_install_phase:
+                        package_name = collect_match.group(1)
+                        if package_name not in collected_packages:
+                            collected_packages.append(package_name)
+                            # Send the number of packages found so far, and -1 for the total
+                            # to signal that the total is not yet known.
+                            await progress_callback(
+                                "collecting", len(collected_packages), -1, package_name
+                            )
+                        continue
+
+                    # Phase 2: Transition to Installing packages.
+                    install_match = install_regex.match(line)
+                    if install_match and not in_install_phase:
+                        in_install_phase = True
+                        # Now we have the complete list of packages.
+                        # Signal the start of the installation phase with the correct total.
+                        await progress_callback(
+                            "installing", 0, len(collected_packages), "Starting installation..."
+                        )
+                        continue
+
+            except Exception as e:
+                logger.warning(f"Error reading pip stream line: {e}")
+                break
+
+    # Process stdout and stderr concurrently.
+    await asyncio.gather(
+        read_and_parse_stream(process.stdout), read_and_parse_stream(process.stderr)
+    )
+
+    await process.wait()
+
+    if process.returncode == 0 and progress_callback:
+        # On success, send a final update to ensure the progress bar completes.
+        total = len(collected_packages) if collected_packages else 1
+        await progress_callback("installing", total, total, "Installation complete.")
+        logger.info(f"Pip install process {process.pid} completed successfully.")
+    elif process.returncode != 0:
+        logger.error(f"Pip installation failed with exit code {process.returncode}.")
+
+    return process.returncode == 0

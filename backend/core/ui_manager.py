@@ -74,15 +74,27 @@ class UiManager:
         current_progress = 0.0
         status_text = ""
 
-        if total > 0:
-            if phase == "collecting":
-                phase_percent = (processed / total) * collecting_range
+        if phase == "collecting":
+            # For the collecting phase, the total number of packages is not known
+            # upfront. We use a heuristic approach for a smooth progress bar.
+            # We assume a moderate number of packages (e.g., 50) would fill the bar.
+            # Each collected package contributes a small, fixed amount to the progress.
+            # A 'total' of -1 is used as a signal for this heuristic mode.
+            if total == -1:
+                # Each package is worth a fraction of the total collecting_range.
+                # e.g., 35.0 / 50 = 0.7 points per package.
+                phase_progress = min(processed * 0.7, collecting_range)
+                current_progress = collecting_start_progress + phase_progress
+            else: # Fallback to standard percentage if total is known.
+                phase_percent = (processed / total) * collecting_range if total > 0 else 0
                 current_progress = collecting_start_progress + phase_percent
-                status_text = f"Collecting: {item_name}"
-            else:  # 'installing' phase
-                phase_percent = (processed / total) * installing_range
-                current_progress = installing_start_progress + phase_percent
-                status_text = f"Installing: {item_name}"
+            status_text = f"Collecting: {item_name}"
+
+        elif phase == "installing":
+            # The installing phase has a known total based on the collected packages.
+            phase_percent = (processed / total) * installing_range if total > 0 else 0
+            current_progress = installing_start_progress + phase_percent
+            status_text = f"Installing: {item_name}"
 
         # Clamp progress to the maximum allocated for the dependencies phase.
         final_dependencies_progress = installing_start_progress + installing_range  # 95.0
