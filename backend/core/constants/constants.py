@@ -37,7 +37,9 @@ UiNameType = Literal["ComfyUI", "A1111", "Forge", "Fooocus"]
 # Using pathlib for robust, cross-platform path handling.
 BACKEND_DIR = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_FILE_DIR = BACKEND_DIR / "config"
-MANAGED_UIS_ROOT_PATH = BACKEND_DIR.parent / "managed_uis"
+CONFIG_FILE_NAME = "mal_settings.json"
+CONFIG_FILE_PATH = CONFIG_FILE_DIR / CONFIG_FILE_NAME
+MANAGED_UIS_ROOT_PATH = BACKEND_DIR / "managed_uis"
 
 
 # --- Model File Extensions ---
