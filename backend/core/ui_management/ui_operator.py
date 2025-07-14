@@ -1,204 +1,148 @@
-# backend/core/ui_management/ui_adopter.py
+# backend/core/ui_management/ui_operator.py
+import asyncio
 import logging
 import pathlib
+import shutil
 import sys
-from typing import Dict, Any, List, TypedDict
+import os
+from typing import Optional, Tuple
 
-from ..constants.constants import UI_REPOSITORIES, UiNameType
-from .ui_installer import get_dependency_report
+# Note: Using a relative import to get to the ui_installer for the StreamCallback type.
+from .ui_installer import StreamCallback
 
 logger = logging.getLogger(__name__)
 
 
-class AdoptionIssue(TypedDict):
-    """Defines the structure for a single issue found during analysis."""
-
-    code: str
-    message: str
-    is_fixable: bool
-    fix_description: str
-    default_fix_enabled: bool
-
-
-class AdoptionAnalysisResult(TypedDict):
-    """Defines the structure for the final result of an adoption analysis."""
-
-    is_adoptable: bool
-    is_healthy: bool
-    issues: List[AdoptionIssue]
-
-
-class UiAdopter:
+async def _stream_process(
+    process: asyncio.subprocess.Process,
+    stream_callback: Optional[StreamCallback] = None,
+) -> tuple[int, str]:
     """
-    Handles the analysis and adoption process for existing UI installations.
-    This class acts as the "diagnostician" for a potential adoption candidate,
-    checking its health and determining if it can be managed by the application.
+    Reads stdout and stderr from a process line by line, optionally streaming it.
+    This is essential for providing real-time feedback to the user.
     """
+    output_lines = []
 
-    def __init__(self, ui_name: UiNameType, path: pathlib.Path):
-        """
-        Initializes the adopter with the target UI and path.
+    async def read_stream(stream, stream_name):
+        # Continuously read from the stream until it's at the end of the file.
+        while not stream.at_eof():
+            try:
+                line_bytes = await stream.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode("utf-8", errors="replace").strip()
+                # We only process non-empty lines.
+                if line:
+                    output_lines.append(line)
+                    log_line = f"[{process.pid}:{stream_name}] {line}"
+                    logger.debug(log_line)
+                    if stream_callback:
+                        await stream_callback(line)
+            except Exception as e:
+                logger.warning(f"Error reading stream line from process {process.pid}: {e}")
+                break
 
-        Args:
-            ui_name: The type of UI being adopted (e.g., 'ComfyUI', 'A1111').
-            path: The path to the user-provided installation directory.
-        """
-        self.ui_name = ui_name
-        self.path = path
-        self.ui_info = UI_REPOSITORIES.get(ui_name)
-        self.issues: List[AdoptionIssue] = []
+    # Asynchronously read from both stdout and stderr.
+    await asyncio.gather(
+        read_stream(process.stdout, "stdout"), read_stream(process.stderr, "stderr")
+    )
 
-    async def analyze(self) -> AdoptionAnalysisResult:
-        """
-        Performs a comprehensive analysis of the target directory.
-        It checks for critical files, the virtual environment, and dependency integrity
-        to determine the health and adoptability of the installation.
+    # Wait for the process to terminate and get its return code.
+    await process.wait()
+    return_code = process.returncode
+    combined_output = "\n".join(output_lines)
+    logger.info(f"Process {process.pid} finished with exit code {return_code}.")
+    return return_code, combined_output
 
-        Returns:
-            A dictionary containing the analysis results.
-        """
-        logger.info(f"Starting adoption analysis for '{self.ui_name}' at '{self.path}'...")
 
-        if not self.ui_info:
-            self._add_issue(
-                code="INVALID_UI_TYPE",
-                message=f"'{self.ui_name}' is not a recognized UI type.",
-                is_fixable=False,
-            )
-            return self._get_final_result()
+async def delete_ui_environment(ui_dir: pathlib.Path) -> bool:
+    """Completely and safely removes a M.A.L.-managed UI environment directory."""
+    if not ui_dir.is_dir():
+        logger.warning(f"Cannot delete '{ui_dir}'. It is not a valid directory.")
+        return False
 
-        # Perform all checks in a logical order.
-        self._check_path_validity()
-        self._check_start_script()
-        self._check_requirements_file()
-        await self._check_venv_and_dependencies()
-
-        logger.info(f"Analysis complete. Found {len(self.issues)} issue(s).")
-        return self._get_final_result()
-
-    def _add_issue(
-        self,
-        code: str,
-        message: str,
-        is_fixable: bool,
-        fix_description: str = "",
-        default_fix_enabled: bool = True,
-    ):
-        """A helper method to standardize the creation of adoption issues."""
-        self.issues.append(
-            {
-                "code": code,
-                "message": message,
-                "is_fixable": is_fixable,
-                "fix_description": fix_description,
-                "default_fix_enabled": default_fix_enabled,
-            }
+    # Security check: A managed UI must contain a 'venv' folder.
+    # This prevents accidental deletion of arbitrary directories.
+    if "venv" not in [d.name for d in ui_dir.iterdir() if d.is_dir()]:
+        logger.error(
+            f"Security check failed: Refusing to delete '{ui_dir}' as it does not appear to be a valid M.A.L. environment (no venv found)."
         )
+        return False
 
-    def _get_final_result(self) -> AdoptionAnalysisResult:
-        """Compiles the final analysis result from the list of found issues."""
-        is_healthy = not self.issues
-        # An installation is adoptable if it has no issues that are marked as unfixable.
-        is_adoptable = not any(not issue["is_fixable"] for issue in self.issues)
+    logger.info(f"Deleting UI environment at '{ui_dir}'...")
+    try:
+        # Use shutil.rmtree for recursive deletion.
+        shutil.rmtree(ui_dir)
+        logger.info(f"Successfully deleted '{ui_dir}'.")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete directory '{ui_dir}': {e}", exc_info=True)
+        return False
 
-        return {
-            "is_adoptable": is_adoptable,
-            "is_healthy": is_healthy,
-            "issues": self.issues,
-        }
 
-    def _check_path_validity(self):
-        """Checks if the provided path exists and is a directory."""
-        if not self.path.exists():
-            self._add_issue(
-                code="PATH_NOT_FOUND",
-                message=f"The specified directory does not exist: {self.path}",
-                is_fixable=False,
-            )
-        elif not self.path.is_dir():
-            self._add_issue(
-                code="PATH_IS_NOT_DIRECTORY",
-                message=f"The specified path is a file, not a directory: {self.path}",
-                is_fixable=False,
-            )
+async def run_ui(
+    ui_dir: pathlib.Path,
+    start_script: str,
+) -> Tuple[Optional[asyncio.subprocess.Process], Optional[str]]:
+    """
+    Launches a UI, intelligently deciding whether to run a Python script
+    via the venv or to execute a shell/batch script directly.
+    """
+    script_path = ui_dir / start_script
+    if not script_path.exists():
+        msg = f"ERROR: Start script '{start_script}' not found at '{script_path}'. Cannot run UI."
+        logger.error(msg)
+        return None, msg
 
-    def _check_start_script(self):
-        """Checks for the presence of the UI's main start script (e.g., webui.sh or main.py)."""
-        start_script = self.ui_info.get("start_script")
-        if not start_script or not (self.path / start_script).is_file():
-            self._add_issue(
-                code="MISSING_START_SCRIPT",
-                message=f"The main start script ('{start_script}') could not be found. This is a strong indicator that this is not a valid {self.ui_name} installation.",
-                is_fixable=False,
-            )
+    command_to_run: list[str] = []
 
-    def _check_requirements_file(self):
-        """Checks for the presence of the requirements.txt file, which is vital for venv validation."""
-        req_file = self.ui_info.get("requirements_file")
-        if not req_file or not (self.path / req_file).is_file():
-            self._add_issue(
-                code="MISSING_REQUIREMENTS_FILE",
-                message=f"The dependency file ('{req_file}') is missing. A virtual environment cannot be reliably created or validated without it.",
-                is_fixable=False,
-            )
-
-    async def _check_venv_and_dependencies(self):
-        """
-        Checks for the venv's existence, its basic integrity, and whether all
-        required dependencies from requirements.txt are installed.
-        """
-        venv_path = self.path / "venv"
-        if not venv_path.is_dir():
-            self._add_issue(
-                code="VENV_MISSING",
-                message="No 'venv' directory was found. A new virtual environment is required.",
-                is_fixable=True,
-                fix_description="Create a new virtual environment and install all dependencies.",
-                default_fix_enabled=True,
-            )
-            # If the venv is missing, we can't check for dependencies, so we stop here.
-            return
-
-        python_exe_path = (
-            venv_path / "Scripts" / "python.exe"
+    # Check if the start script is a shell or batch file.
+    if start_script.endswith((".sh", ".bat")):
+        logger.info(f"Executing shell/batch script directly: '{script_path}'")
+        # On non-Windows systems, ensure the script has execute permissions.
+        if os.name != "nt":
+            try:
+                script_path.chmod(0o755)
+                logger.info(f"Set executable permissions for '{script_path}'.")
+            except Exception as e:
+                logger.warning(f"Could not set executable permissions for '{script_path}': {e}")
+        command_to_run = [str(script_path)]
+    else:
+        # For .py files, we use the venv's python interpreter.
+        logger.info(f"Executing Python script via virtual environment.")
+        venv_python = (
+            ui_dir / "venv" / "Scripts" / "python.exe"
             if sys.platform == "win32"
-            else venv_path / "bin" / "python"
+            else ui_dir / "venv" / "bin" / "python"
         )
+        if not venv_python.exists():
+            msg = f"ERROR: Virtual environment python not found at '{venv_python}'. Cannot run UI."
+            logger.error(msg)
+            return None, msg
+        # Use -u for unbuffered output, which is crucial for real-time log streaming.
+        command_to_run = [str(venv_python), "-u", str(script_path)]
 
-        if not python_exe_path.is_file():
-            self._add_issue(
-                code="VENV_INCOMPLETE",
-                message="A 'venv' directory exists, but the Python executable is missing. The environment appears to be corrupt.",
-                is_fixable=True,
-                fix_description="Re-create the virtual environment to fix the corruption.",
-                default_fix_enabled=True,
-            )
-            # If the python executable is missing, we can't run pip, so we stop here.
-            return
+    if not command_to_run:
+        # This case should not be reached if constants.py is well-defined.
+        msg = f"ERROR: Could not determine how to run '{start_script}'."
+        logger.error(msg)
+        return None, msg
 
-        # If the requirements file is missing, we can't check dependencies.
-        # This is already caught by _check_requirements_file, but we check again to be safe.
-        req_file = self.ui_info.get("requirements_file")
-        req_path = self.path / req_file
-        if not req_path.is_file():
-            return
-
-        logger.info(f"Checking dependency integrity for '{self.ui_name}'...")
-        extra_packages = self.ui_info.get("extra_packages")
-        report = await get_dependency_report(
-            venv_python=python_exe_path,
-            req_path=req_path,
-            extra_packages=extra_packages,
-            progress_callback=None,  # No progress needed for silent analysis
+    logger.info(
+        f"Attempting to run command: '{' '.join(command_to_run)}' in working directory '{ui_dir}'"
+    )
+    try:
+        # Execute the command, setting the current working directory (cwd) to the UI's root.
+        # This is critical for scripts that use relative paths to find their resources.
+        process = await asyncio.create_subprocess_exec(
+            *command_to_run,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=ui_dir,
         )
-
-        packages_to_install = report.get("install", [])
-        if packages_to_install:
-            package_count = len(packages_to_install)
-            self._add_issue(
-                code="VENV_DEPS_INCOMPLETE",
-                message=f"The virtual environment is missing {package_count} required package(s).",
-                is_fixable=True,
-                fix_description="Run the dependency installer to download and set up the required packages.",
-                default_fix_enabled=True,
-            )
+        logger.info(f"Successfully started process {process.pid} for {ui_dir.name}.")
+        return process, None
+    except Exception as e:
+        msg = f"FATAL: Could not start the UI process. See logs for details. Error: {e}"
+        logger.error(f"Failed to start process for {ui_dir.name}: {e}", exc_info=True)
+        return None, msg
