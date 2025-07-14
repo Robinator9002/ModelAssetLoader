@@ -205,6 +205,7 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
                             key={issue.code}
                             className={issue.is_fixable ? 'fixable' : 'not-fixable'}
                         >
+                            {/* The input remains a sibling to the label, which is correct for the global CSS */}
                             {issue.is_fixable && (
                                 <input
                                     type="checkbox"
@@ -214,8 +215,11 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
                                 />
                             )}
                             <label htmlFor={`fix-${issue.code}`}>
-                                <strong>{issue.message}</strong>
-                                {issue.is_fixable && <span>{issue.fix_description}</span>}
+                                {/* FIX: Wrap the text content in a div to treat it as a single grid item */}
+                                <div className="issue-text-content">
+                                    <strong>{issue.message}</strong>
+                                    {issue.is_fixable && <span>{issue.fix_description}</span>}
+                                </div>
                             </label>
                         </li>
                     ))}

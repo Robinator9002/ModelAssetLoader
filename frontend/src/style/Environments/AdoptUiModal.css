@@ -110,6 +110,14 @@
 
 /* Use the custom checkbox from global.css */
 .issue-list li label {
+    /*
+     * FIX: Override the global `inline-grid` style.
+     * By setting `display: grid` and `width: 100%`, the label becomes a
+     * block-level container that fills its parent. This gives the `auto`
+     * column a defined space, allowing the text in the `span` to wrap correctly.
+    */
+    display: grid;
+    width: 100%;
     grid-template-columns: 20px auto; /* Ensure consistent checkbox layout */
     align-items: flex-start;
     gap: calc(var(--spacing-unit) * 1.5);
@@ -126,6 +134,7 @@
     font-size: 0.9rem;
     color: var(--color-text-secondary);
     line-height: 1.5;
+    display: block; /* FIX: Force the span to take up the full width of its column */
 }
 
 /* --- Action Button Overrides --- */
