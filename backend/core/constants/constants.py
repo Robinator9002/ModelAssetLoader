@@ -1,106 +1,125 @@
 # backend/core/constants/constants.py
 import pathlib
-from typing import Literal, Dict, Any
+import os
+from typing import Literal, Dict, Any, Set
 
 # --- Type Definitions ---
-# These are used for strict type checking across the application.
+# These Literal types provide strict type checking for key identifiers across the application,
+# preventing typos and ensuring consistency.
 
+# Defines the types of models the application can manage.
+# These values are used as keys in the KNOWN_UI_PROFILES dictionary.
 ModelType = Literal[
-    "checkpoints",
-    "loras",
-    "vae",
-    "clip",
-    "unet",
-    "controlnet",
-    "embeddings",
-    "hypernetworks",
-    "diffusers",
-    "custom",
+    "Checkpoint",
+    "VAE",
+    "LoRA",
+    "LyCORIS",
+    "ControlNet",
+    "Upscaler",
+    "Hypernetwork",
+    "TextualInversion",
+    "MotionModule",
+    "Other",
 ]
-UiProfileType = Literal["ComfyUI", "A1111", "ForgeUI", "Custom"]
+
+# Defines the UI folder structures the application understands.
+UiProfileType = Literal["ComfyUI", "A1111"]
+
+# Defines the available color themes for the frontend.
 ColorThemeType = Literal["dark", "light"]
 
-# This type is derived from the keys of UI_REPOSITORIES to ensure we only
-# try to install UIs that are actually defined.
-UiNameType = Literal["ComfyUI", "A1111", "ForgeUI"]
+# This type is dynamically derived from the keys of UI_REPOSITORIES to ensure
+# we only ever try to install or manage UIs that are explicitly defined below.
+UiNameType = Literal["ComfyUI", "A1111", "Forge", "Fooocus"]
 
 
-# --- Configuration File Constants ---
-CONFIG_FILE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "config"
-CONFIG_FILE_NAME = "mal_settings.json"
-CONFIG_FILE_PATH = CONFIG_FILE_DIR / CONFIG_FILE_NAME
-
-# --- Managed UI Installation Root ---
-# This is the fixed root directory where M.A.L. will install and manage UI environments.
-# It is independent of any user-configured base_path to avoid circular dependencies.
-MANAGED_UIS_ROOT_PATH = CONFIG_FILE_DIR.parent / "managed_uis"
+# --- File System Paths and Directories ---
+# Using pathlib for robust, cross-platform path handling.
+BACKEND_DIR = pathlib.Path(__file__).resolve().parent.parent
+CONFIG_FILE_DIR = BACKEND_DIR / "config"
+MANAGED_UIS_ROOT_PATH = BACKEND_DIR.parent / "managed_uis"
 
 
-# --- Model Management Constants ---
-MODEL_FILE_EXTENSIONS = (".safetensors", ".ckpt", ".pt", ".bin", ".pth", ".onnx")
+# --- Model File Extensions ---
+# A set is used for efficient 'in' checks when scanning for model files.
+MODEL_FILE_EXTENSIONS: Set[str] = {
+    ".safetensors",
+    ".ckpt",
+    ".pt",
+    ".bin",
+    ".pth",
+    ".onnx",
+}
 
 
 # --- UI Profile Path Definitions ---
-# Defines the subfolder structure for different UI profiles.
-KNOWN_UI_PROFILES: Dict[UiProfileType, Dict[str, str]] = {
+# This dictionary maps a standardized ModelType to its specific subdirectory
+# for each known UI profile. This is the core of the automatic path resolution.
+KNOWN_UI_PROFILES: Dict[UiProfileType, Dict[ModelType, str]] = {
     "ComfyUI": {
-        "checkpoints": "models/checkpoints",
-        "loras": "models/loras",
-        "vae": "models/vae",
-        "clip": "models/clip",
-        "controlnet": "models/controlnet",
-        "embeddings": "models/embeddings",
-        "diffusers": "models/diffusers",
-        "unet": "models/unet",
-        "hypernetworks": "models/hypernetworks",
+        "Checkpoint": "models/checkpoints",
+        "VAE": "models/vae",
+        "LoRA": "models/loras",
+        "LyCORIS": "models/loras",  # ComfyUI often uses the same folder for LoRA and LyCORIS
+        "ControlNet": "models/controlnet",
+        "TextualInversion": "models/embeddings",
+        "Hypernetwork": "models/hypernetworks",
+        "Upscaler": "models/upscale_models",
+        "MotionModule": "models/motion_modules",
     },
     "A1111": {
-        "checkpoints": "models/Stable-diffusion",
-        "loras": "models/Lora",
-        "vae": "models/VAE",
-        "embeddings": "embeddings",
-        "hypernetworks": "models/hypernetworks",
-        "controlnet": "models/ControlNet",
-    },
-    "ForgeUI": {
-        "checkpoints": "models/Stable-diffusion",
-        "loras": "models/Lora",
-        "vae": "models/VAE",
-        "embeddings": "embeddings",
-        "hypernetworks": "models/hypernetworks",
-        "controlnet": "models/ControlNet",
+        "Checkpoint": "models/Stable-diffusion",
+        "VAE": "models/VAE",
+        "LoRA": "models/Lora",
+        "LyCORIS": "models/LyCORIS",
+        "ControlNet": "models/ControlNet",
+        "TextualInversion": "embeddings",
+        "Hypernetwork": "models/hypernetworks",
+        "Upscaler": "models/ESRGAN",  # A1111 has several upscaler folders, this is a common one
     },
 }
 
 
-# --- UI Installation & Management Constants ---
-# This is the central knowledge base for installing and running different UIs.
+# --- UI Repositories and Configuration ---
+# This dictionary is the single source of truth for UI-specific details.
+# It defines the git repository, required files, and the correct launch script.
 UI_REPOSITORIES: Dict[UiNameType, Dict[str, Any]] = {
     "ComfyUI": {
         "git_url": "https://github.com/comfyanonymous/ComfyUI.git",
         "requirements_file": "requirements.txt",
         "start_script": "main.py",
-        "python_version": "3.10",
         "default_profile_name": "ComfyUI",
-        "extra_packages": ["pyyaml"],
     },
     "A1111": {
         "git_url": "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git",
         "requirements_file": "requirements.txt",
-        "start_script": "webui.py",
-        "python_version": "3.10",
+        # We point to the shell/batch script, not the python file, to ensure
+        # all environment checks and setup steps are properly executed by the UI itself.
+        "start_script": "webui.sh" if os.name != "nt" else "webui.bat",
         "default_profile_name": "A1111",
     },
-    "ForgeUI": {
+    "Forge": {
         "git_url": "https://github.com/lllyasviel/stable-diffusion-webui-forge.git",
         "requirements_file": "requirements.txt",
-        "start_script": "webui.py",
-        "python_version": "3.10",
-        "default_profile_name": "ForgeUI",
+        # Forge also uses a shell script launcher.
+        "start_script": "webui.sh" if os.name != "nt" else "webui.bat",
+        # Forge uses an A1111-compatible folder structure for models.
+        "default_profile_name": "A1111",
+    },
+    "Fooocus": {
+        "git_url": "https://github.com/lllyasviel/Fooocus.git",
+        "requirements_file": "requirements.txt",
+        # Fooocus is special; it often uses an entrypoint file that handles updates.
+        "start_script": "entry_with_update.py",
+        # Its internal structure is closer to ComfyUI for key models.
+        "default_profile_name": "ComfyUI",
+        # Fooocus has specific package needs not always in its requirements.
+        "extra_packages": ["pygit2"],
     },
 }
 
-
 # --- Host Directory Scanning Constants ---
+# Defines system paths to exclude during directory scans to improve performance
+# and avoid issues with virtual or protected file systems on Linux.
 EXCLUDED_SCAN_PREFIXES_LINUX = ("/proc", "/sys", "/dev", "/snap")
 SHALLOW_SCAN_PATHS_LINUX = {"/run", "/mnt", "/media"}
