@@ -518,33 +518,22 @@ input[type='checkbox']:disabled + label[for] {
  * Defines reusable animations for the application.
 */
 @keyframes organic-pulse-spin {
-    /*
-     * This animation creates an organic "breathing" effect. It animates the
-     * border color for the spinner itself and the box-shadow for the glow,
-     * transitioning between the primary and accent theme colors.
+    /* * Eine geglättete Version mit weniger, aber dafür klarer definierten Schritten.
+     * Die Drehung ist nun gleichmäßiger über die Zeit verteilt.
     */
     0% {
         transform: rotate(0deg);
-        border-top-color: var(--color-primary);
-        box-shadow: 0 0 7px rgba(var(--color-primary-rgb), 0.3);
+        box-shadow: 0 0 20px rgba(var(--color-primary-rgb), 0.3);
     }
-    35% {
-        /* At the halfway point, the spinner and its glow have shifted to the accent color. */
-        border-top-color: var(--color-accent);
-        box-shadow: 0 0 18px rgba(var(--color-accent-hue), 80%, 50%, 0.6);
-    }
-    70% {
+    45% {
+        /* Nach der Hälfte der Zeit haben wir eine volle Drehung und den Farbwechsel. */
         transform: rotate(360deg);
-        border-top-color: var(--color-primary);
-        box-shadow: 0 0 7px rgba(var(--color-primary-rgb), 0.3);
-    }
-    85% {
-        transform: rotate(540deg);
-        border-top-color: var(--color-accent)
+        box-shadow: 0 0 25px rgba(var(--color-accent-rgb), 0.6); /* Korrigierte Annahme für die RGBA-Variable */
     }
     100% {
-        transform: rotate(720deg);
-        border-top-color: var(--color-primary);
+        /* Am Ende sind wir bei zwei vollen Drehungen und wieder am Anfangszustand. */
+        transform: rotate(1080deg);
+        box-shadow: 0 0 20px rgba(var(--color-primary-rgb), 0.3);
     }
 }
 
@@ -554,9 +543,9 @@ input[type='checkbox']:disabled + label[for] {
      * The animation is slower (2.5s) and smoother (ease-in-out)
      * to emphasize the organic feel.
     */
-    width: 32px; /* Define a standard size */
-    height: 32px;
+    width: 28px; /* Define a standard size */
+    height: 28px;
     border-radius: 50%;
-    border: 2px solid var(--color-surface-alt); /* The static "track" for the spinner */
-    animation: organic-pulse-spin 2.5s ease-in-out infinite;
+    animation: organic-pulse-spin 3s linear infinite;
+    color: var(--color-primary);
 }
