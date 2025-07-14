@@ -525,9 +525,13 @@ input[type='checkbox']:disabled + label[for] {
         transform: rotate(0deg);
         box-shadow: 0 0 20px rgba(var(--color-primary-rgb), 0.3);
     }
-    45% {
+    50% {
         /* Nach der Hälfte der Zeit haben wir eine volle Drehung und den Farbwechsel. */
         transform: rotate(360deg);
+        box-shadow: 0 0 25px rgba(var(--color-accent-rgb), 0.6); /* Korrigierte Annahme für die RGBA-Variable */
+    }
+    80% {
+        transform: rotate(720deg);
         box-shadow: 0 0 25px rgba(var(--color-accent-rgb), 0.6); /* Korrigierte Annahme für die RGBA-Variable */
     }
     100% {
@@ -546,6 +550,6 @@ input[type='checkbox']:disabled + label[for] {
     width: 28px; /* Define a standard size */
     height: 28px;
     border-radius: 50%;
-    animation: organic-pulse-spin 3s linear infinite;
+    animation: organic-pulse-spin 2.5s linear infinite;
     color: var(--color-primary);
 }

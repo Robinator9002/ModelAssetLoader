@@ -149,6 +149,8 @@ async def get_dependency_report(
     """
     Runs a pip dry-run with a JSON report to analyze dependencies.
     """
+    logger.info("Starting dependency analysis with 'pip --dry-run'...")
+
     report = {}
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as tmp_report_file:
         report_path = pathlib.Path(tmp_report_file.name)
@@ -221,6 +223,7 @@ async def get_dependency_report(
     finally:
         if report_path.exists():
             report_path.unlink()
+    logger.info("Finished dependency analysis.")
     return report
 
 
@@ -266,6 +269,8 @@ async def install_dependencies(
         if item.get("metadata")
     }
     total_download_size = sum(info["size"] for info in package_info.values())
+
+    logger.info(f"Starting actual installation of {len(install_targets)} packages...")
 
     pip_command = [
         str(venv_python),
