@@ -49,7 +49,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
     
     [ ] Fix the Adoption Mechanics Analysis so it works for real now!
 
-    [ ] Test everything intensively to make sure everything works
+    [ ] Test everything intensively to make sure it works
 
 [ ] Phase 3: The Platform (Coming Soon, Very very Soon)
 
