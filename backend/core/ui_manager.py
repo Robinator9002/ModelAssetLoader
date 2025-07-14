@@ -268,14 +268,14 @@ class UiManager:
             return True
         return False
 
-    def analyze_adoption_candidate(
+    async def analyze_adoption_candidate(
         self, ui_name: UiNameType, path: pathlib.Path
     ) -> AdoptionAnalysisResult:
         """
         Analyzes a directory to determine if it's a valid, adoptable UI installation.
         """
         adopter = UiAdopter(ui_name, path)
-        return adopter.analyze()
+        return await adopter.analyze()
 
     def repair_and_adopt_ui(
         self, ui_name: UiNameType, path: pathlib.Path, issues_to_fix: List[str], task_id: str
@@ -325,13 +325,18 @@ class UiManager:
                 )
             )
 
-            if "VENV_MISSING" in issues_to_fix or "VENV_INCOMPLETE" in issues_to_fix:
+            if "VENV_MISSING" in issues_to_fix:
                 await download_tracker.update_task_progress(
                     task_id, 10, "Creating virtual environment..."
                 )
                 if not await ui_installer.create_venv(path, streamer):
                     raise RuntimeError("Failed to create virtual environment.")
 
+            if (
+                "VENV_DEPS_INCOMPLETE" in issues_to_fix
+                or "VENV_INCOMPLETE" in issues_to_fix
+                or "VENV_MISSING" in issues_to_fix
+            ):
                 await download_tracker.update_task_progress(
                     task_id, 50, "Installing dependencies..."
                 )

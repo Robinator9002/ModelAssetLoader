@@ -115,7 +115,7 @@ async def create_venv(
     return return_code == 0
 
 
-async def _get_dependency_report(
+async def get_dependency_report(
     venv_python: pathlib.Path,
     req_path: pathlib.Path,
     extra_packages: Optional[List[str]],
@@ -124,6 +124,7 @@ async def _get_dependency_report(
     """
     Runs a pip dry-run with a JSON report. It parses the command's stderr in
     real-time to provide progress updates during the dependency resolution phase.
+    This is used for both installation progress estimation and adoption analysis.
     """
     report = {}
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as tmp_report_file:
@@ -246,7 +247,7 @@ async def install_dependencies(
         logger.error(f"Venv or requirements file not found for {ui_dir.name}.")
         return False
 
-    report = await _get_dependency_report(venv_python, req_path, extra_packages, progress_callback)
+    report = await get_dependency_report(venv_python, req_path, extra_packages, progress_callback)
     install_targets = report.get("install", [])
 
     if not install_targets:
@@ -287,8 +288,6 @@ async def install_dependencies(
         stderr=asyncio.subprocess.PIPE,
     )
 
-    # Immediately pass the created process object to the caller if a callback is provided.
-    # This is crucial for allowing the caller to terminate the process if needed.
     if process_created_callback:
         process_created_callback(process)
 

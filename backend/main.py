@@ -471,9 +471,10 @@ async def delete_ui_endpoint(ui_name: UiNameTypePydantic):
 )
 async def analyze_adoption_endpoint(request: UiAdoptionAnalysisRequest):
     try:
-        return AdoptionAnalysisResponse(
-            **ui_manager.analyze_adoption_candidate(request.ui_name, pathlib.Path(request.path))
+        analysis_result = await ui_manager.analyze_adoption_candidate(
+            request.ui_name, pathlib.Path(request.path)
         )
+        return AdoptionAnalysisResponse(**analysis_result)
     except Exception as e:
         logger.error(f"Error during adoption analysis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")

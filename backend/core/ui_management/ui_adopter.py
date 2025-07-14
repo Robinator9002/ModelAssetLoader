@@ -2,15 +2,14 @@
 import logging
 import pathlib
 import sys
-from typing import Dict, Any, List, TypedDict
+from typing import Dict, Any, List, TypedDict, Optional
 
 from ..constants.constants import UI_REPOSITORIES, UiNameType
+from .ui_installer import get_dependency_report
 
 logger = logging.getLogger(__name__)
 
 
-# We'll use TypedDicts for now to define the structure of our analysis.
-# Later, these will be replaced by more robust Pydantic models for the API.
 class AdoptionIssue(TypedDict):
     code: str
     message: str
@@ -44,7 +43,7 @@ class UiAdopter:
         self.ui_info = UI_REPOSITORIES.get(ui_name)
         self.issues: List[AdoptionIssue] = []
 
-    def analyze(self) -> AdoptionAnalysisResult:
+    async def analyze(self) -> AdoptionAnalysisResult:
         """
         Performs a comprehensive analysis of the target directory.
         It checks for critical files, the virtual environment, and other markers
@@ -56,7 +55,6 @@ class UiAdopter:
         logger.info(f"Starting adoption analysis for '{self.ui_name}' at '{self.path}'...")
 
         if not self.ui_info:
-            # This should ideally be caught before calling, but as a safeguard:
             self._add_issue(
                 code="INVALID_UI_TYPE",
                 message=f"'{self.ui_name}' is not a recognized UI type.",
@@ -64,12 +62,10 @@ class UiAdopter:
             )
             return self._get_final_result()
 
-        # --- Run all diagnostic checks ---
         self._check_path_validity()
         self._check_start_script()
         self._check_requirements_file()
-        self._check_venv_integrity()
-        # Add more checks here in the future (e.g., git repo status)
+        await self._check_venv_and_dependencies()
 
         logger.info(f"Analysis complete. Found {len(self.issues)} issue(s).")
         return self._get_final_result()
@@ -96,8 +92,6 @@ class UiAdopter:
     def _get_final_result(self) -> AdoptionAnalysisResult:
         """Compiles the final analysis result from the list of issues."""
         is_healthy = not self.issues
-        # An installation is considered "unadoptable" only if a critical,
-        # unfixable issue is present (like the path not existing).
         is_adoptable = not any(not issue["is_fixable"] for issue in self.issues)
 
         return {
@@ -105,8 +99,6 @@ class UiAdopter:
             "is_healthy": is_healthy,
             "issues": self.issues,
         }
-
-    # --- Individual Diagnostic Checks ---
 
     def _check_path_validity(self):
         """Checks if the provided path exists and is a directory."""
@@ -130,7 +122,7 @@ class UiAdopter:
             self._add_issue(
                 code="MISSING_START_SCRIPT",
                 message=f"The main start script ('{start_script}') could not be found. This is a strong indicator that this is not a valid {self.ui_name} installation.",
-                is_fixable=False,  # For now, we consider this unfixable. Could be changed to git pull later.
+                is_fixable=False,
                 fix_description="Re-clone the repository to restore missing files.",
             )
 
@@ -141,12 +133,15 @@ class UiAdopter:
             self._add_issue(
                 code="MISSING_REQUIREMENTS_FILE",
                 message=f"The dependency file ('{req_file}') is missing. A virtual environment cannot be reliably created or validated without it.",
-                is_fixable=False,  # Also considered unfixable for now.
+                is_fixable=False,
                 fix_description="Re-clone the repository to restore missing files.",
             )
 
-    def _check_venv_integrity(self):
-        """Checks for the existence and basic integrity of the venv."""
+    async def _check_venv_and_dependencies(self):
+        """
+        Checks for the venv's existence, its basic integrity, and whether all
+        required dependencies from requirements.txt are installed.
+        """
         venv_path = self.path / "venv"
         if not venv_path.is_dir():
             self._add_issue(
@@ -156,9 +151,8 @@ class UiAdopter:
                 fix_description="Create a new virtual environment and install all dependencies.",
                 default_fix_enabled=True,
             )
-            return  # Stop here if venv is missing, no point checking for python.exe
+            return
 
-        # Determine the expected path to the python executable based on OS
         python_exe_path = (
             venv_path / "Scripts" / "python.exe"
             if sys.platform == "win32"
@@ -171,5 +165,31 @@ class UiAdopter:
                 message="A 'venv' directory exists, but the Python executable is missing. The environment seems to be corrupt or incomplete.",
                 is_fixable=True,
                 fix_description="Re-create the virtual environment to fix it.",
+                default_fix_enabled=True,
+            )
+            return
+
+        req_file = self.ui_info.get("requirements_file")
+        req_path = self.path / req_file
+        if not req_path.is_file():
+            return
+
+        logger.info(f"Checking dependency integrity for '{self.ui_name}'...")
+        extra_packages = self.ui_info.get("extra_packages")
+        report = await get_dependency_report(
+            venv_python=python_exe_path,
+            req_path=req_path,
+            extra_packages=extra_packages,
+            progress_callback=None,
+        )
+
+        packages_to_install = report.get("install", [])
+        if packages_to_install:
+            package_count = len(packages_to_install)
+            self._add_issue(
+                code="VENV_DEPS_INCOMPLETE",
+                message=f"The virtual environment is missing {package_count} required package(s).",
+                is_fixable=True,
+                fix_description="Run the dependency installer to download and set up the required packages.",
                 default_fix_enabled=True,
             )
