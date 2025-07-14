@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _format_bytes(size_bytes: int) -> str:
-    """Formats a size in bytes to a human-readable string (KB, MB, GB)."""
+    """A helper utility to format a size in bytes to a human-readable string."""
     if size_bytes is None:
         return ""
     if size_bytes == 0:
@@ -32,21 +32,10 @@ def _format_bytes(size_bytes: int) -> str:
 
 class UiManager:
     """
-    Manages the lifecycle of UI environments.
-
-    This class serves as the central orchestrator for installing, running, deleting,
-    and adopting UI environments. It coordinates with the UiRegistry for path
-    persistence and delegates specific tasks to operators and installers.
+    Manages the lifecycle of UI environments, acting as the central orchestrator.
     """
 
     def __init__(self, broadcast_callback: Optional[BroadcastCallable] = None):
-        """
-        Initializes the UiManager.
-
-        Args:
-            broadcast_callback: An optional async function to broadcast real-time
-                                status updates, typically to a WebSocket.
-        """
         self.broadcast_callback = broadcast_callback
         self.running_processes: Dict[str, asyncio.subprocess.Process] = {}
         self.installation_processes: Dict[str, asyncio.subprocess.Process] = {}
@@ -54,15 +43,8 @@ class UiManager:
         self.registry = UiRegistry()
         logger.info("UiManager initialized and connected to UI Registry.")
 
-    async def _stream_process_output(
-        self,
-        process: asyncio.subprocess.Process,
-        task_id: str,
-    ):
-        """
-        Reads stdout and stderr from a process, streams it for logging, and waits for completion.
-        This method is internal to the UiManager, giving it full control over managed processes.
-        """
+    async def _stream_process_output(self, process: asyncio.subprocess.Process, task_id: str):
+        """Reads and logs process output for debugging purposes."""
 
         async def read_stream(stream, stream_name):
             while not stream.at_eof():
@@ -77,7 +59,6 @@ class UiManager:
                     logger.warning(f"Error reading stream line from process {process.pid}: {e}")
                     break
 
-        # Asynchronously read from both stdout and stderr.
         await asyncio.gather(
             read_stream(process.stdout, "stdout"), read_stream(process.stderr, "stderr")
         )
@@ -92,16 +73,10 @@ class UiManager:
         item_name: str,
         item_size: Optional[int],
     ):
-        """
-        Translates structured progress from the pip installer into a percentage
-        and human-readable status for the frontend.
-        """
-        collecting_start_progress = 25.0
-        collecting_range = 50.0
-        installing_start_progress = collecting_start_progress + collecting_range
-        installing_range = 15.0
-        current_progress = 0.0
-        status_text = ""
+        """Translates structured pip progress into frontend status updates."""
+        collecting_start_progress, collecting_range = 25.0, 50.0
+        installing_start_progress, installing_range = 75.0, 15.0
+        current_progress, status_text = 0.0, ""
 
         if phase == "collecting":
             if total == -1:
@@ -111,43 +86,34 @@ class UiManager:
             else:
                 phase_percent = (processed / total) * collecting_range if total > 0 else 0
                 current_progress = collecting_start_progress + phase_percent
-                size_str = f"({_format_bytes(item_size)})"
+                size_str = f"({_format_bytes(item_size)})" if item_size else ""
                 status_text = f"Collecting: {item_name} {size_str}".strip()
-
         elif phase == "installing":
             phase_percent = (processed / total) * installing_range if total > 0 else 0
             current_progress = installing_start_progress + phase_percent
             status_text = item_name
 
-        final_dependencies_progress = installing_start_progress + installing_range
-        current_progress = min(current_progress, final_dependencies_progress)
-
         await download_tracker.update_task_progress(
-            task_id, progress=current_progress, status_text=status_text
+            task_id, progress=min(current_progress, 90.0), status_text=status_text
         )
 
     async def get_all_statuses(self) -> List[ManagedUiStatus]:
         """Retrieves the current status for all registered UI environments."""
         statuses: List[ManagedUiStatus] = []
-        registered_paths = self.registry.get_all_paths()
-
-        for ui_name, install_path in registered_paths.items():
-            is_installed = install_path.is_dir()
-            running_task_id = self.running_ui_tasks.get(ui_name)
-            is_running = running_task_id is not None
-
-            if not is_installed:
+        for ui_name, install_path in self.registry.get_all_paths().items():
+            if not install_path.is_dir():
                 logger.warning(
                     f"Installation for '{ui_name}' at '{install_path}' not found. Unregistering."
                 )
                 self.registry.remove_installation(ui_name)
                 continue
 
+            running_task_id = self.running_ui_tasks.get(ui_name)
             statuses.append(
                 ManagedUiStatus(
                     ui_name=ui_name,
-                    is_installed=is_installed,
-                    is_running=is_running,
+                    is_installed=True,
+                    is_running=running_task_id is not None,
                     install_path=str(install_path),
                     running_task_id=running_task_id,
                 )
@@ -157,7 +123,7 @@ class UiManager:
     async def install_ui_environment(
         self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str
     ):
-        """Orchestrates the complete installation of a new UI environment."""
+        """Orchestrates the complete, resilient installation of a new UI environment."""
         await asyncio.sleep(0.5)
         ui_info = await self._get_ui_info(ui_name, task_id)
         if not ui_info:
@@ -166,12 +132,19 @@ class UiManager:
         def process_created_cb(process: asyncio.subprocess.Process):
             self.installation_processes[task_id] = process
 
-        try:
-            streamer = lambda line: logger.debug(f"[{task_id}] STREAM: {line}")
-            pip_progress_cb = self._pip_progress_callback
+        async def streamer(line: str):
+            logger.debug(f"[{task_id}] {line}")
 
-            await download_tracker.update_task_progress(task_id, 0, f"Cloning {ui_name}...")
-            await ui_installer.clone_repo(ui_info["git_url"], install_path, streamer)
+        try:
+            requirements_file_name = ui_info.get("requirements_file")
+            if not requirements_file_name:
+                raise RuntimeError(f"No 'requirements_file' defined for {ui_name}.")
+
+            await download_tracker.update_task_progress(
+                task_id, 0, f"Cloning {ui_name} repository..."
+            )
+            if not await ui_installer.clone_repo(ui_info["git_url"], install_path, streamer):
+                raise RuntimeError("Failed to clone repository.")
 
             await download_tracker.update_task_progress(
                 task_id, 15.0, "Creating virtual environment..."
@@ -179,12 +152,12 @@ class UiManager:
             if not await ui_installer.create_venv(install_path, streamer):
                 raise RuntimeError(f"Failed to create venv for {ui_name}.")
 
-            await download_tracker.update_task_progress(task_id, 25.0, "Analyzing dependencies...")
+            await download_tracker.update_task_progress(task_id, 25.0, "Installing dependencies...")
             dependencies_installed = await ui_installer.install_dependencies(
                 install_path,
-                ui_info["requirements_file"],
+                requirements_file_name,
                 stream_callback=streamer,
-                progress_callback=lambda *args: pip_progress_cb(task_id, *args),
+                progress_callback=lambda *args: self._pip_progress_callback(task_id, *args),
                 extra_packages=ui_info.get("extra_packages"),
                 process_created_callback=process_created_cb,
             )
@@ -197,20 +170,60 @@ class UiManager:
         except asyncio.CancelledError:
             await download_tracker.fail_download(task_id, "Installation was cancelled by user.")
         except Exception as e:
+            logger.error(f"Installation process for {ui_name} failed.", exc_info=True)
             await download_tracker.fail_download(task_id, f"Installation failed: {e}")
         finally:
-            if task_id in self.installation_processes:
-                del self.installation_processes[task_id]
+            self.installation_processes.pop(task_id, None)
 
     def run_ui(self, ui_name: UiNameType, task_id: str):
-        """Starts a registered UI environment as a background process."""
+        """Starts a registered UI environment as a background task."""
         install_path = self.registry.get_path(ui_name)
         if not install_path or not install_path.exists():
             self._fail_task_fast(task_id, ui_name, f"Installation path for {ui_name} not found.")
             return
-
         task = asyncio.create_task(self._run_and_manage_process(ui_name, install_path, task_id))
         download_tracker.start_tracking(task_id, "UI Process", ui_name, task)
+
+    async def _run_and_manage_process(
+        self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str
+    ):
+        """The core async method that runs a UI process and tracks its lifecycle."""
+        try:
+            ui_info = await self._get_ui_info(ui_name, task_id)
+            if not ui_info:
+                return
+            if not install_path.is_dir():
+                raise RuntimeError(f"Installation directory for {ui_name} not found.")
+            start_script = ui_info.get("start_script")
+            if not start_script:
+                raise RuntimeError(f"No 'start_script' defined for {ui_name}.")
+
+            process, error_msg = await ui_operator.run_ui(install_path, start_script)
+            if not process:
+                raise RuntimeError(error_msg or "UI process failed to start.")
+
+            self.running_processes[task_id] = process
+            self.running_ui_tasks[ui_name] = task_id
+            await download_tracker.update_task_progress(
+                task_id, 5, "Process is running...", "running"
+            )
+
+            await self._stream_process_output(process, task_id)
+
+            if process.returncode == 0:
+                await download_tracker.complete_download(
+                    task_id, f"{ui_name} finished successfully."
+                )
+            else:
+                await download_tracker.fail_download(
+                    task_id, f"{ui_name} exited with code {process.returncode}."
+                )
+        except Exception as e:
+            await download_tracker.fail_download(task_id, str(e))
+        finally:
+            self.running_processes.pop(task_id, None)
+            if self.running_ui_tasks.get(ui_name) == task_id:
+                self.running_ui_tasks.pop(ui_name, None)
 
     async def stop_ui(self, task_id: str):
         """Stops a running UI process by its task ID."""
@@ -279,10 +292,10 @@ class UiManager:
         def process_created_cb(process: asyncio.subprocess.Process):
             self.installation_processes[task_id] = process
 
-        try:
-            streamer = lambda line: logger.debug(f"[{task_id}] STREAM: {line}")
-            pip_progress_cb = self._pip_progress_callback
+        async def streamer(line: str):
+            logger.debug(f"[{task_id}] {line}")
 
+        try:
             if "VENV_MISSING" in issues_to_fix:
                 await download_tracker.update_task_progress(
                     task_id, 10, "Creating virtual environment..."
@@ -300,10 +313,10 @@ class UiManager:
                 dependencies_installed = await ui_installer.install_dependencies(
                     path,
                     ui_info["requirements_file"],
-                    stream_callback=streamer,
-                    progress_callback=lambda *args: pip_progress_cb(task_id, *args),
-                    extra_packages=ui_info.get("extra_packages"),
-                    process_created_callback=process_created_cb,
+                    streamer,
+                    lambda *args: self._pip_progress_callback(task_id, *args),
+                    ui_info.get("extra_packages"),
+                    process_created_cb,
                 )
                 if not dependencies_installed:
                     raise RuntimeError("Failed to install dependencies.")
@@ -318,48 +331,7 @@ class UiManager:
         except Exception as e:
             await download_tracker.fail_download(task_id, f"Repair process failed: {e}")
         finally:
-            if task_id in self.installation_processes:
-                del self.installation_processes[task_id]
-
-    async def _run_and_manage_process(
-        self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str
-    ):
-        """The core async method that runs a UI process and tracks its lifecycle."""
-        process = None
-        try:
-            ui_info = await self._get_ui_info(ui_name, task_id)
-            if not ui_info:
-                return
-            if not install_path.is_dir():
-                raise RuntimeError(f"Installation directory for {ui_name} not found.")
-            start_script = ui_info.get("start_script")
-            if not start_script:
-                raise RuntimeError(f"No 'start_script' defined for {ui_name}.")
-
-            process, error_msg = await ui_operator.run_ui(install_path, start_script)
-            if not process:
-                raise RuntimeError(error_msg or "UI process failed to start.")
-
-            self.running_processes[task_id] = process
-            self.running_ui_tasks[ui_name] = task_id
-            await download_tracker.update_task_progress(
-                task_id, 5, "Process is running...", "running"
-            )
-
-            await self._stream_process_output(process, task_id)
-
-            if process.returncode == 0:
-                await download_tracker.complete_download(task_id, f"{ui_name} finished.")
-            else:
-                await download_tracker.fail_download(
-                    task_id, f"{ui_name} exited with code {process.returncode}."
-                )
-        except Exception as e:
-            await download_tracker.fail_download(task_id, str(e))
-        finally:
-            self.running_processes.pop(task_id, None)
-            if self.running_ui_tasks.get(ui_name) == task_id:
-                self.running_ui_tasks.pop(ui_name, None)
+            self.installation_processes.pop(task_id, None)
 
     async def _get_ui_info(
         self, ui_name: UiNameType, task_id: Optional[str] = None

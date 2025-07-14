@@ -6,13 +6,13 @@ import sys
 import re
 import json
 import tempfile
+import shutil
 from typing import Callable, Coroutine, Any, Optional, Literal, List, Dict, Tuple
 
 # --- Type Definitions ---
 StreamCallback = Callable[[str], Coroutine[Any, Any, None]]
 PipPhase = Literal["collecting", "installing"]
 PipProgressCallback = Callable[[PipPhase, int, int, str, Optional[int]], Coroutine[Any, Any, None]]
-# A callback to signal that a process has been created, passing the process object.
 ProcessCreatedCallback = Callable[[asyncio.subprocess.Process], None]
 
 
@@ -25,8 +25,7 @@ async def _stream_process(
 ) -> tuple[int, str]:
     """
     Reads stdout and stderr from a process, streams it back via callback,
-    and returns the full combined output. This is used for general command
-    output like git clone or venv creation.
+    and returns the full combined output.
     """
     output_lines = []
 
@@ -39,10 +38,8 @@ async def _stream_process(
                 line = line_bytes.decode("utf-8", errors="replace").strip()
                 if line:
                     output_lines.append(line)
-                    log_line = f"[{process.pid}:{stream_name}] {line}"
-                    logger.debug(log_line)
                     if stream_callback:
-                        await stream_callback(line)
+                        await stream_callback(f"[{process.pid}:{stream_name}] {line}")
             except Exception as e:
                 logger.warning(f"Error reading stream line: {e}")
                 break
@@ -63,29 +60,46 @@ async def clone_repo(
 ) -> bool:
     """
     Clones a git repository into a specified target directory.
-    Skips cloning if the directory already exists and is not empty.
+    If the directory already exists, it will be completely removed to ensure
+    a clean, fresh installation.
     """
-    if target_dir.exists() and any(target_dir.iterdir()):
-        logger.warning(f"Target directory {target_dir} already exists. Skipping clone.")
+    if target_dir.exists():
+        logger.warning(
+            f"Target directory {target_dir} already exists. Deleting for a fresh install."
+        )
         if stream_callback:
-            await stream_callback(f"Directory {target_dir.name} already exists. Skipping clone.")
-        return True
+            await stream_callback(f"Cleaning up existing directory: {target_dir.name}...")
+        try:
+            shutil.rmtree(target_dir)
+        except Exception as e:
+            error_msg = f"Error: Could not delete existing directory {target_dir}. Please remove it manually. Details: {e}"
+            logger.error(error_msg)
+            if stream_callback:
+                await stream_callback(error_msg)
+            return False
 
     logger.info(f"Cloning '{git_url}' into '{target_dir}'...")
-    target_dir.mkdir(parents=True, exist_ok=True)
-    process = await asyncio.create_subprocess_exec(
-        "git",
-        "clone",
-        "--depth",
-        "1",
-        "--progress",
-        git_url,
-        str(target_dir),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    return_code, _ = await _stream_process(process, stream_callback)
-    return return_code == 0
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "--progress",
+            git_url,
+            str(target_dir),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        return_code, _ = await _stream_process(process, stream_callback)
+        return return_code == 0
+    except Exception as e:
+        error_msg = f"Failed to clone repository: {e}"
+        logger.error(error_msg, exc_info=True)
+        if stream_callback:
+            await stream_callback(error_msg)
+        return False
 
 
 async def create_venv(
@@ -93,14 +107,25 @@ async def create_venv(
 ) -> bool:
     """
     Creates a Python virtual environment in the specified directory.
-    Skips creation if a 'venv' directory already exists.
+    If a venv already exists, it is deleted to ensure a clean state.
     """
     venv_path = ui_dir / "venv"
     if venv_path.exists():
-        logger.info(f"Virtual environment already exists at '{venv_path}'. Skipping.")
+        logger.warning(
+            f"Virtual environment already exists at '{venv_path}'. Deleting for fresh setup."
+        )
         if stream_callback:
-            await stream_callback("Virtual environment already exists. Skipping.")
-        return True
+            await stream_callback("Removing existing virtual environment...")
+        try:
+            shutil.rmtree(venv_path)
+        except Exception as e:
+            error_msg = (
+                f"Error: Could not delete existing venv. Please remove it manually. Details: {e}"
+            )
+            logger.error(error_msg)
+            if stream_callback:
+                await stream_callback(error_msg)
+            return False
 
     logger.info(f"Creating virtual environment in '{venv_path}'...")
     process = await asyncio.create_subprocess_exec(
@@ -122,9 +147,7 @@ async def get_dependency_report(
     progress_callback: Optional[PipProgressCallback],
 ) -> Dict[str, Any]:
     """
-    Runs a pip dry-run with a JSON report. It parses the command's stderr in
-    real-time to provide progress updates during the dependency resolution phase.
-    This is used for both installation progress estimation and adoption analysis.
+    Runs a pip dry-run with a JSON report to analyze dependencies.
     """
     report = {}
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as tmp_report_file:
@@ -146,7 +169,6 @@ async def get_dependency_report(
         if extra_packages:
             command.extend(extra_packages)
 
-        logger.info(f"Generating dependency report with command: {' '.join(command)}")
         process = await asyncio.create_subprocess_exec(
             *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
@@ -155,7 +177,6 @@ async def get_dependency_report(
         packages_found = []
 
         async def read_analysis_stream(stream, is_stderr: bool):
-            """Reads a stream, parsing only stderr for progress updates."""
             while not stream.at_eof():
                 try:
                     line_bytes = await stream.readline()
@@ -164,11 +185,10 @@ async def get_dependency_report(
                     line = line_bytes.decode("utf-8", errors="replace").strip()
                     if not line:
                         continue
-
                     if is_stderr and progress_callback:
-                        collect_match = collect_regex.match(line)
-                        if collect_match:
-                            package_name = collect_match.group(1)
+                        match = collect_regex.match(line)
+                        if match:
+                            package_name = match.group(1)
                             if package_name not in packages_found:
                                 packages_found.append(package_name)
                                 await progress_callback(
@@ -186,28 +206,21 @@ async def get_dependency_report(
             read_analysis_stream(process.stdout, is_stderr=False),
             read_analysis_stream(process.stderr, is_stderr=True),
         )
-
         await process.wait()
 
         if process.returncode != 0:
-            logger.error(
-                f"Failed to generate dependency report. Pip exited with code {process.returncode}."
-            )
+            logger.error(f"Pip report generation failed with code {process.returncode}.")
             return {}
 
         if report_path.exists() and report_path.stat().st_size > 0:
             with open(report_path, "r") as f:
                 report = json.load(f)
-            logger.info(
-                f"Successfully generated dependency report with {len(report.get('install', []))} items."
-            )
         else:
             logger.warning("Dependency report was not generated or is empty.")
 
     finally:
         if report_path.exists():
             report_path.unlink()
-
     return report
 
 
@@ -220,21 +233,7 @@ async def install_dependencies(
     process_created_callback: Optional[ProcessCreatedCallback] = None,
 ) -> bool:
     """
-    Installs dependencies from a requirements file into a venv.
-
-    This function uses a two-stage process to provide accurate, size-weighted
-    progress. First, it generates a report to calculate the total download size,
-    then it installs the packages while tracking progress against that total.
-
-    Args:
-        ui_dir: The root directory of the UI environment.
-        requirements_file: The name of the requirements file (e.g., 'requirements.txt').
-        stream_callback: An async callback to stream raw process output.
-        progress_callback: An async callback for structured progress updates.
-        extra_packages: A list of additional packages to install.
-        process_created_callback: A callback that receives the process object
-                                  immediately after it's created, allowing the
-                                  caller to manage or terminate it.
+    Installs dependencies from a requirements file into a venv using a two-stage process.
     """
     venv_python = (
         ui_dir / "venv" / "Scripts" / "python.exe"
@@ -287,13 +286,8 @@ async def install_dependencies(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-
     if process_created_callback:
         process_created_callback(process)
-
-    logger.info(
-        f"Starting actual pip install ({process.pid}) with a total download size of {total_download_size} bytes."
-    )
 
     collect_regex = re.compile(r"^\s*Collecting\s+([a-zA-Z0-9-_.]+)", re.IGNORECASE)
     bytes_processed = 0
@@ -312,9 +306,9 @@ async def install_dependencies(
                     await stream_callback(line)
 
                 if progress_callback and total_download_size > 0:
-                    collect_match = collect_regex.match(line)
-                    if collect_match:
-                        package_name = collect_match.group(1).lower().replace("_", "-")
+                    match = collect_regex.match(line)
+                    if match:
+                        package_name = match.group(1).lower().replace("_", "-")
                         info = package_info.get(package_name)
                         if info:
                             bytes_processed += info["size"]
@@ -330,15 +324,10 @@ async def install_dependencies(
                 break
 
     if total_download_size == 0 and progress_callback:
-        logger.info("All packages seem to be cached. Simulating collection progress.")
         total_packages = len(package_info)
         for i, (name, info) in enumerate(package_info.items()):
             await progress_callback(
-                "collecting",
-                i + 1,
-                total_packages,
-                f"{name.capitalize()} {info['version']}",
-                0,
+                "collecting", i + 1, total_packages, f"{name.capitalize()} {info['version']}", 0
             )
             await asyncio.sleep(0.01)
 
@@ -348,10 +337,7 @@ async def install_dependencies(
     await process.wait()
 
     if process.returncode == 0 and progress_callback:
-        await progress_callback("installing", 0, 1, "Finalizing installation...", 0)
-        await asyncio.sleep(1)
         await progress_callback("installing", 1, 1, "Installation complete.", 0)
-        logger.info(f"Pip install process {process.pid} completed successfully.")
     elif process.returncode != 0:
         logger.error(f"Pip installation failed with exit code {process.returncode}.")
 
