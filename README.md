@@ -47,9 +47,9 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Get the Cancellation of UI Downloads to work
     
-    [ ] Fix the Adoption Mechanics Analysis so it works for real now!
+    [x] Fix the Adoption Mechanics Analysis so it works for real now!
 
-    [ ] Fix the Start Functionality for Installed Uis
+    [x] Fix the Start Functionality for Installed Uis
 
     [ ] Test everything intensively to make sure it works
 
