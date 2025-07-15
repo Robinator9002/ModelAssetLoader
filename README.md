@@ -43,7 +43,7 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Fix the Installation Modal for Ui Installations
 
-[ ] Phase 2.5: Bugfixing (Active right now)
+[x] Phase 2.5: Bugfixing (Finished)
 
     [x] Get the Cancellation of UI Downloads to work
     
@@ -51,9 +51,17 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
     [x] Fix the Start Functionality for Installed Uis
 
-    [ ] Test everything intensively to make sure it works
+[ ] Phase 3: Improvements (Starting now)
 
-[ ] Phase 3: The Platform (Coming Soon, Very very Soon)
+    [ ] Get A1111 to work (errors in the creation of the environment)
+
+    [ ] Overwork the UI Management to allow the user to change paths and stack more version of one ui
+
+    [ ] Fix the start button for every individual AI and give better feedback during starting
+
+    [ ] Overwork Error Messages to be more descriptive
+
+[ ] Phase 4: The Platform (Coming Soon, Very very Soon)
 
     [ ] Integrate more model sources, with CivitAI as the next major target.
 
