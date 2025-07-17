@@ -53,11 +53,9 @@ M.A.L. is more than just a downloader. My goal is for it to be the central hub f
 
 [ ] Phase 3: Improvements (Starting now)
 
-    [ ] Get A1111 to work (errors in the creation of the environment)
-
     [ ] Overwork the UI Management to allow the user to change paths and stack more version of one ui
 
-    [ ] Fix the start button for every individual AI and give better feedback during starting
+    [ ] Fix the start button for every individual AI and give better feedback during starting (including A1111 installation)
 
     [ ] Overwork Error Messages to be more descriptive
 
