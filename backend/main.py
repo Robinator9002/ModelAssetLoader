@@ -4,7 +4,7 @@ import json
 import logging
 import pathlib
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from fastapi import (
     Body,
@@ -16,6 +16,9 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
+
+# --- FIX: Import Pydantic's BaseModel for new request models ---
+from pydantic import BaseModel
 
 # --- API Model Imports ---
 from backend.api.models import (
@@ -44,7 +47,12 @@ from backend.api.models import (
 )
 
 # --- Core Service Imports ---
-from backend.core.constants.constants import MANAGED_UIS_ROOT_PATH, UI_REPOSITORIES
+# --- FIX: Import KNOWN_UI_PROFILES to expose it via an API endpoint. ---
+from backend.core.constants.constants import (
+    MANAGED_UIS_ROOT_PATH,
+    UI_REPOSITORIES,
+    KNOWN_UI_PROFILES,
+)
 from backend.core.file_manager import FileManager
 from backend.core.file_management.download_tracker import download_tracker
 from backend.core.source_manager import SourceManager
@@ -80,6 +88,21 @@ app.add_middleware(
 source_manager = SourceManager()
 file_manager = FileManager()
 ui_manager = UiManager()
+
+
+# --- NEW: Pydantic models for consistent request bodies ---
+# These models replace the use of raw `dict` payloads for task-related actions,
+# ensuring that all incoming requests are properly validated by FastAPI.
+class DownloadTaskRequest(BaseModel):
+    """Request model for actions targeting a download task by its ID."""
+
+    download_id: str
+
+
+class UiTaskRequest(BaseModel):
+    """Request model for actions targeting a UI task by its ID."""
+
+    task_id: str
 
 
 # --- WebSocket Connection Manager ---
@@ -169,8 +192,12 @@ async def search_models_endpoint(
             limit=limit,
             page=page,
         )
+        # --- FIX: Use the corrected 'last_modified' field from the Pydantic model ---
+        # The model was updated to use snake_case, so we must use it here as well.
         return PaginatedModelListResponse(
-            items=[ModelListItem(**m) for m in models_data],
+            items=[
+                ModelListItem(lastModified=m.pop("last_modified", None), **m) for m in models_data
+            ],
             page=page,
             limit=limit,
             has_more=has_more,
@@ -208,6 +235,21 @@ async def get_model_details_endpoint(source: str, model_id: str):
 )
 async def get_config_endpoint():
     return MalFullConfiguration(**file_manager.get_current_configuration())
+
+
+# --- NEW Endpoint ---
+@app.get(
+    "/api/filemanager/known-ui-profiles",
+    response_model=Dict[str, Dict[str, str]],
+    tags=["FileManager"],
+    summary="Get Known UI Profile Path Structures",
+)
+async def get_known_ui_profiles_endpoint():
+    """
+    Provides the frontend with the backend's single source of truth for
+    default model path structures, eliminating duplicated constants.
+    """
+    return KNOWN_UI_PROFILES
 
 
 @app.post(
@@ -262,12 +304,26 @@ async def download_file_endpoint(download_request: FileDownloadRequest):
     tags=["FileManager"],
     summary="Cancel a running model file download task",
 )
-async def cancel_download_endpoint(payload: dict = Body(...)):
-    download_id = payload.get("download_id")
-    if not download_id:
-        raise HTTPException(status_code=400, detail="download_id is required.")
-    await file_manager.cancel_download(download_id)
-    return {"success": True, "message": f"Cancellation request for {download_id} sent."}
+# --- FIX: Replaced raw dict with a validated Pydantic model for consistency and safety. ---
+async def cancel_download_endpoint(request: DownloadTaskRequest):
+    await file_manager.cancel_download(request.download_id)
+    return {"success": True, "message": f"Cancellation request for {request.download_id} sent."}
+
+
+# --- NEW Endpoint ---
+@app.post(
+    "/api/filemanager/download/dismiss",
+    status_code=status.HTTP_200_OK,
+    tags=["FileManager"],
+    summary="Dismiss a finished task from the tracker",
+)
+async def dismiss_download_endpoint(request: DownloadTaskRequest):
+    """
+    Removes a completed, failed, or cancelled task from the in-memory
+    DownloadTracker, cleaning up the user's view.
+    """
+    await file_manager.dismiss_download(request.download_id)
+    return {"success": True, "message": f"Task {request.download_id} dismissed."}
 
 
 @app.get(
@@ -442,12 +498,10 @@ async def stop_ui_endpoint(request: UiStopRequest):
     tags=["UIs"],
     summary="Cancel a running UI installation or repair task",
 )
-async def cancel_ui_task_endpoint(payload: dict = Body(...)):
-    task_id = payload.get("task_id")
-    if not task_id:
-        raise HTTPException(status_code=400, detail="task_id is required.")
-    await ui_manager.cancel_ui_task(task_id)
-    return {"success": True, "message": f"Cancellation request for UI task {task_id} sent."}
+# --- FIX: Replaced raw dict with a validated Pydantic model. ---
+async def cancel_ui_task_endpoint(request: UiTaskRequest):
+    await ui_manager.cancel_ui_task(request.task_id)
+    return {"success": True, "message": f"Cancellation request for UI task {request.task_id} sent."}
 
 
 @app.delete(
@@ -474,7 +528,7 @@ async def analyze_adoption_endpoint(request: UiAdoptionAnalysisRequest):
         analysis_result = await ui_manager.analyze_adoption_candidate(
             request.ui_name, pathlib.Path(request.path)
         )
-        return AdoptionAnalysisResponse(**analysis_result)
+        return AdoptionAnalysisResponse(**analysis_result.dict())
     except Exception as e:
         logger.error(f"Error during adoption analysis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
