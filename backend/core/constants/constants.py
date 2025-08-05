@@ -23,7 +23,13 @@ ModelType = Literal[
 ]
 
 # Defines the UI folder structures the application understands.
-UiProfileType = Literal["ComfyUI", "A1111"]
+# --- FIX: Added "Forge" and "Custom" to the Literal type. ---
+# The original type was incomplete, not reflecting all possible states
+# that the application logic (e.g., in config_manager) already handles.
+# This ensures the type definition is the single source of truth and allows
+# static analysis tools to catch invalid profile assignments.
+UiProfileType = Literal["ComfyUI", "A1111", "Forge", "Custom"]
+
 
 # Defines the available color themes for the frontend.
 ColorThemeType = Literal["dark", "light"]
@@ -58,6 +64,9 @@ MODEL_FILE_EXTENSIONS: Set[str] = {
 # --- UI Profile Path Definitions ---
 # This dictionary maps a standardized ModelType to its specific subdirectory
 # for each known UI profile. This is the core of the automatic path resolution.
+# NOTE: "Forge" is not listed here as a primary key because its model folder
+# structure is compatible with "A1111", which is used as its default profile.
+# "Custom" is not listed as it uses user-defined paths.
 KNOWN_UI_PROFILES: Dict[UiProfileType, Dict[ModelType, str]] = {
     "ComfyUI": {
         "Checkpoint": "models/checkpoints",
