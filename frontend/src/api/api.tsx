@@ -1,15 +1,21 @@
 // frontend/src/api/api.tsx
 import axios, { type AxiosInstance } from 'axios';
 
+// --- Constants ---
+// Centralized base URLs for API and WebSocket connections.
 const API_BASE_URL = 'http://localhost:8000/api';
 const WS_BASE_URL = 'ws://localhost:8000';
 
+// --- API Client ---
+// A pre-configured Axios instance for all HTTP requests.
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
 });
+
+// --- Type Definitions & Interfaces ---
 
 // --- Generic Model Interfaces ---
 export interface ModelFile {
@@ -22,7 +28,8 @@ export interface ModelListItem {
     source: string;
     author?: string | null;
     model_name: string;
-    lastModified?: string | null; // ISO Date String
+    // --- FIX: Renamed to match the corrected snake_case field from the backend Pydantic model. ---
+    last_modified?: string | null; // ISO Date String
     tags: string[];
     pipeline_tag?: string | null;
     downloads?: number | null;
@@ -57,20 +64,32 @@ export interface SearchModelParams {
 }
 
 // --- FileManager & Download Interfaces ---
-export type UiNameType = 'ComfyUI' | 'A1111' | 'ForgeUI';
-export type UiProfileType = UiNameType | 'Custom';
+
+// --- FIX: Corrected UiNameType to match the backend's single source of truth. ---
+// This is a critical fix to prevent runtime errors when interacting with the API.
+// The previous type was missing 'Fooocus' and incorrectly had 'ForgeUI' instead of 'Forge'.
+export type UiNameType = 'ComfyUI' | 'A1111' | 'Forge' | 'Fooocus';
+
+// --- FIX: Corrected UiProfileType to match the backend's updated Literal. ---
+export type UiProfileType = 'ComfyUI' | 'A1111' | 'Forge' | 'Custom';
+
 export type ColorThemeType = 'dark' | 'light';
+
+// --- FIX: Corrected ModelType to use capitalized strings as expected by the backend. ---
+// This is a critical fix that resolves the API validation error for all download requests.
+// The backend expects values like "Checkpoint", not "checkpoints".
 export type ModelType =
-    | 'checkpoints'
-    | 'loras'
-    | 'vae'
-    | 'clip'
-    | 'unet'
-    | 'controlnet'
-    | 'embeddings'
-    | 'hypernetworks'
-    | 'diffusers'
-    | 'custom';
+    | 'Checkpoint'
+    | 'VAE'
+    | 'LoRA'
+    | 'LyCORIS'
+    | 'ControlNet'
+    | 'Upscaler'
+    | 'Hypernetwork'
+    | 'TextualInversion'
+    | 'MotionModule'
+    | 'Other'; // 'Other' can be used as a fallback.
+
 export type ConfigurationMode = 'automatic' | 'manual';
 
 export interface PathConfigurationRequest {
@@ -176,7 +195,7 @@ export interface AvailableUiItem {
 
 export interface UiInstallRequest {
     ui_name: UiNameType;
-    custom_install_path: string;
+    custom_install_path: string | null; // Path can be null for default installs
     set_as_active: boolean;
 }
 
@@ -250,7 +269,7 @@ export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
         return response.data;
     } catch (error) {
         console.error('Error fetching UI statuses:', error);
-        return { items: [] };
+        throw error; // Let the caller handle the error state
     }
 };
 
@@ -374,7 +393,7 @@ export const finalizeAdoptionAPI = async (
     }
 };
 
-// --- Other API Functions ---
+// --- Model Search & Details API ---
 
 export const searchModels = async (
     params: SearchModelParams,
@@ -400,6 +419,8 @@ export const getModelDetails = async (source: string, modelId: string): Promise<
     }
 };
 
+// --- File Manager & Downloads API ---
+
 export const downloadFileAPI = async (
     request: FileDownloadRequest,
 ): Promise<FileDownloadResponse> => {
@@ -410,10 +431,10 @@ export const downloadFileAPI = async (
         );
         return response.data;
     } catch (error) {
-        console.error('Error in downloadFileAPI:', error);
         const axiosError = error as any;
-        if (axiosError.response && axiosError.response.data) {
-            return axiosError.response.data;
+        if (axiosError.response && axiosError.response.data?.detail) {
+            // Throw a proper error instead of returning a success-like object
+            throw new Error(axiosError.response.data.detail);
         }
         throw error;
     }
@@ -428,7 +449,27 @@ export const cancelDownloadAPI = async (
         });
         return response.data;
     } catch (error) {
-        console.error(`Error cancelling download ${downloadId}:`, error);
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
+        }
+        throw error;
+    }
+};
+
+// --- NEW: Added dismissDownloadAPI to correctly implement the functionality. ---
+// This function was missing, causing an import error in App.tsx. It sends a request
+// to the backend to remove a completed or failed task from the tracker's memory.
+export const dismissDownloadAPI = async (
+    downloadId: string,
+): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.post('/filemanager/download/dismiss', {
+            download_id: downloadId,
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Error dismissing download ${downloadId}:`, error);
         const axiosError = error as any;
         if (axiosError.response?.data?.detail) {
             throw new Error(axiosError.response.data.detail);
@@ -447,10 +488,9 @@ export const configurePathsAPI = async (
         );
         return response.data;
     } catch (error) {
-        console.error('Error in configurePathsAPI:', error);
         const axiosError = error as any;
-        if (axiosError.response && axiosError.response.data) {
-            return axiosError.response.data;
+        if (axiosError.response && axiosError.response.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
         }
         throw error;
     }
@@ -459,23 +499,23 @@ export const configurePathsAPI = async (
 export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration> => {
     try {
         const response = await apiClient.get<MalFullConfiguration>('/filemanager/configuration');
-        return {
-            ...response.data,
-            custom_model_type_paths: response.data.custom_model_type_paths || {},
-            color_theme: response.data.color_theme || 'dark',
-            config_mode: response.data.config_mode || 'automatic',
-            automatic_mode_ui: response.data.automatic_mode_ui || null,
-        };
+        return response.data;
     } catch (error) {
         console.error('Error fetching current configuration:', error);
-        return {
-            base_path: null,
-            profile: null,
-            custom_model_type_paths: {},
-            color_theme: 'dark',
-            config_mode: 'automatic',
-            automatic_mode_ui: null,
-        };
+        throw error; // Let the caller handle the error state
+    }
+};
+
+// --- NEW: API to fetch known UI profiles from the backend. ---
+// This eliminates the duplicated, hardcoded constant in the frontend, making the
+// backend the single source of truth for model path structures.
+export const getKnownUiProfilesAPI = async (): Promise<Record<string, Record<string, string>>> => {
+    try {
+        const response = await apiClient.get('/filemanager/known-ui-profiles');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching known UI profiles:', error);
+        throw error;
     }
 };
 
@@ -494,16 +534,11 @@ export const scanHostDirectoriesAPI = async (
         );
         return response.data;
     } catch (error) {
-        console.error('Error in scanHostDirectoriesAPI:', error);
         const axiosError = error as any;
-        if (axiosError.response && axiosError.response.data) {
-            return axiosError.response.data;
+        if (axiosError.response && axiosError.response.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
         }
-        return {
-            success: false,
-            error: 'Error scanning host directories.',
-            data: null,
-        };
+        throw new Error('An unknown error occurred while scanning directories.');
     }
 };
 
@@ -532,7 +567,6 @@ export const deleteManagedItemAPI = async (
         );
         return response.data;
     } catch (error) {
-        console.error(`Error deleting item at ${relativePath}:`, error);
         const axiosError = error as any;
         if (axiosError.response?.data?.detail) {
             throw new Error(axiosError.response.data.detail);
@@ -548,14 +582,15 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
         });
         return response.data;
     } catch (error) {
-        console.error(`Error getting preview for ${relativePath}:`, error);
         const axiosError = error as any;
-        if (axiosError.response?.data) {
-            return { success: false, path: relativePath, error: axiosError.response.data.detail };
+        if (axiosError.response?.data?.detail) {
+            throw new Error(axiosError.response.data.detail);
         }
         throw error;
     }
 };
+
+// --- WebSocket Connection ---
 
 export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSocket => {
     const wsUrl = `${WS_BASE_URL}/ws/downloads`;
@@ -585,4 +620,5 @@ export const connectToDownloadTracker = (onMessage: (data: any) => void): WebSoc
     return ws;
 };
 
+// Default export of the configured client, can be used for one-off requests.
 export default apiClient;
