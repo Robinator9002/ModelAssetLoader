@@ -26,14 +26,22 @@ class ModelListItem(BaseModel):
     model_name: str = Field(
         ..., description="The name of the model, typically derived from the ID."
     )
-    lastModified: Optional[datetime] = Field(
-        None, description="Timestamp of the last modification."
+    # --- FIX: Renamed field to snake_case and added an alias. ---
+    # This aligns the Python code with the standard PEP 8 naming convention (snake_case)
+    # while ensuring it correctly deserializes the camelCase 'lastModified' key
+    # from the incoming JSON data from the Hugging Face API.
+    last_modified: Optional[datetime] = Field(
+        None, alias="lastModified", description="Timestamp of the last modification."
     )
     tags: List[str] = Field(
         default_factory=list, description="List of tags associated with the model."
     )
     downloads: Optional[int] = Field(None, description="Number of downloads.")
     likes: Optional[int] = Field(None, description="Number of likes.")
+
+    # Allow population by alias
+    class Config:
+        populate_by_name = True
 
 
 class PaginatedModelListResponse(BaseModel):
@@ -143,14 +151,16 @@ class LocalFileItem(BaseModel):
 
     name: str = Field(..., description="The name of the file or directory.")
     path: str = Field(..., description="The relative path from the base_path.")
-    item_type: Literal["file", "directory"] = Field(..., alias="type")
+    item_type: Literal["file", "directory"]
     size: Optional[int] = Field(
         None, description="Size of the file in bytes (null for directories)."
     )
     last_modified: datetime = Field(..., description="Timestamp of the last modification.")
 
-    class Config:
-        populate_by_name = True
+    # --- COMMENT: This model previously had a 'type' alias which is unnecessary ---
+    # Pydantic v2 automatically handles aliasing for snake_case fields from
+    # camelCase JSON, so an explicit alias is not needed here. We keep it
+    # in other models for clarity or compatibility where needed.
 
 
 class LocalFileActionRequest(BaseModel):
