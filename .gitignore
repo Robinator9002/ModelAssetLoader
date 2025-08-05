@@ -16,6 +16,9 @@ dist-ssr
 config
 managed_uis
 
+# Virtual Env
+.venv
+
 # Editor directories and files
 .vscode/*
 __pycache__
