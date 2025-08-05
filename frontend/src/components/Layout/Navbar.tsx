@@ -13,7 +13,8 @@ import {
     Power,
 } from 'lucide-react';
 import { type DownloadSummaryStatus } from '../../App';
-import { type UiProfileType } from '../../api/api';
+// --- FIX: Import UiNameType, as it is the correct type for this component's prop. ---
+import { type UiNameType } from '../../api/api';
 
 export type MalTabKey = 'search' | 'files' | 'configuration' | 'environments';
 
@@ -23,9 +24,12 @@ interface NavbarProps {
     onToggleDownloads: () => void;
     downloadStatus: DownloadSummaryStatus;
     downloadCount: number;
-    // Props for the new quick-start button
-    activeUiProfile: UiProfileType | null;
-    isUiInstalled: boolean; // --- FIX: Added this prop ---
+    // --- FIX: Renamed prop and changed its type from UiProfileType to UiNameType. ---
+    // The button's purpose is to display the *name* of the active UI (e.g., "Fooocus"),
+    // not its folder profile type. This change makes the prop name more accurate and
+    // resolves the TypeScript error by accepting the correct data type.
+    activeUiName: UiNameType | null;
+    isUiInstalled: boolean;
     isUiRunning: boolean;
     onQuickStart: () => void;
 }
@@ -69,8 +73,9 @@ const Navbar: React.FC<NavbarProps> = ({
     onToggleDownloads,
     downloadStatus,
     downloadCount,
-    activeUiProfile,
-    isUiInstalled, // --- FIX: Destructured the new prop ---
+    // --- FIX: Destructure the corrected prop name. ---
+    activeUiName,
+    isUiInstalled,
     isUiRunning,
     onQuickStart,
 }) => {
@@ -91,8 +96,8 @@ const Navbar: React.FC<NavbarProps> = ({
         }
     };
 
-    // --- FIX: The condition now checks if the UI is installed before rendering the button ---
-    const showQuickStartButton = activeUiProfile && activeUiProfile !== 'Custom' && isUiInstalled;
+    // The condition now correctly checks if there is an active UI name and if it's installed.
+    const showQuickStartButton = activeUiName && isUiInstalled;
 
     return (
         <header className="app-navbar">
@@ -121,14 +126,16 @@ const Navbar: React.FC<NavbarProps> = ({
                     <button
                         className={`quick-start-button ${isUiRunning ? 'running' : 'stopped'}`}
                         onClick={onQuickStart}
-                        title={isUiRunning ? `Stop ${activeUiProfile}` : `Start ${activeUiProfile}`}
+                        // --- FIX: Use the corrected prop name in the title attribute. ---
+                        title={isUiRunning ? `Stop ${activeUiName}` : `Start ${activeUiName}`}
                     >
                         {isUiRunning ? (
                             <Loader2 size={16} className="animate-spin" />
                         ) : (
                             <Play size={16} />
                         )}
-                        <span className="quick-start-label">{activeUiProfile}</span>
+                        {/* --- FIX: Use the corrected prop name for the button label. --- */}
+                        <span className="quick-start-label">{activeUiName}</span>
                         <Power size={16} />
                     </button>
                 )}
