@@ -16,8 +16,6 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-
-# --- FIX: Import Pydantic's BaseModel for new request models ---
 from pydantic import BaseModel
 
 # --- API Model Imports ---
@@ -42,12 +40,11 @@ from backend.api.models import (
     UiAdoptionRepairRequest,
     UiInstallRequest,
     UiNameTypePydantic,
-    UiStopRequest,
     ModelListItem,
+    # --- FIX: UiStopRequest is no longer needed, it's replaced by UiTaskRequest ---
 )
 
 # --- Core Service Imports ---
-# --- FIX: Import KNOWN_UI_PROFILES to expose it via an API endpoint. ---
 from backend.core.constants.constants import (
     MANAGED_UIS_ROOT_PATH,
     UI_REPOSITORIES,
@@ -90,9 +87,7 @@ file_manager = FileManager()
 ui_manager = UiManager()
 
 
-# --- NEW: Pydantic models for consistent request bodies ---
-# These models replace the use of raw `dict` payloads for task-related actions,
-# ensuring that all incoming requests are properly validated by FastAPI.
+# --- Pydantic models for consistent request bodies ---
 class DownloadTaskRequest(BaseModel):
     """Request model for actions targeting a download task by its ID."""
 
@@ -107,7 +102,20 @@ class UiTaskRequest(BaseModel):
 
 # --- WebSocket Connection Manager ---
 class ConnectionManager:
-    """Manages active WebSocket connections for real-time broadcasting."""
+    """
+    Manages active WebSocket connections for real-time broadcasting.
+
+    --- ARCHITECTURAL NOTE ---
+    This implementation uses a simple in-memory list of connections, which is
+    perfectly suitable for a local, desktop-style application that runs as a
+    single server process (i.e., with one Uvicorn worker).
+
+    If this application were to be deployed in a multi-worker or distributed
+    environment, this approach would NOT work, as each worker would have its
+    own independent list of connections. A production-grade solution for such a
+    scenario would involve an external message broker like Redis Pub/Sub to
+    handle broadcasting across all server instances.
+    """
 
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -123,10 +131,16 @@ class ConnectionManager:
             logger.info(f"WebSocket client disconnected: {websocket.client}")
 
     async def broadcast(self, message: str):
+        """Sends a message to all currently connected WebSocket clients."""
+        if not self.active_connections:
+            return  # No clients to broadcast to
+
+        # Iterate over a copy of the list to safely remove disconnected clients
         for connection in list(self.active_connections):
             try:
                 await connection.send_text(message)
             except Exception:
+                # If sending fails, assume the client has disconnected.
                 self.disconnect(connection)
 
 
@@ -151,9 +165,11 @@ async def websocket_endpoint(websocket: WebSocket):
             json.dumps({"type": "initial_state", "downloads": initial_statuses})
         )
         while True:
+            # Keep the connection alive, waiting for messages (if any were implemented)
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        # If this was the last client, clear the callbacks to prevent unnecessary work.
         if not manager.active_connections:
             download_tracker.set_broadcast_callback(None)
             ui_manager.broadcast_callback = None
@@ -192,12 +208,12 @@ async def search_models_endpoint(
             limit=limit,
             page=page,
         )
-        # --- FIX: Use the corrected 'last_modified' field from the Pydantic model ---
-        # The model was updated to use snake_case, so we must use it here as well.
+        # --- FIX: Pydantic's alias handles the conversion automatically. ---
+        # The ModelListItem now has an alias for `last_modified`, so we can
+        # directly unpack the dictionary from the source manager. Pydantic will
+        # correctly map the `lastModified` key to the `last_modified` field.
         return PaginatedModelListResponse(
-            items=[
-                ModelListItem(lastModified=m.pop("last_modified", None), **m) for m in models_data
-            ],
+            items=[ModelListItem(**m) for m in models_data],
             page=page,
             limit=limit,
             has_more=has_more,
@@ -237,7 +253,6 @@ async def get_config_endpoint():
     return MalFullConfiguration(**file_manager.get_current_configuration())
 
 
-# --- NEW Endpoint ---
 @app.get(
     "/api/filemanager/known-ui-profiles",
     response_model=Dict[str, Dict[str, str]],
@@ -304,13 +319,11 @@ async def download_file_endpoint(download_request: FileDownloadRequest):
     tags=["FileManager"],
     summary="Cancel a running model file download task",
 )
-# --- FIX: Replaced raw dict with a validated Pydantic model for consistency and safety. ---
 async def cancel_download_endpoint(request: DownloadTaskRequest):
     await file_manager.cancel_download(request.download_id)
     return {"success": True, "message": f"Cancellation request for {request.download_id} sent."}
 
 
-# --- NEW Endpoint ---
 @app.post(
     "/api/filemanager/download/dismiss",
     status_code=status.HTTP_200_OK,
@@ -336,7 +349,9 @@ async def scan_host_directories_endpoint(
     path: Optional[str] = Query(None), max_depth: int = Query(1, ge=1, le=5)
 ):
     try:
-        result = file_manager.list_host_directories(path_to_scan_str=path, max_depth=max_depth)
+        result = await file_manager.list_host_directories(
+            path_to_scan_str=path, max_depth=max_depth
+        )
         if not result.get("success"):
             raise HTTPException(
                 status_code=400, detail=result.get("error", "Failed to scan directories.")
@@ -424,38 +439,29 @@ async def get_all_ui_statuses_endpoint():
     summary="Install a UI Environment",
 )
 async def install_ui_endpoint(request: UiInstallRequest = Body(...)):
-    """
-    Triggers the background installation of a UI. It handles both default
-    and custom installation paths.
-    """
     task_id = str(uuid.uuid4())
-
     install_path: pathlib.Path
     if request.custom_install_path:
         install_path = pathlib.Path(request.custom_install_path)
     else:
         install_path = MANAGED_UIS_ROOT_PATH / request.ui_name
-
     try:
         install_path.parent.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         logger.error(f"Failed to create or access install directory {install_path.parent}: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid installation path: {install_path}")
-
     install_coro = ui_manager.install_ui_environment(
         ui_name=request.ui_name,
         install_path=install_path,
         task_id=task_id,
     )
     background_task = asyncio.create_task(install_coro)
-
     download_tracker.start_tracking(
         download_id=task_id,
         repo_id="UI Installation",
         filename=request.ui_name,
         task=background_task,
     )
-
     return UiActionResponse(
         success=True,
         message=f"Installation for {request.ui_name} started.",
@@ -487,7 +493,8 @@ async def run_ui_endpoint(ui_name: UiNameTypePydantic):
     tags=["UIs"],
     summary="Stop a Running UI Process",
 )
-async def stop_ui_endpoint(request: UiStopRequest):
+# --- FIX: Use the consistent UiTaskRequest model. ---
+async def stop_ui_endpoint(request: UiTaskRequest):
     await ui_manager.stop_ui(task_id=request.task_id)
     return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
 
@@ -498,7 +505,6 @@ async def stop_ui_endpoint(request: UiStopRequest):
     tags=["UIs"],
     summary="Cancel a running UI installation or repair task",
 )
-# --- FIX: Replaced raw dict with a validated Pydantic model. ---
 async def cancel_ui_task_endpoint(request: UiTaskRequest):
     await ui_manager.cancel_ui_task(request.task_id)
     return {"success": True, "message": f"Cancellation request for UI task {request.task_id} sent."}
@@ -528,7 +534,7 @@ async def analyze_adoption_endpoint(request: UiAdoptionAnalysisRequest):
         analysis_result = await ui_manager.analyze_adoption_candidate(
             request.ui_name, pathlib.Path(request.path)
         )
-        return AdoptionAnalysisResponse(**analysis_result.dict())
+        return AdoptionAnalysisResponse(**analysis_result)
     except Exception as e:
         logger.error(f"Error during adoption analysis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
