@@ -133,8 +133,13 @@ class FileManager:
         logger.info(f"Cancel request received for download {download_id}.")
         await download_tracker.cancel_and_remove(download_id)
 
+    # --- NEW Method ---
     async def dismiss_download(self, download_id: str):
-        """Removes a finished download from the tracker."""
+        """
+        Removes a finished (completed, failed, or cancelled) task from the tracker.
+        This method is called by the new API endpoint in main.py. It acts as a
+        pass-through to the specialized download_tracker singleton.
+        """
         logger.info(f"Dismiss request received for download {download_id}.")
         await download_tracker.remove_download(download_id)
 
@@ -157,6 +162,10 @@ class FileManager:
             return None
         try:
             absolute_path = (self.base_path / clean_path_str).resolve()
+            # --- COMMENT: Enhanced security check explanation ---
+            # This check ensures that the fully resolved path is still a child of
+            # the configured base_path. This prevents escaping the intended
+            # directory via symlinks or other filesystem tricks.
             if (
                 self.base_path.resolve() not in absolute_path.parents
                 and absolute_path != self.base_path.resolve()
@@ -184,16 +193,15 @@ class FileManager:
         """Gets the contents of a directory, filtered by mode."""
         items = []
         for p in directory.iterdir():
-            # --- NEU: Ausschluss der 'venv' im Automatikmodus ---
-            # Wenn wir uns im Stammverzeichnis des base_path befinden und der Modus automatisch ist,
-            # überspringen wir das 'venv'-Verzeichnis, um unnötiges Scannen zu vermeiden.
+            # In automatic mode, skip scanning the 'venv' directory at the root
+            # of the base path to improve performance and avoid irrelevant results.
             if (
                 self.config.config_mode == "automatic"
                 and p.is_dir()
                 and p.name == "venv"
                 and p.parent == self.base_path
             ):
-                logger.info("Skipping 'venv' directory at base path root in automatic mode.")
+                logger.debug("Skipping 'venv' directory at base path root in automatic mode.")
                 continue
 
             try:
@@ -211,7 +219,7 @@ class FileManager:
                             items.append(item_data)
                     elif any(p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
                         items.append(item_data)
-                else:
+                else:  # 'explorer' mode
                     items.append(item_data)
             except (FileNotFoundError, PermissionError):
                 continue
@@ -226,8 +234,9 @@ class FileManager:
             return {"path": relative_path_str, "items": []}
 
         if mode == "models":
-            # Smart drill-down for models view
-            for _ in range(10):  # Max drill-down depth
+            # Smart drill-down for models view: if a directory contains only one
+            # other directory, automatically navigate into it.
+            for _ in range(10):  # Max drill-down depth to prevent infinite loops
                 items = self._get_directory_contents(current_path, mode="models")
                 if len(items) == 1 and items[0]["item_type"] == "directory":
                     new_path_str = items[0]["path"]
@@ -258,28 +267,34 @@ class FileManager:
         if not target_path or not target_path.exists():
             return {"success": False, "error": "Path not found."}
         if target_path == self.base_path:
-            return {"success": False, "error": "Cannot delete root."}
+            return {"success": False, "error": "Cannot delete the root directory."}
         try:
             if target_path.is_dir():
                 shutil.rmtree(target_path)
             else:
                 os.remove(target_path)
-            return {"success": True, "message": "Item deleted."}
+            return {"success": True, "message": "Item deleted successfully."}
         except Exception as e:
+            logger.error(f"Failed to delete '{target_path}': {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
     def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
         """Gets the content of a text file for previewing."""
         target_path = self._resolve_and_validate_path(relative_path_str)
         if not target_path or not target_path.is_file():
-            return {"success": False, "error": "Not a file."}
+            return {"success": False, "error": "The specified path is not a valid file."}
+
         allowed_extensions = {".txt", ".md", ".json", ".yaml", ".yml", ".py"}
         if target_path.suffix.lower() not in allowed_extensions:
-            return {"success": False, "error": "Preview not allowed for this file type."}
-        if target_path.stat().st_size > 1024 * 1024:  # 1MB limit
-            return {"success": False, "error": "File is too large to preview."}
+            return {"success": False, "error": "Preview is not allowed for this file type."}
+
+        # Limit preview size to 1MB to prevent performance issues.
+        if target_path.stat().st_size > 1024 * 1024:
+            return {"success": False, "error": "File is too large to preview (> 1MB)."}
+
         try:
             content = target_path.read_text(encoding="utf-8")
             return {"success": True, "path": relative_path_str, "content": content}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            logger.error(f"Failed to read file for preview '{target_path}': {e}", exc_info=True)
+            return {"success": False, "error": f"Could not read file: {e}"}
