@@ -2,24 +2,29 @@
 import asyncio
 import logging
 import pathlib
-from typing import Optional, Dict, List
+import json
+import os
+import signal
+from typing import Optional, Dict, List, Tuple
 
 from backend.api.models import ManagedUiStatus
-from backend.core.constants.constants import UI_REPOSITORIES, UiNameType
+from backend.core.constants.constants import UI_REPOSITORIES, UiNameType, CONFIG_FILE_DIR
 from backend.core.file_management.download_tracker import download_tracker, BroadcastCallable
 from backend.core.ui_management import ui_installer, ui_operator
 from backend.core.ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
 from backend.core.ui_management.ui_registry import UiRegistry
 
-
 logger = logging.getLogger(__name__)
+
+# --- NEW: Path for the process registry file ---
+# This file will store the PIDs of running UI processes to allow for state
+# recovery after the application restarts.
+PROCESS_REGISTRY_FILE_PATH = CONFIG_FILE_DIR / "process_registry.json"
 
 
 def _format_bytes(size_bytes: int) -> str:
     """A helper utility to format a size in bytes to a human-readable string."""
-    if size_bytes is None:
-        return ""
-    if size_bytes == 0:
+    if size_bytes is None or size_bytes == 0:
         return ""
     if size_bytes < 1024:
         return f"{size_bytes} B"
@@ -30,76 +35,115 @@ def _format_bytes(size_bytes: int) -> str:
     return f"{size_bytes/1024**3:.2f} GB"
 
 
+def _is_pid_running(pid: int) -> bool:
+    """
+    Checks if a process with the given PID is currently running.
+    This is a cross-platform way to check for process existence.
+    """
+    if os.name == "nt":  # Windows
+        # Use tasklist command to check for the PID
+        try:
+            output = asyncio.subprocess.check_output(f'tasklist /FI "PID eq {pid}"').decode()
+            return str(pid) in output
+        except (asyncio.subprocess.CalledProcessError, FileNotFoundError):
+            return False
+    else:  # POSIX (Linux, macOS)
+        try:
+            # os.kill with signal 0 is a standard way to check for process existence
+            # without actually sending a signal. It raises PermissionError if the
+            # process exists but we can't signal it, and ProcessLookupError if it doesn't.
+            os.kill(pid, 0)
+        except (ProcessLookupError, PermissionError):
+            return False
+        else:
+            return True
+
+
 class UiManager:
     """
     Manages the lifecycle of UI environments, acting as the central orchestrator.
+    --- REFACTOR: Now includes a persistent process registry. ---
     """
 
     def __init__(self, broadcast_callback: Optional[BroadcastCallable] = None):
         self.broadcast_callback = broadcast_callback
+        # --- REFACTOR: These dictionaries now represent the *live* process state. ---
         self.running_processes: Dict[str, asyncio.subprocess.Process] = {}
         self.installation_processes: Dict[str, asyncio.subprocess.Process] = {}
-        self.running_ui_tasks: Dict[UiNameType, str] = {}
+        # --- REFACTOR: This dictionary is now loaded from and saved to a file. ---
+        self.running_ui_tasks: Dict[str, Tuple[UiNameType, int]] = (
+            {}
+        )  # Maps task_id to (ui_name, pid)
         self.registry = UiRegistry()
-        logger.info("UiManager initialized and connected to UI Registry.")
+        logger.info("UiManager initialized. Loading process registry...")
+        self._load_and_reconcile_registry()
 
-    async def _stream_process_output(self, process: asyncio.subprocess.Process, task_id: str):
-        """Reads and logs process output for debugging purposes."""
+    # --- NEW: Methods for process registry persistence ---
 
-        async def read_stream(stream, stream_name):
-            while not stream.at_eof():
-                try:
-                    line_bytes = await stream.readline()
-                    if not line_bytes:
-                        break
-                    line = line_bytes.decode("utf-8", errors="replace").strip()
-                    if line:
-                        logger.debug(f"[{task_id}:{stream_name}] {line}")
-                except Exception as e:
-                    logger.warning(f"Error reading stream line from process {process.pid}: {e}")
-                    break
+    def _load_and_reconcile_registry(self):
+        """
+        Loads the process registry from the file and reconciles it with the
+        currently running processes on the system.
+        """
+        if not PROCESS_REGISTRY_FILE_PATH.exists():
+            logger.info("Process registry not found. Starting with a clean state.")
+            return
 
-        await asyncio.gather(
-            read_stream(process.stdout, "stdout"), read_stream(process.stderr, "stderr")
-        )
-        await process.wait()
+        try:
+            with open(PROCESS_REGISTRY_FILE_PATH, "r") as f:
+                persisted_tasks = json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Error reading process registry: {e}. Starting fresh.", exc_info=True)
+            return
 
-    async def _pip_progress_callback(
-        self,
-        task_id: str,
-        phase: ui_installer.PipPhase,
-        processed: int,
-        total: int,
-        item_name: str,
-        item_size: Optional[int],
-    ):
-        """Translates structured pip progress into frontend status updates."""
-        collecting_start_progress, collecting_range = 25.0, 50.0
-        installing_start_progress, installing_range = 75.0, 15.0
-        current_progress, status_text = 0.0, ""
-
-        if phase == "collecting":
-            if total == -1:
-                phase_progress = collecting_range * (1 - 1 / (processed + 1))
-                current_progress = collecting_start_progress + phase_progress
-                status_text = item_name
+        reconciled_tasks = {}
+        for task_id, (ui_name, pid) in persisted_tasks.items():
+            if _is_pid_running(pid):
+                logger.info(
+                    f"Reconciling running process: {ui_name} (PID: {pid}, TaskID: {task_id})"
+                )
+                reconciled_tasks[task_id] = (ui_name, pid)
+                # We don't have the process object, so we can't monitor it,
+                # but we can at least reflect its running state.
+                # A background task is created to mark it as 'running' in the tracker.
+                asyncio.create_task(self._reconcile_tracker_status(task_id, ui_name))
             else:
-                phase_percent = (processed / total) * collecting_range if total > 0 else 0
-                current_progress = collecting_start_progress + phase_percent
-                size_str = f"({_format_bytes(item_size)})" if item_size else ""
-                status_text = f"Collecting: {item_name} {size_str}".strip()
-        elif phase == "installing":
-            phase_percent = (processed / total) * installing_range if total > 0 else 0
-            current_progress = installing_start_progress + phase_percent
-            status_text = item_name
+                logger.warning(
+                    f"Found stale process in registry for {ui_name} (PID: {pid}). Removing."
+                )
 
+        self.running_ui_tasks = reconciled_tasks
+        self._save_process_registry()
+        logger.info(
+            f"Process registry loaded and reconciled. {len(self.running_ui_tasks)} processes are active."
+        )
+
+    def _save_process_registry(self):
+        """Saves the current state of running UI tasks to the registry file."""
+        try:
+            CONFIG_FILE_DIR.mkdir(exist_ok=True)
+            with open(PROCESS_REGISTRY_FILE_PATH, "w") as f:
+                json.dump(self.running_ui_tasks, f, indent=4)
+        except IOError as e:
+            logger.error(f"Failed to save process registry: {e}", exc_info=True)
+
+    async def _reconcile_tracker_status(self, task_id: str, ui_name: UiNameType):
+        """Creates a dummy task in the tracker for a reconciled process."""
+        # This task does nothing but hold the place in the UI.
+        dummy_task = asyncio.create_task(asyncio.sleep(float("inf")))
+        download_tracker.start_tracking(task_id, "UI Process", ui_name, dummy_task)
         await download_tracker.update_task_progress(
-            task_id, progress=min(current_progress, 90.0), status_text=status_text
+            task_id, 5, "Process is running (Reconciled)", "running"
         )
 
     async def get_all_statuses(self) -> List[ManagedUiStatus]:
         """Retrieves the current status for all registered UI environments."""
         statuses: List[ManagedUiStatus] = []
+        # Create a reverse map for quick lookup of running status by ui_name
+        running_ui_map = {
+            ui_name: task_id for task_id, (ui_name, pid) in self.running_ui_tasks.items()
+        }
+
         for ui_name, install_path in self.registry.get_all_paths().items():
             if not install_path.is_dir():
                 logger.warning(
@@ -108,7 +152,7 @@ class UiManager:
                 self.registry.remove_installation(ui_name)
                 continue
 
-            running_task_id = self.running_ui_tasks.get(ui_name)
+            running_task_id = running_ui_map.get(ui_name)
             statuses.append(
                 ManagedUiStatus(
                     ui_name=ui_name,
@@ -124,6 +168,7 @@ class UiManager:
         self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str
     ):
         """Orchestrates the complete, resilient installation of a new UI environment."""
+        # ... (rest of the method is unchanged)
         await asyncio.sleep(0.5)
         ui_info = await self._get_ui_info(ui_name, task_id)
         if not ui_info:
@@ -202,8 +247,12 @@ class UiManager:
             if not process:
                 raise RuntimeError(error_msg or "UI process failed to start.")
 
+            # --- REFACTOR: Persist the new running process ---
             self.running_processes[task_id] = process
-            self.running_ui_tasks[ui_name] = task_id
+            self.running_ui_tasks[task_id] = (ui_name, process.pid)
+            self._save_process_registry()
+            logger.info(f"Registered and saved process for {ui_name} with PID {process.pid}.")
+
             await download_tracker.update_task_progress(
                 task_id, 5, "Process is running...", "running"
             )
@@ -221,23 +270,48 @@ class UiManager:
         except Exception as e:
             await download_tracker.fail_download(task_id, str(e))
         finally:
+            # --- REFACTOR: Remove the finished process from state and registry ---
             self.running_processes.pop(task_id, None)
-            if self.running_ui_tasks.get(ui_name) == task_id:
-                self.running_ui_tasks.pop(ui_name, None)
+            if task_id in self.running_ui_tasks:
+                removed_ui, removed_pid = self.running_ui_tasks.pop(task_id)
+                self._save_process_registry()
+                logger.info(
+                    f"Unregistered and saved process for {removed_ui} with PID {removed_pid}."
+                )
 
     async def stop_ui(self, task_id: str):
         """Stops a running UI process by its task ID."""
+        # Check live processes first
         process = self.running_processes.get(task_id)
-        if not process:
+        if process:
+            logger.info(f"Stopping live process for task {task_id} (PID: {process.pid}).")
+            try:
+                process.terminate()
+                await asyncio.wait_for(process.wait(), timeout=10)
+            except asyncio.TimeoutError:
+                process.kill()
+            # The finally block in _run_and_manage_process will handle registry cleanup
             return
-        try:
-            process.terminate()
-            await asyncio.wait_for(process.wait(), timeout=10)
-        except asyncio.TimeoutError:
-            process.kill()
+
+        # If not a live process (i.e., it was reconciled), stop by PID
+        if task_id in self.running_ui_tasks:
+            ui_name, pid = self.running_ui_tasks[task_id]
+            logger.info(f"Stopping reconciled process for {ui_name} (PID: {pid}).")
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                logger.warning(f"Process with PID {pid} not found, already stopped.")
+            except Exception as e:
+                logger.error(f"Failed to stop process with PID {pid}: {e}", exc_info=True)
+
+            # Manually clean up the tracker and registry
+            self.running_ui_tasks.pop(task_id, None)
+            self._save_process_registry()
+            await download_tracker.complete_download(task_id, f"Stop request sent for {ui_name}.")
 
     async def cancel_ui_task(self, task_id: str):
         """Cancels a running UI installation or repair task."""
+        # ... (method is unchanged)
         process = self.installation_processes.get(task_id)
         if process:
             try:
@@ -250,6 +324,7 @@ class UiManager:
 
     async def delete_environment(self, ui_name: UiNameType) -> bool:
         """Deletes a UI environment's directory and removes it from the registry."""
+        # ... (method is unchanged)
         install_path = self.registry.get_path(ui_name)
         if not install_path:
             return False
@@ -262,6 +337,7 @@ class UiManager:
         self, ui_name: UiNameType, path: pathlib.Path
     ) -> AdoptionAnalysisResult:
         """Analyzes a directory to determine if it's a valid, adoptable UI installation."""
+        # ... (method is unchanged)
         adopter = UiAdopter(ui_name, path)
         return await adopter.analyze()
 
@@ -269,11 +345,13 @@ class UiManager:
         self, ui_name: UiNameType, path: pathlib.Path, issues_to_fix: List[str], task_id: str
     ):
         """Creates a background task to repair a UI environment and then adopt it."""
+        # ... (method is unchanged)
         task = asyncio.create_task(self._run_repair_process(ui_name, path, issues_to_fix, task_id))
         download_tracker.start_tracking(task_id, "UI Adoption Repair", ui_name, task)
 
     def finalize_adoption(self, ui_name: UiNameType, path: pathlib.Path) -> bool:
         """Directly adopts a UI by adding it to the registry without repairs."""
+        # ... (method is unchanged)
         try:
             self.registry.add_installation(ui_name, path)
             return True
@@ -285,6 +363,7 @@ class UiManager:
         self, ui_name: UiNameType, path: pathlib.Path, issues_to_fix: List[str], task_id: str
     ):
         """The core async method that performs the repair actions."""
+        # ... (method is unchanged)
         ui_info = await self._get_ui_info(ui_name, task_id)
         if not ui_info:
             return
@@ -333,10 +412,45 @@ class UiManager:
         finally:
             self.installation_processes.pop(task_id, None)
 
+    async def _pip_progress_callback(
+        self,
+        task_id: str,
+        phase: ui_installer.PipPhase,
+        processed: int,
+        total: int,
+        item_name: str,
+        item_size: Optional[int],
+    ):
+        """Translates structured pip progress into frontend status updates."""
+        # ... (method is unchanged)
+        collecting_start_progress, collecting_range = 25.0, 50.0
+        installing_start_progress, installing_range = 75.0, 15.0
+        current_progress, status_text = 0.0, ""
+
+        if phase == "collecting":
+            if total == -1:
+                phase_progress = collecting_range * (1 - 1 / (processed + 1))
+                current_progress = collecting_start_progress + phase_progress
+                status_text = item_name
+            else:
+                phase_percent = (processed / total) * collecting_range if total > 0 else 0
+                current_progress = collecting_start_progress + phase_percent
+                size_str = f"({_format_bytes(item_size)})" if item_size else ""
+                status_text = f"Collecting: {item_name} {size_str}".strip()
+        elif phase == "installing":
+            phase_percent = (processed / total) * installing_range if total > 0 else 0
+            current_progress = installing_start_progress + phase_percent
+            status_text = item_name
+
+        await download_tracker.update_task_progress(
+            task_id, progress=min(current_progress, 90.0), status_text=status_text
+        )
+
     async def _get_ui_info(
         self, ui_name: UiNameType, task_id: Optional[str] = None
     ) -> Optional[dict]:
         """Helper to retrieve UI metadata from constants."""
+        # ... (method is unchanged)
         ui_info = UI_REPOSITORIES.get(ui_name)
         if not ui_info and task_id:
             await self._fail_task_fast(task_id, ui_name, f"Unknown UI '{ui_name}'.")
@@ -344,6 +458,29 @@ class UiManager:
 
     def _fail_task_fast(self, task_id: str, ui_name: UiNameType, message: str):
         """Helper to quickly fail a task that cannot even start."""
+        # ... (method is unchanged)
         logger.error(message)
         task = asyncio.create_task(download_tracker.fail_download(task_id, message))
         download_tracker.start_tracking(task_id, "UI Process", ui_name, task)
+
+    async def _stream_process_output(self, process: asyncio.subprocess.Process, task_id: str):
+        """Reads and logs process output for debugging purposes."""
+
+        # ... (method is unchanged)
+        async def read_stream(stream, stream_name):
+            while not stream.at_eof():
+                try:
+                    line_bytes = await stream.readline()
+                    if not line_bytes:
+                        break
+                    line = line_bytes.decode("utf-8", errors="replace").strip()
+                    if line:
+                        logger.debug(f"[{task_id}:{stream_name}] {line}")
+                except Exception as e:
+                    logger.warning(f"Error reading stream line from process {process.pid}: {e}")
+                    break
+
+        await asyncio.gather(
+            read_stream(process.stdout, "stdout"), read_stream(process.stderr, "stderr")
+        )
+        await process.wait()
