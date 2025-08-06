@@ -3,10 +3,11 @@ import logging
 import pathlib
 import asyncio
 import uuid
-import os
-import shutil
 from typing import Dict, Any, Optional, List, Tuple
 
+# --- Refactored Imports ---
+# Import the new, specialized class for filesystem operations.
+from .file_management.managed_file_system import ManagedFileSystem
 from .ui_management.ui_registry import UiRegistry
 from .file_management.config_manager import ConfigManager
 from .file_management.path_resolver import PathResolver
@@ -17,7 +18,6 @@ from .constants.constants import (
     ModelType,
     UiProfileType,
     ColorThemeType,
-    MODEL_FILE_EXTENSIONS,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,19 +26,30 @@ logger = logging.getLogger(__name__)
 class FileManager:
     """
     Acts as a high-level orchestrator for all file and model management operations.
-    @refactor Blocking file I/O operations (delete, read) are now non-blocking,
-    preventing the server from freezing on slow disk operations.
+
+    @refactor This class has been refactored to follow the Single Responsibility
+    Principle more closely. It no longer contains low-level file system logic.
+    Instead, it instantiates and delegates all file browsing, deletion, and
+    previewing tasks to the specialized `ManagedFileSystem` class. Its primary
+    role is now to coordinate between its various specialized sub-managers.
     """
 
     def __init__(self):
         """
-        Initializes all the specialized manager components.
+        Initializes all the specialized manager components, including the new
+        ManagedFileSystem for direct file operations.
         """
+        # 1. Create the single source of truth for UI paths.
         self.ui_registry = UiRegistry()
+        # 2. Initialize the configuration manager, giving it access to the registry.
         self.config = ConfigManager(ui_registry=self.ui_registry)
+        # 3. Initialize all other specialized managers.
         self.paths = PathResolver(self.config)
         self.downloader = ModelDownloader()
         self.scanner = HostScanner()
+        # 4. NEW: Instantiate the dedicated filesystem manager.
+        self.fs = ManagedFileSystem(self.config)
+
         logger.info(
             f"FileManager initialized. Profile: '{self.config.ui_profile}', Base Path: '{self.config.base_path}'."
         )
@@ -47,6 +58,9 @@ class FileManager:
     def base_path(self) -> Optional[pathlib.Path]:
         """Returns the dynamically resolved base path from the config manager."""
         return self.config.base_path
+
+    # --- Configuration Management ---
+    # These methods are high-level and correctly belong here.
 
     def get_current_configuration(self) -> Dict[str, Any]:
         """Gets the full, current application configuration."""
@@ -61,7 +75,7 @@ class FileManager:
         config_mode: Optional[str] = None,
         automatic_mode_ui: Optional[str] = None,
     ) -> Tuple[bool, str]:
-        """Configures the application paths and settings."""
+        """Configures the application paths and settings by delegating to the ConfigManager."""
         changed, message = self.config.update_configuration(
             base_path_str,
             profile,
@@ -72,6 +86,9 @@ class FileManager:
         )
         success = "failed" not in message
         return success, message
+
+    # --- Download Orchestration ---
+    # These methods coordinate between PathResolver, ModelDownloader, and DownloadTracker.
 
     def start_download_model_file(
         self,
@@ -122,157 +139,29 @@ class FileManager:
         logger.info(f"Dismiss request received for download {download_id}.")
         await download_tracker.remove_download(download_id)
 
+    # --- Host Scanning ---
+    # This method simply delegates to the HostScanner.
+
     async def list_host_directories(
         self, path_to_scan_str: Optional[str] = None, max_depth: int = 1
     ) -> Dict[str, Any]:
         """Asynchronously lists directories on the host system."""
-        # This method is now async to match the HostScanner's async interface.
         return await self.scanner.list_host_directories(path_to_scan_str, max_depth)
 
-    def _resolve_and_validate_path(
-        self, relative_path_str: Optional[str]
-    ) -> Optional[pathlib.Path]:
-        """Resolves a relative path against the base_path and validates it."""
-        if not self.base_path:
-            return None
-        if not relative_path_str:
-            return self.base_path
-
-        clean_path_str = os.path.normpath(relative_path_str.strip())
-        if os.path.isabs(clean_path_str) or ".." in clean_path_str.split(os.sep):
-            return None
-        try:
-            absolute_path = (self.base_path / clean_path_str).resolve()
-            if (
-                self.base_path.resolve() not in absolute_path.parents
-                and absolute_path != self.base_path.resolve()
-            ):
-                return None
-            return absolute_path
-        except Exception:
-            return None
-
-    def _has_models_recursive(self, directory: pathlib.Path) -> bool:
-        """Checks if a directory or its subdirectories contain model files."""
-        try:
-            for entry in os.scandir(directory):
-                if entry.is_file(follow_symlinks=False):
-                    if any(entry.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
-                        return True
-                elif entry.is_dir(follow_symlinks=False):
-                    if self._has_models_recursive(pathlib.Path(entry.path)):
-                        return True
-        except (PermissionError, FileNotFoundError):
-            return False
-        return False
-
-    def _get_directory_contents(self, directory: pathlib.Path, mode: str) -> List[Dict[str, Any]]:
-        """Gets the contents of a directory, filtered by mode."""
-        items = []
-        for p in directory.iterdir():
-            if (
-                self.config.config_mode == "automatic"
-                and p.is_dir()
-                and p.name == "venv"
-                and p.parent == self.base_path
-            ):
-                logger.debug("Skipping 'venv' directory in automatic mode.")
-                continue
-
-            try:
-                is_dir = p.is_dir()
-                item_data = {
-                    "name": p.name,
-                    "path": str(p.relative_to(self.base_path)),
-                    "item_type": "directory" if is_dir else "file",
-                    "size": p.stat().st_size if not is_dir else None,
-                    "last_modified": p.stat().st_mtime,
-                }
-                if mode == "models":
-                    if is_dir:
-                        if self._has_models_recursive(p):
-                            items.append(item_data)
-                    elif any(p.name.lower().endswith(ext) for ext in MODEL_FILE_EXTENSIONS):
-                        items.append(item_data)
-                else:  # 'explorer' mode
-                    items.append(item_data)
-            except (FileNotFoundError, PermissionError):
-                continue
-        return items
+    # --- DELEGATED FILE SYSTEM OPERATIONS ---
+    # All the following methods now delegate their calls to the new ManagedFileSystem instance.
+    # This cleans up FileManager and centralizes the file logic.
 
     def list_managed_files(
         self, relative_path_str: Optional[str], mode: str = "explorer"
     ) -> Dict[str, Any]:
-        """Lists files in the managed path, with smart navigation for 'models' mode."""
-        current_path = self._resolve_and_validate_path(relative_path_str)
-        if not current_path or not current_path.is_dir():
-            return {"path": relative_path_str, "items": []}
-
-        if mode == "models":
-            for _ in range(10):
-                items = self._get_directory_contents(current_path, mode="models")
-                if len(items) == 1 and items[0]["item_type"] == "directory":
-                    new_path_str = items[0]["path"]
-                    resolved_new_path = self._resolve_and_validate_path(new_path_str)
-                    if resolved_new_path:
-                        current_path = resolved_new_path
-                    else:
-                        break
-                else:
-                    break
-
-        final_items = self._get_directory_contents(current_path, mode)
-        final_items.sort(key=lambda x: (x["item_type"] != "directory", x["name"].lower()))
-
-        final_relative_path = (
-            str(current_path.relative_to(self.base_path))
-            if current_path != self.base_path
-            else None
-        )
-        if final_relative_path == ".":
-            final_relative_path = None
-
-        return {"path": final_relative_path, "items": final_items}
+        """Delegates the listing of managed files to the filesystem manager."""
+        return self.fs.list_managed_files(relative_path_str, mode)
 
     async def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
-        """Asynchronously deletes a file or directory within the managed base path."""
-        target_path = self._resolve_and_validate_path(relative_path_str)
-        if not target_path or not target_path.exists():
-            return {"success": False, "error": "Path not found."}
-        if target_path == self.base_path:
-            return {"success": False, "error": "Cannot delete the root directory."}
-        try:
-            # @fix {PERFORMANCE} shutil.rmtree and os.remove are blocking I/O calls.
-            # Running them in a separate thread prevents the server from freezing
-            # when deleting large directories or files.
-            if target_path.is_dir():
-                await asyncio.to_thread(shutil.rmtree, target_path)
-            else:
-                await asyncio.to_thread(os.remove, target_path)
-            return {"success": True, "message": "Item deleted successfully."}
-        except Exception as e:
-            logger.error(f"Failed to delete '{target_path}': {e}", exc_info=True)
-            return {"success": False, "error": str(e)}
+        """Delegates the deletion of a managed item to the filesystem manager."""
+        return await self.fs.delete_managed_item(relative_path_str)
 
     async def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
-        """Asynchronously gets the content of a text file for previewing."""
-        target_path = self._resolve_and_validate_path(relative_path_str)
-        if not target_path or not target_path.is_file():
-            return {"success": False, "error": "The specified path is not a valid file."}
-
-        allowed_extensions = {".txt", ".md", ".json", ".yaml", ".yml", ".py"}
-        if target_path.suffix.lower() not in allowed_extensions:
-            return {"success": False, "error": "Preview is not allowed for this file type."}
-
-        if target_path.stat().st_size > 1024 * 1024:
-            return {"success": False, "error": "File is too large to preview (> 1MB)."}
-
-        try:
-            # @fix {PERFORMANCE} read_text() is a blocking I/O call. Offloading
-            # it to a thread ensures the server remains responsive while reading
-            # the file from disk.
-            content = await asyncio.to_thread(target_path.read_text, encoding="utf-8")
-            return {"success": True, "path": relative_path_str, "content": content}
-        except Exception as e:
-            logger.error(f"Failed to read file for preview '{target_path}': {e}", exc_info=True)
-            return {"success": False, "error": f"Could not read file: {e}"}
+        """Delegates fetching a file preview to the filesystem manager."""
+        return await self.fs.get_file_preview(relative_path_str)
