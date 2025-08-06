@@ -10,15 +10,15 @@ import {
     finalizeAdoptionAPI,
     // Type definitions
     type AvailableUiItem,
-    type ManagedUiStatus,
     type UiNameType,
     type UiInstallRequest,
+    type DownloadStatus, // <-- FIX: Import DownloadStatus for typing
 } from '../../api/api';
 import {
-    // --- REFACTOR: Import Zustand stores ---
+    // --- FIX: Corrected store imports to be direct paths ---
     useUiStore,
-    useTaskStore,
-} from '../../state'; // Assuming a barrel file for stores
+} from '../../state/uiStore';
+import { useTaskStore } from '../../state/taskStore';
 import {
     // Icons
     Layers,
@@ -36,10 +36,9 @@ import ConfirmModal from '../Layout/ConfirmModal';
 import AdoptUiModal from './AdoptUiModal';
 
 /**
- * @refactor This component is no longer a "dumb" presentational component.
- * It is now self-sufficient, fetching its own data from Zustand stores and
- * containing its own logic for handling user actions by calling the API directly.
- * All `on...` props have been removed, decoupling it from App.tsx.
+ * @refactor This component is now self-sufficient, fetching its own data from
+ * Zustand stores and containing its own logic for handling user actions by
+ * calling the API directly. All `on...` props have been removed.
  */
 const UiManagementPage: React.FC = () => {
     // --- State from Zustand Stores ---
@@ -58,8 +57,9 @@ const UiManagementPage: React.FC = () => {
     // Checks if a UI is involved in a pending or in-progress task.
     const isUiBusy = useCallback(
         (uiName: UiNameType): boolean => {
+            // --- FIX: Explicitly type 'd' as DownloadStatus ---
             return Array.from(activeTasks.values()).some(
-                (d) =>
+                (d: DownloadStatus) =>
                     d.filename === uiName &&
                     ['pending', 'downloading', 'running'].includes(d.status),
             );
@@ -70,7 +70,8 @@ const UiManagementPage: React.FC = () => {
     // Combines available UI data with live status data for rendering.
     const combinedUiData = useMemo(() => {
         const statusMap = new Map(uiStatuses.map((s) => [s.ui_name, s]));
-        return availableUis.map((ui) => {
+        // --- FIX: Explicitly type 'ui' as AvailableUiItem ---
+        return availableUis.map((ui: AvailableUiItem) => {
             const status = statusMap.get(ui.ui_name);
             return {
                 ...ui,
@@ -91,7 +92,6 @@ const UiManagementPage: React.FC = () => {
                 if (response.success && response.set_as_active_on_completion) {
                     addTaskToAutoConfigure(response.task_id);
                 }
-                // TODO: Consider opening the sidebar from a global state/store action
             } catch (error: any) {
                 console.error(`Failed to start installation for ${request.ui_name}:`, error);
                 // TODO: Implement a user-facing error notification system.
