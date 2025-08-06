@@ -4,13 +4,14 @@ import {
     // API functions for fetching and saving configuration
     getCurrentConfigurationAPI,
     configurePathsAPI,
-    getKnownUiProfilesAPI,
+    getKnownUiProfilesAPI, // <-- Import the new API function
     // Type definitions from the API layer
     type ColorThemeType,
     type UiProfileType,
     type ConfigurationMode,
     type UiNameType,
     type PathConfigurationRequest,
+    type ModelType, // <-- Import ModelType for use in the profile dictionary
 } from '../api/api';
 
 /**
@@ -22,7 +23,7 @@ import {
 export interface AppPathConfig {
     basePath: string | null;
     uiProfile: UiProfileType | null;
-    customPaths: Record<string, string>;
+    customPaths: Partial<Record<ModelType, string>>; // Use Partial as not all model types may be defined
     configMode: ConfigurationMode;
     automaticModeUi: UiNameType | null;
 }
@@ -38,7 +39,12 @@ interface ConfigState {
     pathConfig: AppPathConfig;
     theme: ColorThemeType;
     isLoading: boolean;
-    knownUiProfiles: Record<string, Record<string, string>>; // To store fetched profiles
+    /**
+     * @fix {DATA_INTEGRITY} Added state to hold UI profiles fetched from the backend.
+     * This ensures the frontend uses the single source of truth from the server
+     * instead of a hardcoded, potentially outdated constant.
+     */
+    knownUiProfiles: Record<UiProfileType, Partial<Record<ModelType, string>>>;
 
     // Actions (functions to modify the state)
     loadInitialConfig: () => Promise<void>;
@@ -52,103 +58,98 @@ interface ConfigState {
  * This store is the single source of truth for all application-level configuration.
  * It encapsulates the state related to paths, UI profiles, and themes, as well as
  * the async actions required to fetch and save that configuration.
- *
- * By centralizing this logic, we remove it from `App.tsx`, allowing any component
- * in the application to access or update configuration state without prop-drilling.
  */
-export const useConfigStore =
-    create <
-    ConfigState >
-    ((set, get) => ({
-        // --- INITIAL STATE ---
-        pathConfig: {
-            basePath: null,
-            uiProfile: null,
-            customPaths: {},
-            configMode: 'automatic',
-            automaticModeUi: null,
-        },
-        theme: 'dark',
-        isLoading: true,
-        knownUiProfiles: {}, // Starts empty, will be fetched from the backend
+export const useConfigStore = create<ConfigState>((set, get) => ({
+    // --- INITIAL STATE ---
+    pathConfig: {
+        basePath: null,
+        uiProfile: null,
+        customPaths: {},
+        configMode: 'automatic',
+        automaticModeUi: null,
+    },
+    theme: 'dark',
+    isLoading: true,
+    knownUiProfiles: {} as Record<UiProfileType, Partial<Record<ModelType, string>>>, // Starts empty
 
-        // --- ACTIONS ---
+    // --- ACTIONS ---
 
-        /**
-         * Fetches the initial configuration and known UI profiles from the backend.
-         * This action is called once when the application first loads. It sets the
-         * loading state, makes the API calls, and then updates the store with the
-         * retrieved data.
-         */
-        loadInitialConfig: async () => {
-            set({ isLoading: true });
-            try {
-                // Fetch both configuration and UI profiles in parallel for efficiency
-                const [config, profiles] = await Promise.all([
-                    getCurrentConfigurationAPI(),
-                    getKnownUiProfilesAPI(),
-                ]);
+    /**
+     * Fetches the initial configuration and known UI profiles from the backend.
+     * This action is called once when the application first loads.
+     */
+    loadInitialConfig: async () => {
+        set({ isLoading: true });
+        try {
+            /**
+             * @fix {DATA_INTEGRITY} Fetch both config and profiles in parallel.
+             * This efficiently loads all necessary startup data and ensures the
+             * frontend has the canonical UI profile data from the backend.
+             */
+            const [config, profiles] = await Promise.all([
+                getCurrentConfigurationAPI(),
+                getKnownUiProfilesAPI(),
+            ]);
 
+            set({
+                pathConfig: {
+                    basePath: config.base_path,
+                    uiProfile: config.profile,
+                    customPaths: config.custom_model_type_paths || {},
+                    configMode: config.config_mode || 'automatic',
+                    automaticModeUi: config.automatic_mode_ui || null,
+                },
+                theme: config.color_theme || 'dark',
+                knownUiProfiles: profiles as Record<
+                    UiProfileType,
+                    Partial<Record<ModelType, string>>
+                >,
+            });
+        } catch (error) {
+            console.error('Failed to load initial application config:', error);
+            // In case of an error, we still want to stop the loading state.
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+    /**
+     * Saves a new configuration to the backend and updates the local state on success.
+     * @param {PathConfigurationRequest} newConfig - The configuration object to save.
+     */
+    updateConfiguration: async (newConfig: PathConfigurationRequest) => {
+        try {
+            const response = await configurePathsAPI(newConfig);
+            if (response.success && response.current_config) {
+                const updated = response.current_config;
                 set({
                     pathConfig: {
-                        basePath: config.base_path,
-                        uiProfile: config.profile,
-                        customPaths: config.custom_model_type_paths || {},
-                        configMode: config.config_mode || 'automatic',
-                        automaticModeUi: config.automatic_mode_ui || null,
+                        basePath: updated.base_path,
+                        uiProfile: updated.profile,
+                        customPaths: updated.custom_model_type_paths || {},
+                        configMode: updated.config_mode || 'automatic',
+                        automaticModeUi: updated.automatic_mode_ui || null,
                     },
-                    theme: config.color_theme || 'dark',
-                    knownUiProfiles: profiles,
+                    theme: updated.color_theme || get().theme,
                 });
-            } catch (error) {
-                console.error('Failed to load initial application config:', error);
-                // In case of an error, we can set a default state or show an error message.
-                // For now, we just log it and leave the state as default.
-            } finally {
-                set({ isLoading: false });
+            } else {
+                throw new Error(response.error || 'Failed to save configuration.');
             }
-        },
+        } catch (error) {
+            console.error('Error saving configuration:', error);
+            throw error;
+        }
+    },
 
-        /**
-         * Saves a new configuration to the backend and updates the local state on success.
-         * @param {PathConfigurationRequest} newConfig - The configuration object to save.
-         */
-        updateConfiguration: async (newConfig: PathConfigurationRequest) => {
-            try {
-                const response = await configurePathsAPI(newConfig);
-                if (response.success && response.current_config) {
-                    const updated = response.current_config;
-                    set({
-                        pathConfig: {
-                            basePath: updated.base_path,
-                            uiProfile: updated.profile,
-                            customPaths: updated.custom_model_type_paths || {},
-                            configMode: updated.config_mode || 'automatic',
-                            automaticModeUi: updated.automatic_mode_ui || null,
-                        },
-                        theme: updated.color_theme || get().theme,
-                    });
-                } else {
-                    // If the API returns a specific error message, throw it
-                    throw new Error(response.error || 'Failed to save configuration.');
-                }
-            } catch (error) {
-                console.error('Error saving configuration:', error);
-                throw error; // Re-throw the error so the component can handle it (e.g., show a toast)
-            }
-        },
-
-        /**
-         * Updates the color theme in the state and persists it to the backend.
-         * This is a separate, lighter-weight action than updating the full configuration.
-         * @param {ColorThemeType} newTheme - The new theme to apply ('light' or 'dark').
-         */
-        setTheme: (newTheme: ColorThemeType) => {
-            set({ theme: newTheme });
-            // Persist the theme change to the backend without affecting other settings.
-            // This is a "fire and forget" call; we don't wait for the response to update the UI.
-            configurePathsAPI({ color_theme: newTheme }).catch((error) => {
-                console.error('Failed to save theme to backend:', error);
-            });
-        },
-    }));
+    /**
+     * Updates the color theme in the state and persists it to the backend.
+     * @param {ColorThemeType} newTheme - The new theme to apply ('light' or 'dark').
+     */
+    setTheme: (newTheme: ColorThemeType) => {
+        set({ theme: newTheme });
+        // Persist the theme change to the backend without affecting other settings.
+        configurePathsAPI({ color_theme: newTheme }).catch((error) => {
+            console.error('Failed to save theme to backend:', error);
+        });
+    },
+}));
