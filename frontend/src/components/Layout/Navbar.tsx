@@ -1,5 +1,7 @@
 // frontend/src/components/Layout/Navbar.tsx
 import React from 'react';
+// --- REFACTOR: Import NavLink for routing ---
+import { NavLink } from 'react-router-dom';
 import {
     Search,
     Settings,
@@ -13,76 +15,47 @@ import {
     Power,
 } from 'lucide-react';
 import { type DownloadSummaryStatus } from '../../App';
-// --- FIX: Import UiNameType, as it is the correct type for this component's prop. ---
 import { type UiNameType } from '../../api/api';
 
-export type MalTabKey = 'search' | 'files' | 'configuration' | 'environments';
+// --- REFACTOR: The key now corresponds to the route path ---
+export interface NavItemConfig {
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+}
 
+const navItems: NavItemConfig[] = [
+    { key: '/environments', label: 'UI Management', icon: <Layers size={18} /> },
+    { key: '/search', label: 'Model Search', icon: <Search size={18} /> },
+    { key: '/files', label: 'File Manager', icon: <FolderKanban size={18} /> },
+    { key: '/configuration', label: 'Settings', icon: <Settings size={18} /> },
+];
+
+/**
+ * @refactor This component has been updated for react-router-dom.
+ * It no longer takes `activeTab` or `onTabChange` props. Instead, it uses
+ * the `NavLink` component, which automatically handles the 'active' state
+ * based on the current URL, fully decoupling navigation from App.tsx.
+ */
 interface NavbarProps {
-    activeTab: MalTabKey;
-    onTabChange: (tab: MalTabKey) => void;
     onToggleDownloads: () => void;
     downloadStatus: DownloadSummaryStatus;
     downloadCount: number;
-    // --- FIX: Renamed prop and changed its type from UiProfileType to UiNameType. ---
-    // The button's purpose is to display the *name* of the active UI (e.g., "Fooocus"),
-    // not its folder profile type. This change makes the prop name more accurate and
-    // resolves the TypeScript error by accepting the correct data type.
     activeUiName: UiNameType | null;
     isUiInstalled: boolean;
     isUiRunning: boolean;
     onQuickStart: () => void;
 }
 
-interface NavItemConfig {
-    key: MalTabKey;
-    label: string;
-    icon: React.ReactNode;
-}
-
-const navItems: NavItemConfig[] = [
-    {
-        key: 'search',
-        label: 'Model Search',
-        icon: <Search size={18} />,
-    },
-    {
-        key: 'files',
-        label: 'File Manager',
-        icon: <FolderKanban size={18} />,
-    },
-    {
-        key: 'environments',
-        label: 'UI Management',
-        icon: <Layers size={18} />,
-    },
-    {
-        key: 'configuration',
-        label: 'Settings',
-        icon: <Settings size={18} />,
-    },
-];
-
-/**
- * The main navigation bar for the application. It displays the primary navigation
- * tabs and provides a dynamic button to manage and view the status of downloads.
- */
 const Navbar: React.FC<NavbarProps> = ({
-    activeTab,
-    onTabChange,
     onToggleDownloads,
     downloadStatus,
     downloadCount,
-    // --- FIX: Destructure the corrected prop name. ---
     activeUiName,
     isUiInstalled,
     isUiRunning,
     onQuickStart,
 }) => {
-    /**
-     * Determines which icon to display on the downloads button based on the
-     * summarized status of all active downloads.
-     */
     const getDownloadStatusIcon = () => {
         switch (downloadStatus) {
             case 'downloading':
@@ -91,12 +64,11 @@ const Navbar: React.FC<NavbarProps> = ({
                 return <CheckCircle2 size={18} />;
             case 'error':
                 return <AlertTriangle size={18} />;
-            default: // 'idle'
+            default:
                 return <DownloadCloud size={18} />;
         }
     };
 
-    // The condition now correctly checks if there is an active UI name and if it's installed.
     const showQuickStartButton = activeUiName && isUiInstalled;
 
     return (
@@ -105,17 +77,19 @@ const Navbar: React.FC<NavbarProps> = ({
                 <ul className="navbar-tabs-list">
                     {navItems.map((item) => (
                         <li key={item.key} className="navbar-tab-item">
-                            <button
-                                className={`navbar-tab-button ${
-                                    activeTab === item.key ? 'active' : ''
-                                }`}
-                                onClick={() => onTabChange(item.key)}
-                                aria-current={activeTab === item.key ? 'page' : undefined}
+                            {/* --- REFACTOR: Replaced button with NavLink --- */}
+                            <NavLink
+                                to={item.key}
+                                // The `className` prop can be a function to conditionally apply classes.
+                                // `isActive` is automatically provided by NavLink.
+                                className={({ isActive }) =>
+                                    `navbar-tab-button ${isActive ? 'active' : ''}`
+                                }
                                 title={item.label}
                             >
                                 <span className="navbar-tab-icon">{item.icon}</span>
                                 <span className="navbar-tab-label">{item.label}</span>
-                            </button>
+                            </NavLink>
                         </li>
                     ))}
                 </ul>
@@ -126,7 +100,6 @@ const Navbar: React.FC<NavbarProps> = ({
                     <button
                         className={`quick-start-button ${isUiRunning ? 'running' : 'stopped'}`}
                         onClick={onQuickStart}
-                        // --- FIX: Use the corrected prop name in the title attribute. ---
                         title={isUiRunning ? `Stop ${activeUiName}` : `Start ${activeUiName}`}
                     >
                         {isUiRunning ? (
@@ -134,7 +107,6 @@ const Navbar: React.FC<NavbarProps> = ({
                         ) : (
                             <Play size={16} />
                         )}
-                        {/* --- FIX: Use the corrected prop name for the button label. --- */}
                         <span className="quick-start-label">{activeUiName}</span>
                         <Power size={16} />
                     </button>
