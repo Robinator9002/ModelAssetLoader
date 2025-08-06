@@ -1,7 +1,11 @@
 // frontend/src/App.tsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
+// --- REFACTOR: Import routing components from react-router-dom ---
+import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
-import Navbar, { type MalTabKey } from './components/Layout/Navbar';
+
+// --- Component Imports ---
+import Navbar from './components/Layout/Navbar';
 import ThemeSwitcher from './components/Theme/ThemeSwitcher';
 import ModelSearchPage from './components/ModelLoader/ModelSearchPage';
 import ModelDetailsPage from './components/ModelLoader/ModelDetailsPage';
@@ -16,27 +20,34 @@ import appIcon from '/icon.png';
 import { useConfigStore } from './state/configStore';
 import { useUiStore } from './state/uiStore';
 import { useTaskStore } from './state/taskStore';
-// --- REFACTOR: Import the new modal store ---
 import { useModalStore } from './state/modalStore';
 
 // --- API & Type Imports ---
 import { type ModelListItem } from './api/api';
 
-/**
- * Represents the summarized status of all background tasks for UI feedback.
- */
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
 
 /**
- * The root component of the M.A.L. application.
- *
- * @refactor This component has been significantly refactored. It no longer manages
- * the state for the Download Modal. That logic has been moved into a dedicated
- * `modalStore`. It also no longer contains the logic for its child pages, which
- * are now self-sufficient. Its primary role is now layout, routing, and wiring
- * up the remaining global components.
+ * @refactor This is the new root component that handles routing.
+ * The main App logic is moved to the `AppContent` component to allow
+ * it to access routing hooks like `useNavigate`.
  */
 function App() {
+    return (
+        <BrowserRouter>
+            <AppContent />
+        </BrowserRouter>
+    );
+}
+
+/**
+ * The main application component, now responsible for layout and state orchestration.
+ * Routing is handled by the parent `App` component.
+ */
+function AppContent() {
+    // --- Hooks ---
+    const navigate = useNavigate();
+
     // --- State from Zustand Stores ---
     const {
         pathConfig,
@@ -47,34 +58,41 @@ function App() {
     } = useConfigStore();
     const { uiStatuses, fetchUiData } = useUiStore();
     const { activeTasks, connect, dismissTask } = useTaskStore();
-    // --- REFACTOR: Get modal state directly from the modal store ---
     const { isDownloadModalOpen, modelForDownload, specificFileForDownload, closeDownloadModal } =
         useModalStore();
 
     // --- Local View State ---
-    const [activeTab, setActiveTab] = useState<MalTabKey>('environments');
     const [selectedModel, setSelectedModel] = useState<ModelListItem | null>(null);
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
 
-    // --- Application Initialization Effect ---
+    // --- Effects ---
     useEffect(() => {
         loadInitialConfig();
         fetchUiData();
         connect();
     }, [loadInitialConfig, fetchUiData, connect]);
 
-    // --- Theme Management ---
     useEffect(() => {
         document.body.className = theme === 'light' ? 'light-theme' : '';
     }, [theme]);
 
-    // --- REFACTOR: This handler is now much simpler ---
-    // It's only responsible for closing the modal (which is now done via the store)
-    // and opening the sidebar.
+    useEffect(() => {
+        if (selectedModel) {
+            // The state is passed here, but the component needs the prop for direct rendering
+            navigate(`/search/${selectedModel.source}/${selectedModel.id}`);
+        }
+    }, [selectedModel, navigate]);
+
+    // --- Callbacks ---
     const handleDownloadsStarted = useCallback(() => {
         closeDownloadModal();
         setDownloadsSidebarOpen(true);
     }, [closeDownloadModal]);
+
+    const handleBackToSearch = () => {
+        setSelectedModel(null);
+        navigate('/search');
+    };
 
     // --- Memoized Derived State ---
     const downloadSummaryStatus = useMemo((): DownloadSummaryStatus => {
@@ -96,35 +114,6 @@ function App() {
     }, [pathConfig, uiStatuses]);
 
     // --- Render Logic ---
-
-    const renderActiveTabContent = () => {
-        if (isConfigLoading) {
-            return <p className="page-state-container">Loading configuration...</p>;
-        }
-        if (selectedModel) {
-            return (
-                <ModelDetailsPage
-                    selectedModel={selectedModel}
-                    onBack={() => setSelectedModel(null)}
-                />
-            );
-        }
-
-        switch (activeTab) {
-            case 'search':
-                return <ModelSearchPage onModelSelect={setSelectedModel} />;
-            case 'files':
-                return <FileManagerPage />;
-            case 'environments':
-                return <UiManagementPage />;
-            case 'configuration':
-                return <ConfigurationsPage managedUis={uiStatuses} />;
-            default:
-                // Fallback to a default page
-                return <UiManagementPage />;
-        }
-    };
-
     return (
         <div className={`app-wrapper ${isDownloadsSidebarOpen ? 'sidebar-open' : ''}`}>
             <DownloadSidebar
@@ -135,38 +124,56 @@ function App() {
             />
             <div className="app-content-pusher">
                 <header className="app-header-placeholder">
-                    <div
-                        style={{
-                            gap: '1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        <img
-                            src={appIcon}
-                            style={{ width: '2rem', height: 'auto' }}
-                            alt="M.A.L. Icon"
-                        />
-                        <h1>M.A.L.</h1>
-                    </div>
+                    <img
+                        src={appIcon}
+                        style={{ width: '2rem', height: 'auto' }}
+                        alt="M.A.L. Icon"
+                    />
+                    <h1>M.A.L.</h1>
                 </header>
                 <Navbar
-                    activeTab={activeTab}
-                    onTabChange={(tab) => {
-                        setSelectedModel(null);
-                        setActiveTab(tab);
-                    }}
                     onToggleDownloads={() => setDownloadsSidebarOpen((p) => !p)}
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeTasks.size}
                     activeUiName={activeUiForQuickStart?.ui_name || null}
                     isUiInstalled={activeUiForQuickStart?.is_installed || false}
                     isUiRunning={activeUiForQuickStart?.is_running || false}
-                    // Quick start logic will be refactored later
                     onQuickStart={() => console.log('Quick Start Clicked')}
                 />
-                <main className="main-content-area">{renderActiveTabContent()}</main>
+                <main className="main-content-area">
+                    {isConfigLoading ? (
+                        <p className="page-state-container">Loading configuration...</p>
+                    ) : (
+                        <Routes>
+                            <Route
+                                path="/search"
+                                element={<ModelSearchPage onModelSelect={setSelectedModel} />}
+                            />
+                            {/* --- FIX: Pass the required 'selectedModel' prop to the component --- */}
+                            {/* If a user lands on this URL directly, selectedModel will be null, so we redirect them. */}
+                            <Route
+                                path="/search/:source/:modelId"
+                                element={
+                                    selectedModel ? (
+                                        <ModelDetailsPage
+                                            selectedModel={selectedModel}
+                                            onBack={handleBackToSearch}
+                                        />
+                                    ) : (
+                                        <Navigate to="/search" replace />
+                                    )
+                                }
+                            />
+                            <Route path="/files" element={<FileManagerPage />} />
+                            <Route path="/environments" element={<UiManagementPage />} />
+                            <Route
+                                path="/configuration"
+                                element={<ConfigurationsPage managedUis={uiStatuses} />}
+                            />
+                            <Route path="*" element={<UiManagementPage />} />
+                        </Routes>
+                    )}
+                </main>
             </div>
             <div className="theme-switcher-container">
                 <ThemeSwitcher
@@ -174,7 +181,6 @@ function App() {
                     onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 />
             </div>
-            {/* --- REFACTOR: The DownloadModal is now controlled by the modalStore --- */}
             <DownloadModal
                 isOpen={isDownloadModalOpen}
                 onClose={closeDownloadModal}
