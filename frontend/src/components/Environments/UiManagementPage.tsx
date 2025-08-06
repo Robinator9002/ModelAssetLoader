@@ -1,12 +1,24 @@
 // frontend/src/components/Environments/UiManagementPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
+    // --- REFACTOR: Import API functions directly ---
+    installUiAPI,
+    runUiAPI,
+    stopUiAPI,
+    deleteUiAPI,
+    repairUiAPI,
+    finalizeAdoptionAPI,
     // Type definitions
     type AvailableUiItem,
     type ManagedUiStatus,
     type UiNameType,
     type UiInstallRequest,
 } from '../../api/api';
+import {
+    // --- REFACTOR: Import Zustand stores ---
+    useUiStore,
+    useTaskStore,
+} from '../../state'; // Assuming a barrel file for stores
 import {
     // Icons
     Layers,
@@ -21,78 +33,42 @@ import {
 // Component Imports
 import InstallUiModal from './InstallUiModal';
 import ConfirmModal from '../Layout/ConfirmModal';
-import AdoptUiModal from './AdoptUiModal'; // Import the new adoption modal
+import AdoptUiModal from './AdoptUiModal';
 
 /**
- * Props for the UiManagementPage component.
- * Updated to include handlers for the adoption workflow.
+ * @refactor This component is no longer a "dumb" presentational component.
+ * It is now self-sufficient, fetching its own data from Zustand stores and
+ * containing its own logic for handling user actions by calling the API directly.
+ * All `on...` props have been removed, decoupling it from App.tsx.
  */
-interface UiManagementPageProps {
-    availableUis: AvailableUiItem[];
-    uiStatuses: ManagedUiStatus[];
-    onInstall: (request: UiInstallRequest) => void;
-    onRun: (uiName: UiNameType) => void;
-    onStop: (taskId: string) => void;
-    onDelete: (uiName: UiNameType) => void;
-    isBusy: (uiName: UiNameType) => boolean;
-    // Handlers for the adoption process, to be passed from App.tsx
-    onRepair: (uiName: UiNameType, path: string, issues: string[]) => void;
-    onFinalizeAdoption: (uiName: UiNameType, path: string) => void;
-}
+const UiManagementPage: React.FC = () => {
+    // --- State from Zustand Stores ---
+    const { availableUis, uiStatuses, fetchUiData, isLoading } = useUiStore();
+    const { activeTasks, addTaskToAutoConfigure } = useTaskStore();
 
-/**
- * A dedicated page for discovering, installing, and managing different AI UI environments.
- */
-const UiManagementPage: React.FC<UiManagementPageProps> = ({
-    availableUis,
-    uiStatuses,
-    onInstall,
-    onRun,
-    onStop,
-    onDelete,
-    isBusy,
-    onRepair,
-    onFinalizeAdoption,
-}) => {
-    // --- State for Modals ---
+    // --- Local View State (for modals) ---
     const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
     const [uiToInstall, setUiToInstall] = useState<AvailableUiItem | null>(null);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [uiToDelete, setUiToDelete] = useState<UiNameType | null>(null);
-    // State for the new adoption modal
     const [isAdoptModalOpen, setIsAdoptModalOpen] = useState(false);
 
-    // --- Modal Handlers ---
-    const handleOpenInstallModal = (ui: AvailableUiItem) => {
-        setUiToInstall(ui);
-        setIsInstallModalOpen(true);
-    };
+    // --- Memoized Derived State ---
 
-    const handleCloseInstallModal = () => {
-        setUiToInstall(null);
-        setIsInstallModalOpen(false);
-    };
+    // Checks if a UI is involved in a pending or in-progress task.
+    const isUiBusy = useCallback(
+        (uiName: UiNameType): boolean => {
+            return Array.from(activeTasks.values()).some(
+                (d) =>
+                    d.filename === uiName &&
+                    ['pending', 'downloading', 'running'].includes(d.status),
+            );
+        },
+        [activeTasks],
+    );
 
-    const handleConfirmInstall = (request: UiInstallRequest) => {
-        onInstall(request);
-        handleCloseInstallModal();
-    };
-
-    const handleRequestDelete = (uiName: UiNameType) => {
-        setUiToDelete(uiName);
-        setIsDeleteConfirmOpen(true);
-    };
-
-    const handleConfirmDelete = () => {
-        if (uiToDelete) {
-            onDelete(uiToDelete);
-        }
-        setIsDeleteConfirmOpen(false);
-        setUiToDelete(null);
-    };
-
-    // --- Data Combination Logic ---
-    const getCombinedUiData = () => {
+    // Combines available UI data with live status data for rendering.
+    const combinedUiData = useMemo(() => {
         const statusMap = new Map(uiStatuses.map((s) => [s.ui_name, s]));
         return availableUis.map((ui) => {
             const status = statusMap.get(ui.ui_name);
@@ -104,9 +80,108 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                 running_task_id: status?.running_task_id,
             };
         });
+    }, [availableUis, uiStatuses]);
+
+    // --- Action Handlers (Logic now lives here) ---
+
+    const handleInstall = useCallback(
+        async (request: UiInstallRequest) => {
+            try {
+                const response = await installUiAPI(request);
+                if (response.success && response.set_as_active_on_completion) {
+                    addTaskToAutoConfigure(response.task_id);
+                }
+                // TODO: Consider opening the sidebar from a global state/store action
+            } catch (error: any) {
+                console.error(`Failed to start installation for ${request.ui_name}:`, error);
+                // TODO: Implement a user-facing error notification system.
+            }
+            setIsInstallModalOpen(false);
+        },
+        [addTaskToAutoConfigure],
+    );
+
+    const handleRun = useCallback(async (uiName: UiNameType) => {
+        try {
+            await runUiAPI(uiName);
+        } catch (error: any) {
+            console.error(`Failed to start UI ${uiName}:`, error);
+        }
+    }, []);
+
+    const handleStop = useCallback(async (taskId: string) => {
+        try {
+            await stopUiAPI(taskId);
+        } catch (error: any) {
+            console.error(`Failed to stop UI task ${taskId}:`, error);
+        }
+    }, []);
+
+    const handleDelete = useCallback(async () => {
+        if (!uiToDelete) return;
+        try {
+            await deleteUiAPI(uiToDelete);
+            fetchUiData(); // Manually trigger a refresh after deletion.
+        } catch (error: any) {
+            console.error(`Failed to delete UI ${uiToDelete}:`, error);
+        }
+        setIsDeleteConfirmOpen(false);
+        setUiToDelete(null);
+    }, [uiToDelete, fetchUiData]);
+
+    const handleRepair = useCallback(
+        async (uiName: UiNameType, path: string, issuesToFix: string[]) => {
+            try {
+                const response = await repairUiAPI({
+                    ui_name: uiName,
+                    path,
+                    issues_to_fix: issuesToFix,
+                });
+                if (response.success) {
+                    addTaskToAutoConfigure(response.task_id);
+                }
+            } catch (error: any) {
+                console.error(`Failed to start repair for ${uiName}:`, error);
+            }
+            setIsAdoptModalOpen(false);
+        },
+        [addTaskToAutoConfigure],
+    );
+
+    const handleFinalizeAdoption = useCallback(
+        async (uiName: UiNameType, path: string) => {
+            try {
+                await finalizeAdoptionAPI({ ui_name: uiName, path });
+                fetchUiData(); // Refresh UI data after successful adoption.
+            } catch (error: any) {
+                console.error(`Failed to finalize adoption for ${uiName}:`, error);
+            }
+            setIsAdoptModalOpen(false);
+        },
+        [fetchUiData],
+    );
+
+    // --- Modal Control Handlers ---
+    const openInstallModal = (ui: AvailableUiItem) => {
+        setUiToInstall(ui);
+        setIsInstallModalOpen(true);
     };
 
-    const combinedUiData = getCombinedUiData();
+    const requestDelete = (uiName: UiNameType) => {
+        setUiToDelete(uiName);
+        setIsDeleteConfirmOpen(true);
+    };
+
+    // --- Render Logic ---
+
+    if (isLoading && combinedUiData.length === 0) {
+        return (
+            <div className="page-state-container">
+                <Loader2 size={32} className="animate-spin" />
+                <p>Loading UI Environments...</p>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -116,7 +191,6 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                         <h1>UI Environments</h1>
                         <p>Install, run, and manage supported AI user interfaces.</p>
                     </div>
-                    {/* Button to trigger the new adoption modal */}
                     <button className="button" onClick={() => setIsAdoptModalOpen(true)}>
                         <ClipboardCheck size={18} /> Adopt Existing UI
                     </button>
@@ -124,8 +198,7 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
 
                 <div className="ui-management-grid">
                     {combinedUiData.map((ui) => {
-                        const isUiBusy = isBusy(ui.ui_name);
-
+                        const busy = isUiBusy(ui.ui_name);
                         return (
                             <div key={ui.ui_name} className="config-card ui-card">
                                 <h2 className="config-card-header">
@@ -180,8 +253,8 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                                     {!ui.is_installed ? (
                                         <button
                                             className="button button-primary full-width"
-                                            onClick={() => handleOpenInstallModal(ui)}
-                                            disabled={isUiBusy}
+                                            onClick={() => openInstallModal(ui)}
+                                            disabled={busy}
                                         >
                                             <Download size={18} /> Install
                                         </button>
@@ -189,7 +262,7 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                                         <>
                                             <button
                                                 className="button button-danger"
-                                                onClick={() => handleRequestDelete(ui.ui_name)}
+                                                onClick={() => requestDelete(ui.ui_name)}
                                                 title="Delete the managed installation."
                                             >
                                                 <Trash2 size={18} />
@@ -197,16 +270,16 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                                             {ui.is_running && ui.running_task_id ? (
                                                 <button
                                                     className="button button-warning"
-                                                    onClick={() => onStop(ui.running_task_id!)}
-                                                    disabled={isUiBusy}
+                                                    onClick={() => handleStop(ui.running_task_id!)}
+                                                    disabled={busy}
                                                 >
                                                     <StopCircle size={18} /> Stop
                                                 </button>
                                             ) : (
                                                 <button
                                                     className="button button-success"
-                                                    onClick={() => onRun(ui.ui_name)}
-                                                    disabled={isUiBusy}
+                                                    onClick={() => handleRun(ui.ui_name)}
+                                                    disabled={busy}
                                                 >
                                                     <Play size={18} /> Start
                                                 </button>
@@ -220,15 +293,15 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                 </div>
             </div>
 
-            {/* Render the modals */}
+            {/* --- Modals --- */}
             <InstallUiModal
                 isOpen={isInstallModalOpen}
-                onClose={handleCloseInstallModal}
+                onClose={() => setIsInstallModalOpen(false)}
                 uiToInstall={uiToInstall}
-                onConfirmInstall={handleConfirmInstall}
+                onConfirmInstall={handleInstall}
                 isSubmitting={
                     !!uiToInstall &&
-                    isBusy(uiToInstall.ui_name) &&
+                    isUiBusy(uiToInstall.ui_name) &&
                     !uiStatuses.find((s) => s.ui_name === uiToInstall.ui_name)?.is_installed
                 }
             />
@@ -236,14 +309,14 @@ const UiManagementPage: React.FC<UiManagementPageProps> = ({
                 isOpen={isAdoptModalOpen}
                 onClose={() => setIsAdoptModalOpen(false)}
                 availableUis={availableUis}
-                onConfirmRepair={onRepair}
-                onConfirmFinalize={onFinalizeAdoption}
+                onConfirmRepair={handleRepair}
+                onConfirmFinalize={handleFinalizeAdoption}
             />
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}
                 title={`Delete ${uiToDelete}?`}
                 message={`Are you sure you want to permanently delete the installation for ${uiToDelete}? This action cannot be undone.`}
-                onConfirm={handleConfirmDelete}
+                onConfirm={handleDelete}
                 onCancel={() => setIsDeleteConfirmOpen(false)}
                 confirmText="Yes, Delete"
                 isDanger={true}
