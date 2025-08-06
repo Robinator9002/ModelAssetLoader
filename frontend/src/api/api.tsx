@@ -28,7 +28,8 @@ export interface ModelListItem {
     source: string;
     author?: string | null;
     model_name: string;
-    // --- FIX: Renamed to match the corrected snake_case field from the backend Pydantic model. ---
+    // This field is snake_case to align with Python conventions,
+    // but the backend model uses an alias to accept 'lastModified' from the source API.
     last_modified?: string | null; // ISO Date String
     tags: string[];
     pipeline_tag?: string | null;
@@ -65,19 +66,26 @@ export interface SearchModelParams {
 
 // --- FileManager & Download Interfaces ---
 
-// --- FIX: Corrected UiNameType to match the backend's single source of truth. ---
-// This is a critical fix to prevent runtime errors when interacting with the API.
-// The previous type was missing 'Fooocus' and incorrectly had 'ForgeUI' instead of 'Forge'.
+/**
+ * @fix {CRITICAL} Corrected UiNameType to match the backend's single source of truth.
+ * The previous type was missing 'Fooocus' and incorrectly had 'ForgeUI' instead of 'Forge'.
+ * This prevents runtime errors when interacting with the API for UI management.
+ */
 export type UiNameType = 'ComfyUI' | 'A1111' | 'Forge' | 'Fooocus';
 
-// --- FIX: Corrected UiProfileType to match the backend's updated Literal. ---
+/**
+ * @fix {CRITICAL} Corrected UiProfileType to match the backend's updated Literal.
+ * The previous type was missing 'Forge', which would cause validation errors.
+ */
 export type UiProfileType = 'ComfyUI' | 'A1111' | 'Forge' | 'Custom';
 
 export type ColorThemeType = 'dark' | 'light';
 
-// --- FIX: Corrected ModelType to use capitalized strings as expected by the backend. ---
-// This is a critical fix that resolves the API validation error for all download requests.
-// The backend expects values like "Checkpoint", not "checkpoints".
+/**
+ * @fix {CRITICAL} Corrected ModelType to use capitalized strings as expected by the backend.
+ * This is a critical fix that resolves the API validation error (HTTP 422) for all download requests.
+ * The backend expects values like "Checkpoint", not "checkpoints".
+ */
 export type ModelType =
     | 'Checkpoint'
     | 'VAE'
@@ -88,7 +96,7 @@ export type ModelType =
     | 'Hypernetwork'
     | 'TextualInversion'
     | 'MotionModule'
-    | 'Other'; // 'Other' can be used as a fallback.
+    | 'Other';
 
 export type ConfigurationMode = 'automatic' | 'manual';
 
@@ -167,7 +175,7 @@ export interface ScanHostDirectoriesResponse {
 export interface LocalFileItem {
     name: string;
     path: string; // Relative path from the base_path
-    type: 'file' | 'directory';
+    item_type: 'file' | 'directory';
     size: number | null; // Size in bytes, null for directories
     last_modified: string; // ISO Date String
 }
@@ -457,9 +465,6 @@ export const cancelDownloadAPI = async (
     }
 };
 
-// --- NEW: Added dismissDownloadAPI to correctly implement the functionality. ---
-// This function was missing, causing an import error in App.tsx. It sends a request
-// to the backend to remove a completed or failed task from the tracker's memory.
 export const dismissDownloadAPI = async (
     downloadId: string,
 ): Promise<{ success: boolean; message: string }> => {
@@ -506,9 +511,6 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
     }
 };
 
-// --- NEW: API to fetch known UI profiles from the backend. ---
-// This eliminates the duplicated, hardcoded constant in the frontend, making the
-// backend the single source of truth for model path structures.
 export const getKnownUiProfilesAPI = async (): Promise<Record<string, Record<string, string>>> => {
     try {
         const response = await apiClient.get('/filemanager/known-ui-profiles');
