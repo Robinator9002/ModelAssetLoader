@@ -7,7 +7,6 @@ import os
 import shutil
 from typing import Dict, Any, Optional, List, Tuple
 
-# --- MODIFIED: Import UiRegistry to pass it down ---
 from .ui_management.ui_registry import UiRegistry
 from .file_management.config_manager import ConfigManager
 from .file_management.path_resolver import PathResolver
@@ -27,18 +26,16 @@ logger = logging.getLogger(__name__)
 class FileManager:
     """
     Acts as a high-level orchestrator for all file and model management operations.
+    @refactor Blocking file I/O operations (delete, read) are now non-blocking,
+    preventing the server from freezing on slow disk operations.
     """
 
     def __init__(self):
         """
-        Initializes all the specialized manager components in the correct order,
-        ensuring dependencies like UiRegistry are passed correctly.
+        Initializes all the specialized manager components.
         """
-        # 1. Create the single source of truth for UI paths.
         self.ui_registry = UiRegistry()
-        # 2. Give the ConfigManager access to it.
         self.config = ConfigManager(ui_registry=self.ui_registry)
-        # 3. The rest of the components can now be initialized.
         self.paths = PathResolver(self.config)
         self.downloader = ModelDownloader()
         self.scanner = HostScanner()
@@ -87,21 +84,14 @@ class FileManager:
     ) -> Dict[str, Any]:
         """Starts a model file download as a background task."""
         if source != "huggingface":
-            return {
-                "success": False,
-                "error": f"Source '{source}' is not supported for downloads.",
-            }
+            return {"success": False, "error": f"Source '{source}' is not supported."}
         if not self.base_path:
-            return {
-                "success": False,
-                "error": "Base path is not configured. Please configure it first.",
-            }
+            return {"success": False, "error": "Base path is not configured."}
+
         final_save_path = self.paths.resolve_final_save_path(filename, model_type, custom_sub_path)
         if not final_save_path:
-            return {
-                "success": False,
-                "error": f"Could not resolve a valid save path for model type '{model_type}'.",
-            }
+            return {"success": False, "error": f"Could not resolve save path for '{model_type}'."}
+
         download_id = str(uuid.uuid4())
         download_task = asyncio.create_task(
             self.downloader.download_model_file(
@@ -119,35 +109,25 @@ class FileManager:
             filename=final_save_path.name,
             task=download_task,
         )
-        logger.info(
-            f"Queued download {download_id} for '{filename}' -> '{final_save_path}' as a background task."
-        )
-        return {
-            "success": True,
-            "message": "Download started.",
-            "download_id": download_id,
-        }
+        logger.info(f"Queued download {download_id} for '{filename}' -> '{final_save_path}'.")
+        return {"success": True, "message": "Download started.", "download_id": download_id}
 
     async def cancel_download(self, download_id: str):
         """Requests cancellation of a running download task."""
         logger.info(f"Cancel request received for download {download_id}.")
         await download_tracker.cancel_and_remove(download_id)
 
-    # --- NEW Method ---
     async def dismiss_download(self, download_id: str):
-        """
-        Removes a finished (completed, failed, or cancelled) task from the tracker.
-        This method is called by the new API endpoint in main.py. It acts as a
-        pass-through to the specialized download_tracker singleton.
-        """
+        """Removes a finished task from the tracker."""
         logger.info(f"Dismiss request received for download {download_id}.")
         await download_tracker.remove_download(download_id)
 
-    def list_host_directories(
+    async def list_host_directories(
         self, path_to_scan_str: Optional[str] = None, max_depth: int = 1
     ) -> Dict[str, Any]:
-        """Lists directories on the host system."""
-        return self.scanner.list_host_directories(path_to_scan_str, max_depth)
+        """Asynchronously lists directories on the host system."""
+        # This method is now async to match the HostScanner's async interface.
+        return await self.scanner.list_host_directories(path_to_scan_str, max_depth)
 
     def _resolve_and_validate_path(
         self, relative_path_str: Optional[str]
@@ -157,15 +137,12 @@ class FileManager:
             return None
         if not relative_path_str:
             return self.base_path
+
         clean_path_str = os.path.normpath(relative_path_str.strip())
         if os.path.isabs(clean_path_str) or ".." in clean_path_str.split(os.sep):
             return None
         try:
             absolute_path = (self.base_path / clean_path_str).resolve()
-            # --- COMMENT: Enhanced security check explanation ---
-            # This check ensures that the fully resolved path is still a child of
-            # the configured base_path. This prevents escaping the intended
-            # directory via symlinks or other filesystem tricks.
             if (
                 self.base_path.resolve() not in absolute_path.parents
                 and absolute_path != self.base_path.resolve()
@@ -193,15 +170,13 @@ class FileManager:
         """Gets the contents of a directory, filtered by mode."""
         items = []
         for p in directory.iterdir():
-            # In automatic mode, skip scanning the 'venv' directory at the root
-            # of the base path to improve performance and avoid irrelevant results.
             if (
                 self.config.config_mode == "automatic"
                 and p.is_dir()
                 and p.name == "venv"
                 and p.parent == self.base_path
             ):
-                logger.debug("Skipping 'venv' directory at base path root in automatic mode.")
+                logger.debug("Skipping 'venv' directory in automatic mode.")
                 continue
 
             try:
@@ -234,9 +209,7 @@ class FileManager:
             return {"path": relative_path_str, "items": []}
 
         if mode == "models":
-            # Smart drill-down for models view: if a directory contains only one
-            # other directory, automatically navigate into it.
-            for _ in range(10):  # Max drill-down depth to prevent infinite loops
+            for _ in range(10):
                 items = self._get_directory_contents(current_path, mode="models")
                 if len(items) == 1 and items[0]["item_type"] == "directory":
                     new_path_str = items[0]["path"]
@@ -261,25 +234,28 @@ class FileManager:
 
         return {"path": final_relative_path, "items": final_items}
 
-    def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
-        """Deletes a file or directory within the managed base path."""
+    async def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
+        """Asynchronously deletes a file or directory within the managed base path."""
         target_path = self._resolve_and_validate_path(relative_path_str)
         if not target_path or not target_path.exists():
             return {"success": False, "error": "Path not found."}
         if target_path == self.base_path:
             return {"success": False, "error": "Cannot delete the root directory."}
         try:
+            # @fix {PERFORMANCE} shutil.rmtree and os.remove are blocking I/O calls.
+            # Running them in a separate thread prevents the server from freezing
+            # when deleting large directories or files.
             if target_path.is_dir():
-                shutil.rmtree(target_path)
+                await asyncio.to_thread(shutil.rmtree, target_path)
             else:
-                os.remove(target_path)
+                await asyncio.to_thread(os.remove, target_path)
             return {"success": True, "message": "Item deleted successfully."}
         except Exception as e:
             logger.error(f"Failed to delete '{target_path}': {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
-        """Gets the content of a text file for previewing."""
+    async def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
+        """Asynchronously gets the content of a text file for previewing."""
         target_path = self._resolve_and_validate_path(relative_path_str)
         if not target_path or not target_path.is_file():
             return {"success": False, "error": "The specified path is not a valid file."}
@@ -288,12 +264,14 @@ class FileManager:
         if target_path.suffix.lower() not in allowed_extensions:
             return {"success": False, "error": "Preview is not allowed for this file type."}
 
-        # Limit preview size to 1MB to prevent performance issues.
         if target_path.stat().st_size > 1024 * 1024:
             return {"success": False, "error": "File is too large to preview (> 1MB)."}
 
         try:
-            content = target_path.read_text(encoding="utf-8")
+            # @fix {PERFORMANCE} read_text() is a blocking I/O call. Offloading
+            # it to a thread ensures the server remains responsive while reading
+            # the file from disk.
+            content = await asyncio.to_thread(target_path.read_text, encoding="utf-8")
             return {"success": True, "path": relative_path_str, "content": content}
         except Exception as e:
             logger.error(f"Failed to read file for preview '{target_path}': {e}", exc_info=True)
