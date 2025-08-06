@@ -41,14 +41,13 @@ from api.models import (
     UiInstallRequest,
     UiNameTypePydantic,
     ModelListItem,
-    # --- FIX: UiStopRequest is no longer needed, it's replaced by UiTaskRequest ---
 )
 
 # --- Core Service Imports ---
 from core.constants.constants import (
     MANAGED_UIS_ROOT_PATH,
     UI_REPOSITORIES,
-    KNOWN_UI_PROFILES,
+    KNOWN_UI_PROFILES,  # <-- Import this constant
 )
 from core.file_manager import FileManager
 from core.file_management.download_tracker import download_tracker
@@ -102,20 +101,7 @@ class UiTaskRequest(BaseModel):
 
 # --- WebSocket Connection Manager ---
 class ConnectionManager:
-    """
-    Manages active WebSocket connections for real-time broadcasting.
-
-    --- ARCHITECTURAL NOTE ---
-    This implementation uses a simple in-memory list of connections, which is
-    perfectly suitable for a local, desktop-style application that runs as a
-    single server process (i.e., with one Uvicorn worker).
-
-    If this application were to be deployed in a multi-worker or distributed
-    environment, this approach would NOT work, as each worker would have its
-    own independent list of connections. A production-grade solution for such a
-    scenario would involve an external message broker like Redis Pub/Sub to
-    handle broadcasting across all server instances.
-    """
+    """Manages active WebSocket connections for real-time broadcasting."""
 
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -133,14 +119,12 @@ class ConnectionManager:
     async def broadcast(self, message: str):
         """Sends a message to all currently connected WebSocket clients."""
         if not self.active_connections:
-            return  # No clients to broadcast to
+            return
 
-        # Iterate over a copy of the list to safely remove disconnected clients
         for connection in list(self.active_connections):
             try:
                 await connection.send_text(message)
             except Exception:
-                # If sending fails, assume the client has disconnected.
                 self.disconnect(connection)
 
 
@@ -165,11 +149,9 @@ async def websocket_endpoint(websocket: WebSocket):
             json.dumps({"type": "initial_state", "downloads": initial_statuses})
         )
         while True:
-            # Keep the connection alive, waiting for messages (if any were implemented)
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        # If this was the last client, clear the callbacks to prevent unnecessary work.
         if not manager.active_connections:
             download_tracker.set_broadcast_callback(None)
             ui_manager.broadcast_callback = None
@@ -208,10 +190,6 @@ async def search_models_endpoint(
             limit=limit,
             page=page,
         )
-        # --- FIX: Pydantic's alias handles the conversion automatically. ---
-        # The ModelListItem now has an alias for `last_modified`, so we can
-        # directly unpack the dictionary from the source manager. Pydantic will
-        # correctly map the `lastModified` key to the `last_modified` field.
         return PaginatedModelListResponse(
             items=[ModelListItem(**m) for m in models_data],
             page=page,
@@ -261,8 +239,10 @@ async def get_config_endpoint():
 )
 async def get_known_ui_profiles_endpoint():
     """
-    Provides the frontend with the backend's single source of truth for
-    default model path structures, eliminating duplicated constants.
+    @fix {DATA_INTEGRITY} Provides the frontend with the backend's single source of truth.
+    This new endpoint serves the KNOWN_UI_PROFILES constant, eliminating the need for
+    a duplicated, hardcoded version in the frontend. This prevents state
+    desynchronization if the backend paths are ever updated.
     """
     return KNOWN_UI_PROFILES
 
@@ -331,10 +311,6 @@ async def cancel_download_endpoint(request: DownloadTaskRequest):
     summary="Dismiss a finished task from the tracker",
 )
 async def dismiss_download_endpoint(request: DownloadTaskRequest):
-    """
-    Removes a completed, failed, or cancelled task from the in-memory
-    DownloadTracker, cleaning up the user's view.
-    """
     await file_manager.dismiss_download(request.download_id)
     return {"success": True, "message": f"Task {request.download_id} dismissed."}
 
@@ -493,7 +469,6 @@ async def run_ui_endpoint(ui_name: UiNameTypePydantic):
     tags=["UIs"],
     summary="Stop a Running UI Process",
 )
-# --- FIX: Use the consistent UiTaskRequest model. ---
 async def stop_ui_endpoint(request: UiTaskRequest):
     await ui_manager.stop_ui(task_id=request.task_id)
     return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
