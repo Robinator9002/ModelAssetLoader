@@ -28,8 +28,6 @@ export interface ModelListItem {
     source: string;
     author?: string | null;
     model_name: string;
-    // This field is snake_case to align with Python conventions,
-    // but the backend model uses an alias to accept 'lastModified' from the source API.
     last_modified?: string | null; // ISO Date String
     tags: string[];
     pipeline_tag?: string | null;
@@ -65,27 +63,9 @@ export interface SearchModelParams {
 }
 
 // --- FileManager & Download Interfaces ---
-
-/**
- * @fix {CRITICAL} Corrected UiNameType to match the backend's single source of truth.
- * The previous type was missing 'Fooocus' and incorrectly had 'ForgeUI' instead of 'Forge'.
- * This prevents runtime errors when interacting with the API for UI management.
- */
 export type UiNameType = 'ComfyUI' | 'A1111' | 'Forge' | 'Fooocus';
-
-/**
- * @fix {CRITICAL} Corrected UiProfileType to match the backend's updated Literal.
- * The previous type was missing 'Forge', which would cause validation errors.
- */
 export type UiProfileType = 'ComfyUI' | 'A1111' | 'Forge' | 'Custom';
-
 export type ColorThemeType = 'dark' | 'light';
-
-/**
- * @fix {CRITICAL} Corrected ModelType to use capitalized strings as expected by the backend.
- * This is a critical fix that resolves the API validation error (HTTP 422) for all download requests.
- * The backend expects values like "Checkpoint", not "checkpoints".
- */
 export type ModelType =
     | 'Checkpoint'
     | 'VAE'
@@ -97,7 +77,6 @@ export type ModelType =
     | 'TextualInversion'
     | 'MotionModule'
     | 'Other';
-
 export type ConfigurationMode = 'automatic' | 'manual';
 
 export interface PathConfigurationRequest {
@@ -174,10 +153,10 @@ export interface ScanHostDirectoriesResponse {
 // --- Interfaces for Local File Management ---
 export interface LocalFileItem {
     name: string;
-    path: string; // Relative path from the base_path
+    path: string;
     item_type: 'file' | 'directory';
-    size: number | null; // Size in bytes, null for directories
-    last_modified: string; // ISO Date String
+    size: number | null;
+    last_modified: string;
 }
 
 export interface FilePreviewResponse {
@@ -203,7 +182,7 @@ export interface AvailableUiItem {
 
 export interface UiInstallRequest {
     ui_name: UiNameType;
-    custom_install_path: string | null; // Path can be null for default installs
+    custom_install_path: string | null;
     set_as_active: boolean;
 }
 
@@ -277,7 +256,7 @@ export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
         return response.data;
     } catch (error) {
         console.error('Error fetching UI statuses:', error);
-        throw error; // Let the caller handle the error state
+        throw error;
     }
 };
 
@@ -441,7 +420,6 @@ export const downloadFileAPI = async (
     } catch (error) {
         const axiosError = error as any;
         if (axiosError.response && axiosError.response.data?.detail) {
-            // Throw a proper error instead of returning a success-like object
             throw new Error(axiosError.response.data.detail);
         }
         throw error;
@@ -507,10 +485,15 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
         return response.data;
     } catch (error) {
         console.error('Error fetching current configuration:', error);
-        throw error; // Let the caller handle the error state
+        throw error;
     }
 };
 
+/**
+ * @fix {DATA_INTEGRITY} New API function to fetch known UI profiles from the backend.
+ * This eliminates the duplicated, hardcoded constant in the frontend, making the
+ * backend the single source of truth for model path structures.
+ */
 export const getKnownUiProfilesAPI = async (): Promise<Record<string, Record<string, string>>> => {
     try {
         const response = await apiClient.get('/filemanager/known-ui-profiles');
