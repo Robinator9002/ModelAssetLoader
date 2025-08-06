@@ -1,16 +1,16 @@
 // frontend/src/components/Files/ConfigurationsPage.tsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-    configurePathsAPI,
+    // Type definitions
     type PathConfigurationRequest,
     type UiProfileType,
     type ModelType,
-    type ColorThemeType,
     type ManagedUiStatus,
     type ConfigurationMode,
     type UiNameType,
 } from '../../api/api';
-import type { AppPathConfig } from '../../App';
+// --- FIX: Import the Zustand store to get centralized state ---
+import { useConfigStore } from '../../state/configStore';
 import FolderSelector from './FolderSelector';
 import {
     Folder,
@@ -23,64 +23,40 @@ import {
     CheckCircle,
     PackageCheck,
     MousePointerClick,
+    Loader2, // Added for loading state
 } from 'lucide-react';
-
-// A frontend copy of the backend's known UI profiles for instant path suggestions.
-const KNOWN_UI_PROFILES: Record<string, Record<string, string>> = {
-    ComfyUI: {
-        checkpoints: 'models/checkpoints',
-        loras: 'models/loras',
-        vae: 'models/vae',
-        clip: 'models/clip',
-        controlnet: 'models/controlnet',
-        embeddings: 'models/embeddings',
-        diffusers: 'models/diffusers',
-        unet: 'models/unet',
-        hypernetworks: 'models/hypernetworks',
-    },
-    A1111: {
-        checkpoints: 'models/Stable-diffusion',
-        loras: 'models/Lora',
-        vae: 'models/VAE',
-        embeddings: 'embeddings',
-        hypernetworks: 'models/hypernetworks',
-        controlnet: 'models/ControlNet',
-    },
-    ForgeUI: {
-        checkpoints: 'models/Stable-diffusion',
-        loras: 'models/Lora',
-        vae: 'models/VAE',
-        embeddings: 'embeddings',
-        hypernetworks: 'models/hypernetworks',
-        controlnet: 'models/ControlNet',
-    },
-};
 
 // Defines the properties for the ConfigurationsPage component.
 interface ConfigurationsPageProps {
-    initialPathConfig: AppPathConfig;
-    onConfigurationSave: (savedConfig: AppPathConfig, savedTheme: ColorThemeType) => void;
-    currentGlobalTheme: ColorThemeType;
+    // --- REFACTOR: These props are no longer needed as the component will get them from the store ---
+    // initialPathConfig: AppPathConfig;
+    // onConfigurationSave: (savedConfig: AppPathConfig, savedTheme: ColorThemeType) => void;
+    // currentGlobalTheme: ColorThemeType;
     managedUis: (ManagedUiStatus & { default_profile_name?: UiProfileType })[];
 }
 
 /**
- * A comprehensive settings page for configuring the application's core functionalities,
- * including file paths and UI integration modes.
+ * A comprehensive settings page for configuring the application's core functionalities.
+ * @refactor This component has been updated to consume its state directly from the
+ * `useConfigStore` instead of receiving it via props. This makes it more self-contained.
  */
-const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
-    initialPathConfig,
-    onConfigurationSave,
-    currentGlobalTheme,
-    managedUis,
-}) => {
-    // --- Component State ---
+const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) => {
+    // --- State from Zustand Store ---
+    const {
+        pathConfig,
+        theme,
+        knownUiProfiles,
+        updateConfiguration,
+        isLoading: isStoreLoading,
+    } = useConfigStore();
+
+    // --- Local Component State ---
     const [configMode, setConfigMode] = useState<ConfigurationMode>('automatic');
     const [manualBasePath, setManualBasePath] = useState<string | null>(null);
     const [selectedProfile, setSelectedProfile] = useState<UiProfileType | null>(null);
     const [selectedManagedUi, setSelectedManagedUi] = useState<UiNameType | null>(null);
     const [modelPaths, setModelPaths] = useState<Partial<Record<ModelType, string>>>({});
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
         null,
     );
@@ -92,22 +68,20 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
 
     // --- Effects ---
 
-    // Synchronize component state with initial props from App.tsx.
+    // Synchronize local component state with the global state from the store.
     useEffect(() => {
-        const { configMode, basePath, uiProfile, customPaths, automaticModeUi } = initialPathConfig;
+        const { configMode, basePath, uiProfile, customPaths, automaticModeUi } = pathConfig;
         setConfigMode(configMode || 'automatic');
         setSelectedProfile(uiProfile || null);
         setModelPaths(customPaths || {});
         setSelectedManagedUi(automaticModeUi || null);
 
-        // In manual mode, the basePath from config is the one to use.
-        // In automatic mode, it's derived, so we only set the manual path state.
         if (configMode === 'manual') {
             setManualBasePath(basePath || null);
         } else {
-            setManualBasePath(null); // Ensure manual path is clear in auto mode
+            setManualBasePath(null);
         }
-    }, [initialPathConfig]);
+    }, [pathConfig]);
 
     // Animate the mode switcher's highlight bar when the mode changes.
     useEffect(() => {
@@ -135,33 +109,41 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
         return manualBasePath;
     }, [configMode, selectedManagedUi, manualBasePath, installedUis]);
 
-    const modelTypesForPaths: ModelType[] = useMemo(
-        () =>
+    const modelTypesForPaths = useMemo(
+        (): ModelType[] =>
             [
-                'checkpoints',
-                'loras',
-                'vae',
-                'embeddings',
-                'controlnet',
-                'diffusers',
-                'clip',
-                'unet',
-                'hypernetworks',
+                'Checkpoint',
+                'LoRA',
+                'VAE',
+                'TextualInversion',
+                'ControlNet',
+                'Upscaler',
+                'Hypernetwork',
+                'LyCORIS',
+                'MotionModule',
             ].sort() as ModelType[],
         [],
     );
 
     // --- Event Handlers ---
 
-    const setProfileAndSuggestPaths = useCallback((profile: UiProfileType | null) => {
-        setSelectedProfile(profile);
-        if (profile && profile !== 'Custom') {
-            const defaultPaths = KNOWN_UI_PROFILES[profile] || {};
-            setModelPaths(defaultPaths);
-        } else if (profile === 'Custom') {
-            setModelPaths({}); // Clear paths for custom to avoid carrying over old settings
-        }
-    }, []);
+    const setProfileAndSuggestPaths = useCallback(
+        (profile: UiProfileType | null) => {
+            setSelectedProfile(profile);
+            /**
+             * @fix {DATA_INTEGRITY} Use the 'knownUiProfiles' from the Zustand store.
+             * This removes the hardcoded constant and ensures the path suggestions
+             * are always in sync with the backend's single source of truth.
+             */
+            if (profile && profile !== 'Custom' && knownUiProfiles[profile]) {
+                const defaultPaths = knownUiProfiles[profile] || {};
+                setModelPaths(defaultPaths);
+            } else if (profile === 'Custom') {
+                setModelPaths({});
+            }
+        },
+        [knownUiProfiles], // Dependency on the fetched profiles
+    );
 
     const handleManagedUiSelect = useCallback(
         (ui: ManagedUiStatus & { default_profile_name?: UiProfileType }) => {
@@ -184,16 +166,15 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
 
     const handleModeChange = (mode: ConfigurationMode) => {
         setConfigMode(mode);
-        // Reset selections when switching modes to prevent invalid states
         setSelectedManagedUi(null);
         setManualBasePath(null);
         setProfileAndSuggestPaths(null);
     };
 
     const handleSaveConfiguration = useCallback(async () => {
+        // Validation logic remains the same
         const isAutomaticModeValid = configMode === 'automatic' && selectedManagedUi;
         const isManualModeValid = configMode === 'manual' && manualBasePath;
-
         if (!isAutomaticModeValid && !isManualModeValid) {
             setFeedback({
                 type: 'error',
@@ -206,7 +187,7 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
             return;
         }
 
-        setIsLoading(true);
+        setIsSaving(true);
         setFeedback(null);
 
         try {
@@ -216,38 +197,23 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                 automatic_mode_ui: configMode === 'automatic' ? selectedManagedUi : null,
                 profile: selectedProfile,
                 custom_model_type_paths: modelPaths as Record<string, string>,
-                color_theme: currentGlobalTheme,
+                color_theme: theme,
             };
 
-            const response = await configurePathsAPI(configToSave);
+            // --- REFACTOR: Call the action from the Zustand store ---
+            await updateConfiguration(configToSave);
 
-            if (response.success && response.current_config) {
-                const newConfig = response.current_config;
-                setFeedback({
-                    type: 'success',
-                    message: response.message || 'Configuration saved successfully!',
-                });
-
-                onConfigurationSave(
-                    {
-                        basePath: newConfig.base_path,
-                        uiProfile: newConfig.profile,
-                        customPaths: newConfig.custom_model_type_paths || {},
-                        configMode: newConfig.config_mode || 'automatic',
-                        automaticModeUi: newConfig.automatic_mode_ui || null,
-                    },
-                    newConfig.color_theme || currentGlobalTheme,
-                );
-            } else {
-                throw new Error(response.error || 'Failed to save configuration.');
-            }
+            setFeedback({
+                type: 'success',
+                message: 'Configuration saved successfully!',
+            });
         } catch (err: any) {
             setFeedback({
                 type: 'error',
                 message: err.message || 'An unknown API error occurred.',
             });
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
             setTimeout(() => setFeedback(null), 5000);
         }
     }, [
@@ -256,17 +222,27 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
         selectedManagedUi,
         selectedProfile,
         modelPaths,
-        currentGlobalTheme,
-        onConfigurationSave,
+        theme,
+        updateConfiguration, // Use the store action
     ]);
 
     // --- Render Logic ---
 
     const isSaveDisabled =
-        isLoading ||
+        isSaving ||
+        isStoreLoading ||
         !selectedProfile ||
         (configMode === 'manual' && !manualBasePath) ||
         (configMode === 'automatic' && !selectedManagedUi);
+
+    if (isStoreLoading) {
+        return (
+            <div className="page-state-container">
+                <Loader2 size={32} className="animate-spin" />
+                <p>Loading settings...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="configurations-page">
@@ -439,7 +415,7 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                                         type="text"
                                         id={`modelPath-${mType}`}
                                         value={modelPaths[mType] || ''}
-                                        placeholder={`e.g., models/${mType}`}
+                                        placeholder={`e.g., models/${mType.toLowerCase()}`}
                                         onChange={(e) =>
                                             handleModelPathChange(mType, e.target.value)
                                         }
@@ -455,7 +431,11 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
             <div className="config-footer">
                 {feedback && (
                     <div className={`feedback-message ${feedback.type}`}>
-                        <AlertTriangle size={16} />
+                        {feedback.type === 'success' ? (
+                            <CheckCircle size={16} />
+                        ) : (
+                            <AlertTriangle size={16} />
+                        )}
                         <span>{feedback.message}</span>
                     </div>
                 )}
@@ -464,8 +444,8 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                     disabled={isSaveDisabled}
                     className="button button-primary save-config-button"
                 >
-                    {isLoading ? <Save size={18} className="animate-spin" /> : <Save size={18} />}
-                    {isLoading ? 'Saving...' : 'Save Configuration'}
+                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    {isSaving ? 'Saving...' : 'Save Configuration'}
                 </button>
             </div>
 
@@ -474,7 +454,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({
                 onSelectFinalPath={(path) => {
                     setManualBasePath(path);
                     setIsFolderSelectorOpen(false);
-                    // When a new base path is selected, reset the profile to force re-selection
                     handleManualProfileSelect(null);
                 }}
                 onCancel={() => setIsFolderSelectorOpen(false)}
