@@ -13,7 +13,7 @@ import {
     type UiNameType,
     type UiInstallRequest,
     type DownloadStatus, // <-- FIX: Import DownloadStatus for typing
-} from '../../api/api';
+} from '~/api';
 import {
     // --- FIX: Corrected store imports to be direct paths ---
     useUiStore,

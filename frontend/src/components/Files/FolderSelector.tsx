@@ -1,6 +1,6 @@
 // frontend/src/components/Layout/FolderSelector.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { scanHostDirectoriesAPI, type HostDirectoryItem } from '../../api/api';
+import { scanHostDirectoriesAPI, type HostDirectoryItem } from '~/api';
 import {
     Folder,
     FolderOpen,

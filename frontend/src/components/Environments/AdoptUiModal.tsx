@@ -8,7 +8,7 @@ import {
     type AvailableUiItem,
     type AdoptionAnalysisResponse,
     type UiAdoptionAnalysisRequest,
-} from '../../api/api';
+} from '~/api';
 import {
     X,
     Folder,

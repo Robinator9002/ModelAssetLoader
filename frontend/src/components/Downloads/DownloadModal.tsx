@@ -1,6 +1,6 @@
 // frontend/src/components/Downloads/DownloadModal.tsx
 import React, { useState, useEffect } from 'react';
-import { type ModelDetails, type ModelFile, type ModelType, downloadFileAPI } from '../../api/api';
+import { type ModelDetails, type ModelFile, type ModelType, downloadFileAPI } from '~/api';
 import { X, Loader2, Download, AlertTriangle } from 'lucide-react';
 
 interface DownloadModalProps {

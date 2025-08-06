@@ -1,7 +1,7 @@
 // frontend/src/components/FileManager/FileItem.tsx
 import React from 'react';
 import { Folder, FileText, Trash2 } from 'lucide-react';
-import { type LocalFileItem } from '../../api/api';
+import { type LocalFileItem } from '~/api';
 
 interface FileItemProps {
     item: LocalFileItem;

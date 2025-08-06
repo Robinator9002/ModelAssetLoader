@@ -1,6 +1,6 @@
 // frontend/src/components/Environments/InstallUiModal.tsx
 import React, { useState, useEffect } from 'react';
-import { type AvailableUiItem, type UiInstallRequest } from '../../api/api';
+import { type AvailableUiItem, type UiInstallRequest } from '~/api';
 import { X, Folder, Download, Loader2, Package, Edit, DownloadCloud } from 'lucide-react';
 import FolderSelector from '../Files/FolderSelector';
 

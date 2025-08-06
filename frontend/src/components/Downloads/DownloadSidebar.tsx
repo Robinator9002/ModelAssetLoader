@@ -1,7 +1,7 @@
 // frontend/src/components/Downloads/DownloadSidebar.tsx
 import React from 'react';
 import { X } from 'lucide-react';
-import { type DownloadStatus } from '../../api/api';
+import { type DownloadStatus } from '~/api';
 import DownloadSidebarItem from './DownloadSidebarItem';
 
 interface DownloadSidebarProps {

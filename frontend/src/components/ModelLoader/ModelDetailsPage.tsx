@@ -4,7 +4,7 @@ import {
     getModelDetails,
     type ModelDetails,
     type ModelListItem,
-} from '../../api/api';
+} from '~/api';
 // --- REFACTOR: Import the new modal store ---
 import { useModalStore } from '../../state/modalStore';
 import ReactMarkdown from 'react-markdown';

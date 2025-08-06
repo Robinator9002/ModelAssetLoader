@@ -15,7 +15,7 @@ import {
     Power,
 } from 'lucide-react';
 import { type DownloadSummaryStatus } from '../../App';
-import { type UiNameType } from '../../api/api';
+import { type UiNameType } from '~/api';
 
 // --- REFACTOR: The key now corresponds to the route path ---
 export interface NavItemConfig {

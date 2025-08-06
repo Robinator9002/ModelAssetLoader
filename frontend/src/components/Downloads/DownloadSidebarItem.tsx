@@ -1,7 +1,7 @@
 // frontend/src/components/Downloads/DownloadSidebarItem.tsx
 import React, { useState } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, X, Ban, Play } from 'lucide-react';
-import { cancelDownloadAPI, cancelUiTaskAPI, stopUiAPI, type DownloadStatus } from '../../api/api';
+import { cancelDownloadAPI, cancelUiTaskAPI, stopUiAPI, type DownloadStatus } from '~/api';
 import ConfirmModal from '../Layout/ConfirmModal';
 
 interface DownloadSidebarItemProps {

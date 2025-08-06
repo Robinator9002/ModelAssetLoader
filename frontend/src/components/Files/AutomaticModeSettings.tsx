@@ -1,6 +1,6 @@
 // frontend/src/components/Files/AutomaticModeSettings.tsx
 import React from 'react';
-import { type UiNameType, type UiProfileType, type ManagedUiStatus } from '../../api/api';
+import { type UiNameType, type UiProfileType, type ManagedUiStatus } from '~/api';
 import { Layers, CheckCircle, Info } from 'lucide-react';
 
 // --- Component Props ---

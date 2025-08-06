@@ -1,6 +1,6 @@
 // frontend/src/components/Files/ManualModeSettings.tsx
 import React, { useState } from 'react';
-import { type UiProfileType } from '../../api/api';
+import { type UiProfileType } from '~/api';
 import FolderSelector from './FolderSelector';
 
 // --- Component Props ---

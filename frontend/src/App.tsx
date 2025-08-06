@@ -23,7 +23,7 @@ import { useTaskStore } from './state/taskStore';
 import { useModalStore } from './state/modalStore';
 
 // --- API & Type Imports ---
-import { type ModelListItem } from './api/api';
+import { type ModelListItem } from '~/api';
 
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
 

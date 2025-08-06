@@ -7,7 +7,7 @@ import {
     // Type definitions from the API layer
     type AvailableUiItem,
     type ManagedUiStatus,
-} from '../api/api';
+} from '~/api';
 
 /**
  * @interface UiState

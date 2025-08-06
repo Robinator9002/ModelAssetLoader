@@ -6,7 +6,7 @@ import {
     deleteManagedItemAPI,
     type LocalFileItem,
     type ViewMode,
-} from '../../api/api';
+} from '~/api';
 // --- REFACTOR: Import Zustand store to get config state ---
 import { useConfigStore } from '../../state/configStore';
 import { Loader2, AlertTriangle, ArrowLeft, RefreshCw, Home, Info } from 'lucide-react';

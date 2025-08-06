@@ -1,6 +1,6 @@
 // frontend/src/state/modalStore.ts
 import { create } from 'zustand';
-import { type ModelDetails, type ModelFile } from '../api/api';
+import { type ModelDetails, type ModelFile } from '~/api';
 
 /**
  * @interface ModalState

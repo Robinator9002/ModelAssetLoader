@@ -7,7 +7,7 @@ import {
     type ModelListItem,
     type PaginatedModelListResponse,
     // --- FIX: Removed unused ModelDetails import ---
-} from '../../api/api';
+} from '~/api';
 // --- REFACTOR: Import the new modal store ---
 import { useModalStore } from '../../state/modalStore';
 // --- REFACTOR: Import the config store to check configuration status ---

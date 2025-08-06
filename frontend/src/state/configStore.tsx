@@ -12,7 +12,7 @@ import {
     type UiNameType,
     type PathConfigurationRequest,
     type ModelType, // <-- Import ModelType for use in the profile dictionary
-} from '../api/api';
+} from '~/api';
 
 /**
  * @interface AppPathConfig

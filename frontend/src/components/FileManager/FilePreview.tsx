@@ -1,6 +1,6 @@
 // frontend/src/components/FileManager/FilePreview.tsx
 import React, { useState, useEffect } from 'react';
-import { getFilePreviewAPI, type LocalFileItem } from '../../api/api';
+import { getFilePreviewAPI, type LocalFileItem } from '~/api';
 import { X, Loader2, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 

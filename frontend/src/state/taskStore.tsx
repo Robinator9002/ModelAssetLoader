@@ -7,7 +7,7 @@ import {
     // Type definitions
     type DownloadStatus,
     type UiNameType,
-} from '../api/api';
+} from '~/api';
 import { useUiStore } from './uiStore';
 import { useConfigStore } from './configStore';
 

@@ -7,7 +7,7 @@ import {
     type ManagedUiStatus,
     type ConfigurationMode,
     type UiNameType,
-} from '../../api/api';
+} from '~/api';
 import { useConfigStore } from '../../state/configStore';
 // --- REFACTOR: Import the new specialized components ---
 import AutomaticModeSettings from './AutomaticModeSettings';
