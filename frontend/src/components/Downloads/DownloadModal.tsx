@@ -11,17 +11,22 @@ interface DownloadModalProps {
     onDownloadsStarted: () => void;
 }
 
+/**
+ * @fix {CRITICAL} Corrected the string literals to match the backend's ModelType.
+ * The values are now capitalized (e.g., 'Checkpoint' instead of 'checkpoints')
+ * to prevent API validation errors (HTTP 422) upon submitting a download request.
+ */
 const COMMON_MODEL_TYPES: ModelType[] = [
-    'checkpoints',
-    'loras',
-    'vae',
-    'embeddings',
-    'controlnet',
-    'diffusers',
-    'clip',
-    'unet',
-    'hypernetworks',
-    'custom',
+    'Checkpoint',
+    'LoRA',
+    'VAE',
+    'TextualInversion', // Corrected from 'embeddings'
+    'ControlNet',
+    'Upscaler', // Added for completeness
+    'Hypernetwork',
+    'LyCORIS', // Added for completeness
+    'MotionModule', // Added for completeness
+    'Other', // Changed from 'custom' to 'Other' to match backend
 ];
 
 const DownloadModal: React.FC<DownloadModalProps> = ({
@@ -38,6 +43,10 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
+    /**
+     * @fix {CRITICAL} Updated the guessing logic to return the correct, capitalized ModelType values.
+     * This ensures that the initial state of the dropdowns is valid according to the API.
+     */
     const guessModelTypeFromFile = (filename: string): ModelType | null => {
         const fnLower = filename.toLowerCase();
         if (
@@ -45,11 +54,15 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
             fnLower.endsWith('.ckpt') ||
             fnLower.endsWith('.safetensors')
         )
-            return 'checkpoints';
-        if (fnLower.includes('lora')) return 'loras';
-        if (fnLower.includes('vae')) return 'vae';
-        if (fnLower.includes('embedding')) return 'embeddings';
-        if (fnLower.includes('controlnet')) return 'controlnet';
+            return 'Checkpoint';
+        if (fnLower.includes('lora')) return 'LoRA';
+        if (fnLower.includes('lycoris')) return 'LyCORIS';
+        if (fnLower.includes('vae')) return 'VAE';
+        if (fnLower.includes('embedding')) return 'TextualInversion';
+        if (fnLower.includes('controlnet')) return 'ControlNet';
+        if (fnLower.includes('upscal')) return 'Upscaler';
+        if (fnLower.includes('hypernetwork')) return 'Hypernetwork';
+        if (fnLower.includes('motion')) return 'MotionModule';
         return null;
     };
 
@@ -61,14 +74,14 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
                 : modelDetails.siblings || [];
 
             filesToConsider.forEach((file) => {
-                const initialModelType = guessModelTypeFromFile(file.rfilename) || 'custom';
+                const initialModelType = guessModelTypeFromFile(file.rfilename) || 'Other';
                 initialSelected[file.rfilename] = {
                     file,
                     modelType: initialModelType,
                     customPath:
-                        initialModelType === 'custom'
+                        initialModelType === 'Other'
                             ? file.rfilename.substring(0, file.rfilename.lastIndexOf('/') + 1) ||
-                              'custom/'
+                              'other/'
                             : undefined,
                 };
             });
@@ -83,7 +96,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
         setSelectedFiles((prev) => {
             const newSelected = { ...prev };
             if (isSelected) {
-                const initialModelType = guessModelTypeFromFile(file.rfilename) || 'custom';
+                const initialModelType = guessModelTypeFromFile(file.rfilename) || 'Other';
                 newSelected[file.rfilename] = { file, modelType: initialModelType };
             } else {
                 delete newSelected[file.rfilename];
@@ -108,14 +121,14 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
         if (isChecked) {
             const allSelected: typeof selectedFiles = {};
             modelDetails?.siblings?.forEach((file) => {
-                const initialModelType = guessModelTypeFromFile(file.rfilename) || 'custom';
+                const initialModelType = guessModelTypeFromFile(file.rfilename) || 'Other';
                 allSelected[file.rfilename] = {
                     file,
                     modelType: initialModelType,
                     customPath:
-                        initialModelType === 'custom'
+                        initialModelType === 'Other'
                             ? file.rfilename.substring(0, file.rfilename.lastIndexOf('/') + 1) ||
-                              'custom/'
+                              'other/'
                             : undefined,
                 };
             });
@@ -137,24 +150,37 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
                 repo_id: modelDetails.id,
                 filename: selection.file.rfilename,
                 model_type: selection.modelType,
-                custom_sub_path:
-                    selection.modelType === 'custom' ? selection.customPath : undefined,
+                custom_sub_path: selection.modelType === 'Other' ? selection.customPath : undefined,
             }),
         );
 
         try {
-            const results = await Promise.all(downloadPromises);
-            const firstError = results.find((res) => !res.success);
-            if (firstError) {
-                throw new Error(firstError.error || 'One or more downloads could not be started.');
+            // We use Promise.allSettled to handle individual failures without stopping all downloads.
+            const results = await Promise.allSettled(downloadPromises);
+
+            // Check if at least one download was initiated successfully.
+            const wasAnySuccess = results.some((res) => res.status === 'fulfilled');
+
+            if (wasAnySuccess) {
+                // Signal the App to take over, which will close this modal and open the sidebar.
+                onDownloadsStarted();
+            } else {
+                // If all promises were rejected, show a generic error.
+                const firstError = results.find((res) => res.status === 'rejected') as
+                    | PromiseRejectedResult
+                    | undefined;
+                throw new Error(
+                    firstError?.reason?.message || 'None of the downloads could be started.',
+                );
             }
-            // This component's responsibility ends here. It signals the App
-            // to take over, which will close this modal and open the sidebar.
-            onDownloadsStarted();
         } catch (err: any) {
             setError(err.message || 'An error occurred while starting downloads.');
         } finally {
-            setIsSubmitting(false);
+            // We don't set isSubmitting to false if successful, as the modal will close.
+            // If there's an error, we allow the user to try again.
+            if (error) {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -256,7 +282,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({
                                                     ))}
                                                 </select>
                                                 {selectedFiles[file.rfilename].modelType ===
-                                                    'custom' && (
+                                                    'Other' && (
                                                     <input
                                                         type="text"
                                                         placeholder="Enter relative path..."
