@@ -6,21 +6,31 @@ import {
     type SearchModelParams,
     type ModelListItem,
     type PaginatedModelListResponse,
-    type ModelDetails,
+    // --- FIX: Removed unused ModelDetails import ---
 } from '../../api/api';
-import { Download, Info, Loader2, ChevronDown, ArrowUp } from 'lucide-react';
+// --- REFACTOR: Import the new modal store ---
+import { useModalStore } from '../../state/modalStore';
+// --- REFACTOR: Import the config store to check configuration status ---
+import { useConfigStore } from '../../state/configStore';
+// --- FIX: Added missing AlertTriangle import ---
+import { Download, Info, Loader2, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react';
 
 interface ModelSearchPageProps {
     onModelSelect: (model: ModelListItem) => void;
-    openDownloadModal: (modelDetails: ModelDetails) => void;
-    isConfigurationDone: boolean;
 }
 
-const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
-    onModelSelect,
-    openDownloadModal,
-    isConfigurationDone,
-}) => {
+/**
+ * @refactor This component is now decoupled from App.tsx for modal control.
+ * It uses the `useModalStore` to open the download modal directly and the
+ * `useConfigStore` to check if the application is configured.
+ */
+const ModelSearchPage: React.FC<ModelSearchPageProps> = ({ onModelSelect }) => {
+    // --- State from Zustand Stores ---
+    const { openDownloadModal } = useModalStore();
+    const { pathConfig } = useConfigStore();
+    const isConfigurationDone = !!pathConfig.basePath;
+
+    // --- Local Component State ---
     const [searchParams, setSearchParams] = useState<SearchModelParams>({
         source: 'huggingface',
         search: '',
@@ -32,7 +42,7 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
         page: 1,
     });
     const [results, setResults] = useState<ModelListItem[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
     const [isFetchingDetails, setIsFetchingDetails] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -42,11 +52,12 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
 
     const resultsContainerRef = useRef<HTMLDivElement>(null);
 
+    // --- Data Fetching ---
     const performSearch = useCallback(
         async (pageToLoad: number, isNewSearch: boolean = false) => {
             if (isNewSearch) {
                 setIsLoading(true);
-                setResults([]); // Clear previous results immediately for a new search
+                setResults([]);
             } else {
                 setIsLoadingMore(true);
             }
@@ -78,6 +89,7 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
         [searchParams],
     );
 
+    // --- Effects ---
     useEffect(() => {
         const handler = setTimeout(() => {
             performSearch(1, true);
@@ -92,6 +104,7 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
         performSearch,
     ]);
 
+    // --- Event Handlers ---
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setSearchParams((prev) => ({
@@ -147,6 +160,7 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
         resultsContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // --- Render Logic ---
     return (
         <div className="model-search-page">
             <form
@@ -179,8 +193,6 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
                             <option value="lastModified">Last Modified</option>
                             <option value="downloads">Downloads</option>
                             <option value="likes">Likes</option>
-                            <option value="author">Author</option>
-                            <option value="id">ID</option>
                         </select>
                     </div>
                     <div className="form-group" style={{ flex: '1' }}>
@@ -205,14 +217,17 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
                 onScroll={handleScroll}
             >
                 {isLoading ? (
-                    <div className="feedback-placeholder">
+                    <div className="page-state-container">
                         <Loader2 size={32} className="animate-spin" />
                         <p>Searching for models...</p>
                     </div>
                 ) : error ? (
-                    <div className="feedback-placeholder error-text">{error}</div>
+                    <div className="page-state-container">
+                        <AlertTriangle size={32} className="icon-error" />
+                        <p>{error}</p>
+                    </div>
                 ) : results.length === 0 ? (
-                    <div className="feedback-placeholder">
+                    <div className="page-state-container">
                         <p>No models found. Try adjusting your search terms.</p>
                     </div>
                 ) : (
@@ -266,11 +281,9 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({
                                 {isLoadingMore ? (
                                     <Loader2 size={20} className="animate-spin" />
                                 ) : (
-                                    <>
-                                        {' '}
-                                        <ChevronDown size={20} /> Load More{' '}
-                                    </>
+                                    <ChevronDown size={20} />
                                 )}
+                                Load More
                             </button>
                         )}
                     </>
