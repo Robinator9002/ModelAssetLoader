@@ -148,7 +148,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     setTheme: (newTheme: ColorThemeType) => {
         set({ theme: newTheme });
         // Persist the theme change to the backend without affecting other settings.
-        configurePathsAPI({ color_theme: newTheme }).catch((error) => {
+        configurePathsAPI({ color_theme: newTheme }).catch((error: any) => {
             console.error('Failed to save theme to backend:', error);
         });
     },

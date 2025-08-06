@@ -58,7 +58,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
 
         console.log('Establishing WebSocket connection...');
-        const ws = connectToDownloadTracker((data) => {
+        const ws = connectToDownloadTracker((data: any) => {
             // --- WebSocket Message Handler ---
             switch (data.type) {
                 case 'initial_state':
