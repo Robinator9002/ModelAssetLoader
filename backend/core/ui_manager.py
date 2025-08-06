@@ -10,7 +10,7 @@ from .ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
 from .ui_management.ui_registry import UiRegistry
 from .ui_management.process_manager import ProcessManager
 from .ui_management.installation_manager import InstallationManager
-from . import ui_operator
+from .ui_management import ui_operator
 
 logger = logging.getLogger(__name__)
 
