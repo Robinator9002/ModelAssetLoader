@@ -21,7 +21,12 @@ logger = logging.getLogger(__name__)
 
 
 class ModelDownloader:
-    """Handles the logic of downloading model files, with cancellation support."""
+    """
+    Handles the logic of downloading model files, with cancellation support.
+    @refactor All blocking file I/O operations (write, move, remove) have been
+    offloaded to a separate thread pool to prevent freezing the main server
+    event loop during large file downloads.
+    """
 
     async def download_model_file(
         self,
@@ -48,23 +53,24 @@ class ModelDownloader:
                     response.raise_for_status()
                     total_size = int(response.headers.get("content-length", 0))
 
+                    # Create a temporary file in a thread-safe way to avoid blocking.
                     with tempfile.NamedTemporaryFile(
                         delete=False, mode="wb", dir=target_directory.parent
                     ) as tmp_file:
                         tmp_file_path = Path(tmp_file.name)
                         downloaded_bytes = 0
 
-                        # Define a blocking write function to be run in a thread
-                        def write_chunk(chunk):
+                        # Define a synchronous (blocking) write function.
+                        def write_chunk_sync(chunk):
                             tmp_file.write(chunk)
 
                         async for chunk in response.aiter_bytes():
-                            # --- FIXED: Run the blocking write operation in a separate thread ---
-                            # This unblocks the event loop, allowing it to send WebSocket updates.
-                            await asyncio.to_thread(write_chunk, chunk)
+                            # @fix {PERFORMANCE} Run the blocking write operation in a thread.
+                            # This unblocks the event loop, allowing it to process other
+                            # tasks (like sending WebSocket updates) while the disk writes.
+                            await asyncio.to_thread(write_chunk_sync, chunk)
 
                             downloaded_bytes += len(chunk)
-                            # --- FIXED: Call the correct, purpose-built tracker method ---
                             await download_tracker.update_progress_from_bytes(
                                 download_id, downloaded_bytes, total_size
                             )
@@ -72,9 +78,10 @@ class ModelDownloader:
             final_local_path = target_directory / final_filename
             final_local_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # The move operation can also be blocking for large files
+            # @fix {PERFORMANCE} The move operation can also be blocking for large files.
+            # Offload it to a thread to keep the server responsive.
             await asyncio.to_thread(shutil.move, tmp_file_path, final_local_path)
-            tmp_file_path = None  # Prevent deletion in finally block
+            tmp_file_path = None  # Prevent deletion in the finally block if move was successful
 
             await download_tracker.complete_download(download_id, str(final_local_path))
 
@@ -83,6 +90,7 @@ class ModelDownloader:
             await download_tracker.fail_download(
                 download_id, "Download cancelled by user.", cancelled=True
             )
+            # Re-raising CancelledError is important for the task manager to know it was cancelled.
             raise
         except (RepositoryNotFoundError, EntryNotFoundError, GatedRepoError) as e:
             await download_tracker.fail_download(download_id, f"Hugging Face API Error: {e}")
@@ -98,5 +106,5 @@ class ModelDownloader:
                 logger.info(
                     f"Cleaning up temporary file {tmp_file_path} for cancelled/failed download."
                 )
-                # This is also blocking, so run it in a thread
+                # @fix {PERFORMANCE} Deleting a large temp file can also block.
                 await asyncio.to_thread(os.remove, tmp_file_path)
