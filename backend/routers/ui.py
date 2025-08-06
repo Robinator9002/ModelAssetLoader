@@ -22,9 +22,9 @@ from api.models import (
 )
 
 # --- Service Imports ---
-from ..dependencies import ui_manager
-from ..core.constants.constants import MANAGED_UIS_ROOT_PATH, UI_REPOSITORIES
-from ..core.file_management.download_tracker import download_tracker
+from dependencies import ui_manager
+from core.constants.constants import MANAGED_UIS_ROOT_PATH, UI_REPOSITORIES
+from core.file_management.download_tracker import download_tracker
 
 logger = logging.getLogger(__name__)
 

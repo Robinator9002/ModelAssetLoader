@@ -7,14 +7,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 # --- Refactored Imports ---
-# Import the application-wide service instances from the central dependencies file.
-from .dependencies import ui_manager
-
 # Import the download_tracker singleton directly.
-from .core.file_management.download_tracker import download_tracker
+from core.file_management.download_tracker import download_tracker
 
 # Import the new API routers.
-from .routers import models, file_manager, ui
+from routers import models, file_manager, ui
 
 # --- Logging Configuration ---
 # Set up a consistent logging format for the entire application.

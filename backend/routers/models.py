@@ -16,7 +16,7 @@ from api.models import (
 # This router needs access to the source_manager to perform its duties.
 # We will create this instance in a central place and import it.
 # For now, we assume it's available from a central dependencies file.
-from ..dependencies import source_manager
+from dependencies import source_manager
 
 logger = logging.getLogger(__name__)
 

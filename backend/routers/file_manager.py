@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 # --- Service Imports ---
 # Import the singleton instance of FileManager from the central dependencies file.
-from ..dependencies import file_manager
+from dependencies import file_manager
 
 logger = logging.getLogger(__name__)
 
