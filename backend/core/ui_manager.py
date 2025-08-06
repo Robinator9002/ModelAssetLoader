@@ -7,12 +7,12 @@ import os
 import signal
 from typing import Optional, Dict, List, Tuple
 
-from backend.api.models import ManagedUiStatus
-from backend.core.constants.constants import UI_REPOSITORIES, UiNameType, CONFIG_FILE_DIR
-from backend.core.file_management.download_tracker import download_tracker, BroadcastCallable
-from backend.core.ui_management import ui_installer, ui_operator
-from backend.core.ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
-from backend.core.ui_management.ui_registry import UiRegistry
+from api.models import ManagedUiStatus
+from core.constants.constants import UI_REPOSITORIES, UiNameType, CONFIG_FILE_DIR
+from core.file_management.download_tracker import download_tracker, BroadcastCallable
+from core.ui_management import ui_installer, ui_operator
+from core.ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
+from core.ui_management.ui_registry import UiRegistry
 
 logger = logging.getLogger(__name__)
 

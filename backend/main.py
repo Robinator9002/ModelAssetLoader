@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # --- API Model Imports ---
-from backend.api.models import (
+from api.models import (
     AdoptionAnalysisResponse,
     AllUiStatusResponse,
     AvailableUiItem,
@@ -45,15 +45,15 @@ from backend.api.models import (
 )
 
 # --- Core Service Imports ---
-from backend.core.constants.constants import (
+from core.constants.constants import (
     MANAGED_UIS_ROOT_PATH,
     UI_REPOSITORIES,
     KNOWN_UI_PROFILES,
 )
-from backend.core.file_manager import FileManager
-from backend.core.file_management.download_tracker import download_tracker
-from backend.core.source_manager import SourceManager
-from backend.core.ui_manager import UiManager
+from core.file_manager import FileManager
+from core.file_management.download_tracker import download_tracker
+from core.source_manager import SourceManager
+from core.ui_manager import UiManager
 
 # --- Logging Configuration ---
 logging.basicConfig(

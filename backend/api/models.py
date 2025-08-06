@@ -75,7 +75,7 @@ class ModelDetails(ModelListItem):
 
 # --- Types for FileManager Configuration and Operations ---
 # Import from constants to ensure single source of truth
-from backend.core.constants.constants import UiNameType, ModelType, UiProfileType, ColorThemeType
+from core.constants.constants import UiNameType, ModelType, UiProfileType, ColorThemeType
 
 UiProfileTypePydantic = UiProfileType
 ModelTypePydantic = ModelType
