@@ -3,27 +3,35 @@ import React, { useState, useEffect } from 'react';
 import {
     getModelDetails,
     type ModelDetails,
-    type ModelFile,
     type ModelListItem,
 } from '../../api/api';
+// --- REFACTOR: Import the new modal store ---
+import { useModalStore } from '../../state/modalStore';
 import ReactMarkdown from 'react-markdown';
 import { Download, ArrowLeft, Loader2, AlertTriangle, FileText, Files } from 'lucide-react';
 
 interface ModelDetailsPageProps {
     selectedModel: ModelListItem;
     onBack: () => void;
-    openDownloadModal: (modelDetails: ModelDetails, specificFile?: ModelFile) => void;
+    // --- REFACTOR: The openDownloadModal prop is no longer needed ---
+    // openDownloadModal: (modelDetails: ModelDetails, specificFile?: ModelFile) => void;
 }
 
-const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({
-    selectedModel,
-    onBack,
-    openDownloadModal,
-}) => {
+/**
+ * @refactor This component is now decoupled from App.tsx for modal control.
+ * It uses the `useModalStore` to open the download modal directly, removing
+ * the need for the `openDownloadModal` prop.
+ */
+const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ selectedModel, onBack }) => {
+    // --- State from Zustand Store ---
+    const { openDownloadModal } = useModalStore();
+
+    // --- Local Component State ---
     const [details, setDetails] = useState<ModelDetails | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
+    // --- Data Fetching ---
     useEffect(() => {
         const fetchDetails = async () => {
             setIsLoading(true);
@@ -40,6 +48,7 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({
         fetchDetails();
     }, [selectedModel]);
 
+    // --- Helper Functions ---
     const formatFileSize = (bytes?: number | null): string => {
         if (bytes === null || typeof bytes === 'undefined' || bytes === 0) return 'N/A';
         const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -47,28 +56,33 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({
         return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${sizes[i]}`;
     };
 
-    if (isLoading)
+    // --- Render Logic ---
+
+    if (isLoading) {
         return (
-            <div className="feedback-placeholder">
+            <div className="page-state-container">
                 <Loader2 size={32} className="animate-spin" />
                 <p>Loading model details...</p>
             </div>
         );
+    }
 
-    if (error)
+    if (error) {
         return (
-            <div className="feedback-placeholder error-text">
-                <AlertTriangle size={32} />
+            <div className="page-state-container">
+                <AlertTriangle size={32} className="icon-error" />
                 <p>{error}</p>
             </div>
         );
+    }
 
-    if (!details)
+    if (!details) {
         return (
-            <div className="feedback-placeholder">
+            <div className="page-state-container">
                 <p>Model details not found.</p>
             </div>
         );
+    }
 
     return (
         <div className="model-details-page">
@@ -88,6 +102,7 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({
                         <h2>
                             <Files size={20} /> Files ({details.siblings?.length || 0})
                         </h2>
+                        {/* --- REFACTOR: Call the store action directly --- */}
                         <button className="button" onClick={() => openDownloadModal(details)}>
                             <Download size={16} />
                             <span>Download All</span>
@@ -102,6 +117,7 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({
                                         {formatFileSize(file.size)}
                                     </span>
                                 </div>
+                                {/* --- REFACTOR: Call the store action directly --- */}
                                 <button
                                     onClick={() => openDownloadModal(details, file)}
                                     className="button-icon"
