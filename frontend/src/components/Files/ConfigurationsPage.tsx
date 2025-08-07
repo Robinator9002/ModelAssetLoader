@@ -8,6 +8,8 @@ import {
     type ConfigurationMode,
 } from '~/api';
 import { useConfigStore } from '../../state/configStore';
+// --- FIX: Import the useUiStore to get access to availableUis ---
+import { useUiStore } from '../../state/uiStore';
 import AutomaticModeSettings from './AutomaticModeSettings';
 import ManualModeSettings from './ManualModeSettings';
 import {
@@ -33,16 +35,13 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
         updateConfiguration,
         isLoading: isStoreLoading,
     } = useConfigStore();
+    // --- FIX: Destructure availableUis from the uiStore ---
+    const { availableUis } = useUiStore();
 
     // --- Local Component State ---
     const [configMode, setConfigMode] = useState<ConfigurationMode>('automatic');
     const [manualBasePath, setManualBasePath] = useState<string | null>(null);
     const [selectedProfile, setSelectedProfile] = useState<UiProfileType | null>(null);
-    /**
-     * @refactor {CRITICAL} This state now stores the unique `installation_id` (a string)
-     * of the selected UI instance, not its generic name (`UiNameType`). This is the
-     * core of the refactoring for this component.
-     */
     const [selectedManagedUiId, setSelectedManagedUiId] = useState<string | null>(null);
     const [modelPaths, setModelPaths] = useState<Partial<Record<ModelType, string>>>({});
     const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -55,13 +54,11 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
     const highlightRef = useRef<HTMLDivElement>(null);
 
     // --- Effects ---
-    // This effect synchronizes the component's local state with the global config store.
     useEffect(() => {
         const { configMode, basePath, uiProfile, customPaths, automaticModeUi } = pathConfig;
         setConfigMode(configMode || 'automatic');
         setSelectedProfile(uiProfile || null);
         setModelPaths(customPaths || {});
-        // --- FIX: Correctly initialize state with the installation_id ---
         setSelectedManagedUiId(automaticModeUi || null);
         if (configMode === 'manual') {
             setManualBasePath(basePath || null);
@@ -70,7 +67,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
         }
     }, [pathConfig]);
 
-    // This effect handles the sliding animation for the mode switcher.
     useEffect(() => {
         if (modeSwitcherRef.current && highlightRef.current) {
             const activeOption = modeSwitcherRef.current.querySelector(
@@ -89,7 +85,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
 
     const effectiveBasePath = useMemo(() => {
         if (configMode === 'automatic') {
-            // --- FIX: Find the selected UI by its `installation_id` ---
             const ui = installedUis.find((u) => u.installation_id === selectedManagedUiId);
             return ui?.install_path || null;
         }
@@ -125,12 +120,9 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
         [knownUiProfiles],
     );
 
-    /**
-     * @refactor {CRITICAL} This handler now receives the full UI instance object
-     * and correctly sets the `installation_id` and the associated UI profile.
-     */
     const handleManagedUiSelect = useCallback(
         (ui: ManagedUiStatus) => {
+            // --- FIX: The `availableUis` variable is now correctly in scope ---
             const uiDetails = availableUis.find((item) => item.ui_name === ui.ui_name);
             setSelectedManagedUiId(ui.installation_id);
             setProfileAndSuggestPaths(uiDetails?.default_profile_name || 'Custom');
@@ -140,14 +132,12 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
 
     const handleModeChange = (mode: ConfigurationMode) => {
         setConfigMode(mode);
-        // Reset selections when switching modes to prevent inconsistent states.
         setSelectedManagedUiId(null);
         setManualBasePath(null);
         setProfileAndSuggestPaths(null);
     };
 
     const handleSaveConfiguration = useCallback(async () => {
-        // --- FIX: Validation logic now correctly checks for the `installation_id` ---
         const isAutomaticModeValid = configMode === 'automatic' && selectedManagedUiId;
         const isManualModeValid = configMode === 'manual' && manualBasePath;
 
@@ -169,7 +159,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
             const configToSave: PathConfigurationRequest = {
                 config_mode: configMode,
                 base_path: configMode === 'manual' ? manualBasePath : null,
-                // --- FIX: Send the `installation_id` to the backend ---
                 automatic_mode_ui: configMode === 'automatic' ? selectedManagedUiId : null,
                 profile: selectedProfile,
                 custom_model_type_paths: modelPaths as Record<string, string>,
@@ -197,7 +186,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
     ]);
 
     // --- Render Logic ---
-    // --- FIX: Save button disabled logic now correctly checks for the `installation_id` ---
     const isSaveDisabled =
         isSaving ||
         isStoreLoading ||
@@ -250,7 +238,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
                             Step 1: Select Managed UI Instance
                         </h2>
                         <div className="config-card-body">
-                            {/* --- FIX: Pass the `installation_id` and correct callback --- */}
                             <AutomaticModeSettings
                                 installedUis={installedUis}
                                 selectedManagedUiId={selectedManagedUiId}
@@ -267,7 +254,6 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
                     />
                 )}
 
-                {/* This card will now only appear if a UI is selected in Automatic mode, or at all times in Manual mode */}
                 {(configMode === 'automatic' && selectedManagedUiId) || configMode === 'manual' ? (
                     <div className={`config-card ${!selectedProfile ? 'disabled-card' : ''}`}>
                         <h2 className="config-card-header">

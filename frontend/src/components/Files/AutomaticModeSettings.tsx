@@ -1,37 +1,37 @@
 // frontend/src/components/Files/AutomaticModeSettings.tsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { type UiNameType, type UiProfileType, type ManagedUiStatus } from '~/api';
+import { type ManagedUiStatus } from '~/api';
 import { Layers, CheckCircle, Download } from 'lucide-react';
 
 // --- Component Props ---
+/**
+ * @refactor {CRITICAL} The props interface has been updated.
+ * - `selectedManagedUi` (by name) is now `selectedManagedUiId` (by unique ID).
+ * - The `onSelectUi` callback now correctly passes the full `ManagedUiStatus` object.
+ * - The type for `installedUis` is simplified as it no longer needs a merged-in property.
+ */
 interface AutomaticModeSettingsProps {
     /** List of all managed UIs that have been successfully installed. */
-    installedUis: (ManagedUiStatus & { default_profile_name?: UiProfileType })[];
-    /** The name of the currently selected UI in automatic mode. */
-    selectedManagedUi: UiNameType | null;
-    /** Callback function to notify the parent when a UI is selected. */
-    onSelectUi: (ui: ManagedUiStatus & { default_profile_name?: UiProfileType }) => void;
+    installedUis: ManagedUiStatus[];
+    /** The unique ID of the currently selected UI instance in automatic mode. */
+    selectedManagedUiId: string | null;
+    /** Callback function to notify the parent when a UI instance is selected. */
+    onSelectUi: (ui: ManagedUiStatus) => void;
 }
 
 /**
  * A specialized component for handling the "Automatic" configuration mode.
- *
- * @refactor This component now includes a user-friendly, guided empty state
- * that appears when no managed UIs are installed. This state provides a clear
- * call-to-action, directing the user to the Environments page.
+ * It now correctly operates on unique UI instances using their `installation_id`.
  */
 const AutomaticModeSettings: React.FC<AutomaticModeSettingsProps> = ({
     installedUis,
-    selectedManagedUi,
+    selectedManagedUiId,
     onSelectUi,
 }) => {
-    // --- NEW: Add the navigate hook for the call-to-action button ---
     const navigate = useNavigate();
 
-    // --- RENDER LOGIC ---
-
-    // If no UIs are installed, render the new empty state call-to-action.
+    // If no UIs are installed, render a user-friendly, guided empty state.
     if (installedUis.length === 0) {
         return (
             <div className="config-empty-state">
@@ -56,32 +56,35 @@ const AutomaticModeSettings: React.FC<AutomaticModeSettingsProps> = ({
     return (
         <>
             <label className="config-label">
-                Select a M.A.L.-managed UI. Its folder will be automatically used as the base path.
+                Select a M.A.L.-managed UI instance. Its folder will be automatically used as the
+                base path.
             </label>
             <div className="profile-selector-grid">
-                {installedUis.map((ui) => (
-                    <div
-                        key={ui.ui_name}
-                        className={`profile-card ${
-                            selectedManagedUi === ui.ui_name ? 'selected' : ''
-                        }`}
-                        onClick={() => onSelectUi(ui)}
-                        tabIndex={0}
-                        role="radio"
-                        aria-checked={selectedManagedUi === ui.ui_name}
-                        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelectUi(ui)}
-                    >
-                        <span className="profile-card-icon">
-                            {selectedManagedUi === ui.ui_name ? (
-                                <CheckCircle size={32} />
-                            ) : (
-                                <Layers size={32} />
-                            )}
-                        </span>
-                        <span className="profile-card-name">{ui.ui_name}</span>
-                        <span className="profile-card-tag">Managed</span>
-                    </div>
-                ))}
+                {installedUis.map((ui) => {
+                    // --- FIX: The selection check is now based on the unique `installation_id` ---
+                    const isSelected = selectedManagedUiId === ui.installation_id;
+                    return (
+                        <div
+                            // --- FIX: The key is now the unique `installation_id` ---
+                            key={ui.installation_id}
+                            className={`profile-card ${isSelected ? 'selected' : ''}`}
+                            onClick={() => onSelectUi(ui)}
+                            tabIndex={0}
+                            role="radio"
+                            aria-checked={isSelected}
+                            onKeyDown={(e) =>
+                                (e.key === 'Enter' || e.key === ' ') && onSelectUi(ui)
+                            }
+                        >
+                            <span className="profile-card-icon">
+                                {isSelected ? <CheckCircle size={32} /> : <Layers size={32} />}
+                            </span>
+                            {/* --- FIX: Display the user-provided `display_name` --- */}
+                            <span className="profile-card-name">{ui.display_name}</span>
+                            <span className="profile-card-tag">{ui.ui_name}</span>
+                        </div>
+                    );
+                })}
             </div>
         </>
     );
