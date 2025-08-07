@@ -46,8 +46,8 @@
 
     /* Responsive Grid Layout */
     display: grid;
-    /* On large screens, create 3 equal-width columns */
-    grid-template-columns: repeat(3, 1fr);
+    /* On large screens, create 2 equal-width columns */
+    grid-template-columns: repeat(2, 1fr);
     gap: calc(var(--spacing-unit) * 3);
     align-items: start; /* Aligns cards to the top of their grid cell */
 }
@@ -126,91 +126,45 @@
     color: var(--color-accent);
 }
 
-.config-hint.error-hint {
-    color: hsl(var(--color-error-hue), 85%, 80%);
-    font-weight: 500;
-}
-
-/* --- Specific Component Styles --- */
-.base-path-selector {
-    display: flex;
-    gap: var(--spacing-unit);
-}
-
-.path-input.config-input {
-    cursor: pointer;
-    background-color: var(--color-background);
-}
-.path-input.config-input:hover {
-    border-color: var(--color-primary);
-}
-
-/* Profile Selection Grid (Automatic Mode) */
-.profile-selector-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: calc(var(--spacing-unit) * 2);
-}
-
-.profile-card {
+/* --- NEW: Styles for Automatic Mode Empty State --- */
+.config-empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    text-align: center;
     gap: var(--spacing-unit);
     padding: calc(var(--spacing-unit) * 2);
-    border: 2px solid var(--color-border);
-    border-radius: var(--border-radius-md);
-    background-color: var(--color-surface-alt);
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    position: relative;
-    text-align: center;
-    min-height: 110px;
+    height: 100%;
+    min-height: 250px; /* Give it some minimum height */
 }
 
-.profile-card:hover {
-    border-color: var(--color-primary);
-    background-color: var(--color-surface);
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-}
-
-.profile-card.selected {
-    border-color: var(--color-primary);
-    background-color: rgba(var(--color-primary-rgb), 0.1);
-    box-shadow: 0 0 0 2px var(--color-primary);
-    transform: translateY(-3px);
-}
-
-.profile-card-icon {
-    color: var(--color-text-secondary);
-    transition: color 0.2s ease-in-out;
-}
-
-.profile-card.selected .profile-card-icon {
+.empty-state-icon {
     color: var(--color-primary);
+    opacity: 0.5;
+    margin-bottom: var(--spacing-unit);
 }
 
-.profile-card-name {
+.empty-state-title {
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--color-text-primary);
+    margin: 0;
 }
 
-.profile-card-tag {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: var(--color-text-on-primary);
-    background-color: var(--color-primary);
-    padding: 2px 6px;
-    border-radius: var(--border-radius-full);
-    position: absolute;
-    top: var(--spacing-unit);
-    right: var(--spacing-unit);
+.empty-state-text {
+    max-width: 80%;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin-bottom: calc(var(--spacing-unit) * 2);
 }
 
-/* Custom Model Paths List */
+.empty-state-button {
+    min-width: 240px;
+    font-size: 1rem;
+}
+
+/* --- Custom Model Paths List --- */
 .custom-paths-list {
     display: grid;
     /* Responsive grid: 2 columns on larger screens, 1 on smaller */
@@ -254,33 +208,4 @@
     min-width: 220px;
     font-size: 1rem;
     padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
-}
-
-/* --- Warning/Info Message Box --- */
-.info-box {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing-unit) * 2);
-    padding: calc(var(--spacing-unit) * 2);
-    border-radius: var(--border-radius-md);
-    background-color: rgba(234, 179, 8, 0.1); /* Yellowish background */
-    border: 1px solid rgba(234, 179, 8, 0.3);
-}
-
-.info-box .icon {
-    color: #eab308; /* Yellow icon color */
-    flex-shrink: 0;
-}
-
-.info-box span {
-    color: #fde047;
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-.light-theme .info-box .icon {
-    color: #a16207;
-}
-.light-theme .info-box span {
-    color: #854d0e;
 }
