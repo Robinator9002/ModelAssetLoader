@@ -6,36 +6,53 @@ import logging
 from core.source_manager import SourceManager
 from core.file_manager import FileManager
 from core.ui_manager import UiManager
+from core.ui_management.ui_registry import UiRegistry
 
 logger = logging.getLogger(__name__)
 
-# --- Service Instantiation ---
+# --- Singleton Service Instantiation ---
 # Here, we create single, application-wide instances of our core services.
-#
-# Rationale:
-# By creating these "singleton" instances in a dedicated, central file, we establish
-# a clear and simple pattern for dependency management. Any part of our application
-# that needs access to a core service (like an API router) can now import it
-# directly from this file.
-#
-# This approach has several advantages:
-# 1.  **Prevents Circular Imports:** It breaks the dependency cycle that would occur
-#     if routers needed to import services from `main.py`, while `main.py` needs
-#     to import the routers.
-# 2.  **Single Source of Truth:** There is only one instance of each manager,
-#     ensuring that all parts of the application share the same state.
-# 3.  **Simplicity:** It's a straightforward and easy-to-understand alternative
-#     to more complex dependency injection frameworks for this application's scale.
+# This is crucial for maintaining a consistent state across the entire app.
 
-logger.info("Instantiating core application services...")
+logger.info("Instantiating core application services for dependency injection...")
 
 try:
+    # 1. Instantiate the UiRegistry first, as it's a shared dependency.
+    # This ensures that both FileManager and UiManager are working with the exact
+    # same list of installed UI environments.
+    ui_registry = UiRegistry()
+
+    # 2. Instantiate the main managers, injecting any shared dependencies.
     source_manager = SourceManager()
-    file_manager = FileManager()
-    ui_manager = UiManager()
+    # We pass the singleton ui_registry to both managers that need it.
+    file_manager = FileManager(ui_registry)
+    ui_manager = UiManager(ui_registry)
+
     logger.info("Core application services instantiated successfully.")
+
 except Exception as e:
     logger.critical(f"Failed to instantiate core services: {e}", exc_info=True)
-    # In a real production scenario, we might want to exit the application here
-    # as it cannot function without these core components.
+    # The application cannot function without these services, so we re-raise.
     raise
+
+
+# --- Dependency Provider Functions ---
+# These functions are the core of the new dependency injection pattern.
+# Instead of importing the instances directly, routers will use FastAPI's
+# `Depends()` with these functions. This makes dependencies explicit and
+# decouples the routers from the instantiation logic.
+
+
+def get_source_manager() -> SourceManager:
+    """Provides the singleton SourceManager instance."""
+    return source_manager
+
+
+def get_file_manager() -> FileManager:
+    """Provides the singleton FileManager instance."""
+    return file_manager
+
+
+def get_ui_manager() -> UiManager:
+    """Provides the singleton UiManager instance."""
+    return ui_manager
