@@ -12,6 +12,9 @@ from ..file_management.download_tracker import download_tracker
 from .ui_registry import UiRegistry
 from . import ui_operator
 
+# --- NEW: Import custom error classes for standardized handling (global import) ---
+from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
+
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
@@ -87,6 +90,8 @@ class ProcessManager:
                 persisted_tasks = json.load(f)
         except (json.JSONDecodeError, IOError) as e:
             logger.error(f"Error reading process registry: {e}. Starting fresh.", exc_info=True)
+            # --- NEW: Wrap in OperationFailedError if this were a public method ---
+            # For internal loading, logging and returning is sufficient.
             return
 
         reconciled_tasks = {}
@@ -116,6 +121,8 @@ class ProcessManager:
                 json.dump(self.running_ui_tasks, f, indent=4)
         except IOError as e:
             logger.error(f"Failed to save process registry: {e}", exc_info=True)
+            # --- NEW: Wrap in OperationFailedError if this were a public method ---
+            # For internal saving, logging is sufficient.
 
     async def _reconcile_tracker_status(self, task_id: str, ui_name: UiNameType):
         """Creates a placeholder task in the tracker for a reconciled process."""
@@ -133,11 +140,17 @@ class ProcessManager:
         """
         Starts a registered UI environment as a managed background process.
         This creates an asyncio task that will run and monitor the subprocess.
+        @refactor: This method now raises EntityNotFoundError or BadRequestError.
         """
         install_path = self.ui_registry.get_path(ui_name)
-        if not install_path or not install_path.exists():
-            self._fail_task_fast(task_id, ui_name, f"Installation path for {ui_name} not found.")
-            return
+        if not install_path:
+            # --- REFACTOR: Raise EntityNotFoundError for missing UI ---
+            raise EntityNotFoundError(entity_name="UI", entity_id=ui_name)
+        if not install_path.exists():
+            # --- REFACTOR: Raise BadRequestError if path doesn't exist ---
+            raise BadRequestError(
+                f"Installation path for UI '{ui_name}' not found at '{install_path}'."
+            )
 
         task = asyncio.create_task(self._run_and_manage_process(ui_name, install_path, task_id))
         download_tracker.start_tracking(task_id, "UI Process", ui_name, task)
@@ -149,15 +162,28 @@ class ProcessManager:
         try:
             ui_info = UI_REPOSITORIES.get(ui_name)
             if not ui_info:
-                raise RuntimeError(f"Unknown UI '{ui_name}'.")
+                # --- REFACTOR: Raise BadRequestError for unknown UI type ---
+                raise BadRequestError(f"UI type '{ui_name}' is not recognized.")
 
             start_script = ui_info.get("start_script")
             if not start_script:
-                raise RuntimeError(f"No 'start_script' defined for {ui_name}.")
+                # --- REFACTOR: Raise OperationFailedError for missing start script config ---
+                raise OperationFailedError(
+                    operation_name="UI Process Start Configuration",
+                    original_exception=ValueError(f"No 'start_script' defined for {ui_name}."),
+                )
 
+            # ui_operator.run_ui is expected to raise MalError on failure now
             process, error_msg = await ui_operator.run_ui(install_path, start_script)
             if not process:
-                raise RuntimeError(error_msg or "UI process failed to start.")
+                # This branch should ideally not be reached if ui_operator raises MalError directly.
+                # However, as a safeguard, if it still returns None, we raise an OperationFailedError.
+                raise OperationFailedError(
+                    operation_name=f"Start UI '{ui_name}' process",
+                    original_exception=Exception(
+                        error_msg or "UI process failed to start unexpectedly."
+                    ),
+                )
 
             # Register the new process in our live and persisted states.
             self.live_processes[task_id] = process
@@ -180,9 +206,23 @@ class ProcessManager:
                 await download_tracker.fail_download(
                     task_id, f"{ui_name} exited with code {process.returncode}."
                 )
+        except asyncio.CancelledError:
+            await download_tracker.fail_download(
+                task_id, "UI process was cancelled by user.", cancelled=True
+            )
+        # --- REFACTOR: Catch MalError first, then generic Exception ---
+        except MalError as e:
+            logger.error(
+                f"UI process for {ui_name} failed with MalError: {e.message}", exc_info=False
+            )
+            await download_tracker.fail_download(task_id, e.message)
         except Exception as e:
-            logger.error(f"Error running process for {ui_name}: {e}", exc_info=True)
-            await download_tracker.fail_download(task_id, str(e))
+            logger.critical(
+                f"An unhandled exception occurred during UI process for {ui_name}!", exc_info=True
+            )
+            await download_tracker.fail_download(
+                task_id, f"A critical internal error occurred: {e}"
+            )
         finally:
             # Clean up the finished process from state and registry.
             self.live_processes.pop(task_id, None)
@@ -192,8 +232,10 @@ class ProcessManager:
                 logger.info(f"Unregistered process for {removed_ui} with PID {removed_pid}.")
 
     async def stop_process(self, task_id: str):
-        """Stops a running UI process by its task ID, whether live or reconciled."""
-        # First, check for a live, managed process object.
+        """
+        Stops a running UI process by its task ID, whether live or reconciled.
+        @refactor: This method now raises OperationFailedError.
+        """
         process = self.live_processes.get(task_id)
         if process:
             logger.info(f"Stopping live process for task {task_id} (PID: {process.pid}).")
@@ -202,6 +244,22 @@ class ProcessManager:
                 await asyncio.wait_for(process.wait(), timeout=10)
             except asyncio.TimeoutError:
                 process.kill()
+                # --- NEW: Raise OperationFailedError if process needs to be killed ---
+                await download_tracker.fail_download(
+                    task_id, f"Process {process.pid} did not terminate gracefully and was killed."
+                )
+                raise OperationFailedError(
+                    operation_name=f"Stop UI task {task_id}",
+                    original_exception=TimeoutError(
+                        f"Process {process.pid} did not terminate gracefully and was killed."
+                    ),
+                )
+            except Exception as e:
+                # --- NEW: Raise OperationFailedError for other termination issues ---
+                await download_tracker.fail_download(task_id, f"Failed to terminate process: {e}")
+                raise OperationFailedError(
+                    operation_name=f"Stop UI task {task_id}", original_exception=e
+                )
             # The finally block in _run_and_manage_process will handle registry cleanup.
             return
 
@@ -213,19 +271,40 @@ class ProcessManager:
                 os.kill(pid, signal.SIGTERM)
             except ProcessLookupError:
                 logger.warning(f"Process with PID {pid} not found, already stopped.")
+                await download_tracker.complete_download(
+                    task_id, f"Process {ui_name} (PID: {pid}) already stopped."
+                )
             except Exception as e:
                 logger.error(f"Failed to stop process with PID {pid}: {e}", exc_info=True)
+                await download_tracker.fail_download(
+                    task_id, f"Failed to stop process with PID {pid}: {e}"
+                )
+                raise OperationFailedError(
+                    operation_name=f"Stop reconciled UI process {ui_name} (PID: {pid})",
+                    original_exception=e,
+                )
 
             # Manually clean up the tracker and registry since the managing task isn't running.
             self.running_ui_tasks.pop(task_id, None)
             self._save_process_registry()
             await download_tracker.complete_download(task_id, f"Stop request sent for {ui_name}.")
+        else:
+            # If task_id is not found in either live_processes or running_ui_tasks
+            logger.warning(f"Attempted to stop task {task_id}, but it was not found as running.")
+            # --- NEW: Raise EntityNotFoundError if task not found ---
+            raise EntityNotFoundError(entity_name="UI Process Task", entity_id=task_id)
 
     # --- Helper Methods ---
 
     def _fail_task_fast(self, task_id: str, ui_name: UiNameType, message: str):
-        """Helper to quickly fail a task that cannot even start."""
+        """
+        Helper to quickly fail a task that cannot even start.
+        @refactor: This method is now less likely to be called directly for start failures
+                   as start_process will raise exceptions.
+        """
         logger.error(message)
+        # This helper is primarily for immediate UI feedback via download_tracker,
+        # not for raising exceptions up the call stack.
         task = asyncio.create_task(download_tracker.fail_download(task_id, message))
         download_tracker.start_tracking(task_id, "UI Process", ui_name, task)
 
@@ -242,6 +321,7 @@ class ProcessManager:
                     if line:
                         logger.debug(f"[{task_id}:{stream_name}] {line}")
                 except Exception as e:
+                    # Log the error but don't re-raise, as streaming should be resilient.
                     logger.warning(f"Error reading stream line from process {process.pid}: {e}")
                     break
 
