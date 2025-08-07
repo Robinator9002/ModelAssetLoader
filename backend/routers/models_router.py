@@ -17,7 +17,13 @@ from dependencies import get_source_manager
 from core.services.source_manager import SourceManager
 
 # --- NEW: Import custom error classes for standardized handling ---
-from core.errors import MalError, EntityNotFoundError, ExternalApiError, OperationFailedError
+from core.errors import (
+    MalError,
+    EntityNotFoundError,
+    ExternalApiError,
+    BadRequestError,
+    OperationFailedError,
+)
 
 # --- NEW: Import specific Hugging Face Hub exceptions for precise error handling ---
 # These imports are necessary for Recipe 2: External API Failures
@@ -110,23 +116,25 @@ async def get_model_details_endpoint(
     """
     try:
         # --- REFACTOR: Use the injected instance 'sm' ---
+        # The sm.get_model_details method is expected to raise MalError (e.g., EntityNotFoundError)
+        # directly if the model is not found or other issues occur.
         details_data = sm.get_model_details(model_id=model_id, source=source)
-        if not details_data:
-            # This check will likely be removed once get_model_details raises EntityNotFoundError
-            # directly instead of returning None for not found cases.
-            raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
         return ModelDetails(**details_data)
     # --- REFACTOR: Apply Recipe 2 for Hugging Face specific errors ---
     except RepositoryNotFoundError:
-        # This is a specific "not found" case from Hugging Face Hub
+        # This is a specific "not found" case from Hugging Face Hub,
+        # which we now explicitly translate to our custom EntityNotFoundError.
         logger.info(f"Model repository '{model_id}' not found via Hugging Face Hub.")
         raise EntityNotFoundError(entity_name="Model", entity_id=model_id)
     except (GatedRepoError, HFValidationError, HfHubHTTPError) as e:
-        # These are general failures from the external Hugging Face API
+        # These are general failures from the external Hugging Face API,
+        # which we now explicitly translate to our custom ExternalApiError.
         logger.error(f"API error for {model_id} from Hugging Face Hub: {e}")
         raise ExternalApiError(service_name="Hugging Face Hub", original_exception=e)
     # --- Keep re-raising HTTPExceptions directly to let FastAPI handle them ---
     except HTTPException:
+        # This block is for HTTPExceptions that might have been raised by FastAPI itself
+        # or intentionally by prior logic (though ideally, we'd use MalError).
         raise
     # --- REFACTOR: Catch custom MalError first for other application-specific errors ---
     except MalError as e:

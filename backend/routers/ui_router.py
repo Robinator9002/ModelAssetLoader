@@ -27,7 +27,7 @@ from core.services.ui_manager import UiManager
 from core.constants.constants import UI_REPOSITORIES
 
 # --- NEW: Import custom error classes for standardized handling ---
-from core.errors import MalError, OperationFailedError, BadRequestError
+from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ router = APIRouter(
 async def list_available_uis_endpoint():
     """Returns a list of all UIs that are defined in the backend constants."""
     # This endpoint is simple and doesn't require the manager or complex error handling.
+    # If UI_REPOSITORIES were to be dynamically loaded and fail, a try-except would be needed.
     return [
         AvailableUiItem(
             ui_name=name,
@@ -74,9 +75,20 @@ async def list_available_uis_endpoint():
 )
 async def get_all_ui_statuses_endpoint(um: UiManager = Depends(get_ui_manager)):
     """Gets the live installation and running status of all managed UIs."""
-    # This endpoint currently doesn't have a try...except block to refactor.
-    # Any errors from um.get_all_statuses would be MalErrors from deeper layers.
-    return AllUiStatusResponse(items=await um.get_all_statuses())
+    try:
+        # Any errors from um.get_all_statuses would be MalErrors from deeper layers.
+        return AllUiStatusResponse(items=await um.get_all_statuses())
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error getting all UI statuses: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(
+            f"An unhandled exception occurred getting all UI statuses: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred while fetching UI statuses.",
+        )
 
 
 @router.post(
@@ -95,34 +107,37 @@ async def install_ui_endpoint(
         install_path = pathlib.Path(request.custom_install_path)
 
     try:
-        # --- REFACTOR: Catch specific errors for path creation/access ---
+        # The responsibility for path creation/validation and raising appropriate
+        # errors (like BadRequestError for invalid paths or OperationFailedError for
+        # permission issues) should ideally be handled within the FileManager or
+        # a dedicated utility, and then propagated as MalError.
+        # Here, we ensure the parent directory exists, and let the service handle deeper issues.
         install_path.parent.mkdir(parents=True, exist_ok=True)
-    except OSError as e:
-        # Catch OSError for issues like permission denied or invalid path.
-        logger.error(f"Failed to create or access install directory {install_path.parent}: {e}")
-        raise BadRequestError(
-            message=f"Invalid installation path or insufficient permissions: {install_path.parent}"
+
+        # Delegate the actual installation logic to the injected ui_manager.
+        # um.install_ui_environment is expected to raise MalError on failure.
+        um.install_ui_environment(
+            ui_name=request.ui_name,
+            install_path=install_path,
+            task_id=task_id,
         )
+
+        return UiActionResponse(
+            success=True,
+            message=f"Installation for {request.ui_name} started.",
+            task_id=task_id,
+            set_as_active_on_completion=request.set_as_active,
+        )
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error during UI installation: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        # Catch any other unexpected errors during path creation.
         logger.critical(
-            f"An unhandled exception occurred during install path creation: {e}", exc_info=True
+            f"An unhandled exception occurred during UI installation: {e}", exc_info=True
         )
-        raise OperationFailedError(operation_name="Create Install Directory", original_exception=e)
-
-    # Delegate the actual installation logic to the injected ui_manager.
-    um.install_ui_environment(
-        ui_name=request.ui_name,
-        install_path=install_path,
-        task_id=task_id,
-    )
-
-    return UiActionResponse(
-        success=True,
-        message=f"Installation for {request.ui_name} started.",
-        task_id=task_id,
-        set_as_active_on_completion=request.set_as_active,
-    )
+        raise HTTPException(
+            status_code=500, detail="An unexpected internal error occurred during UI installation."
+        )
 
 
 @router.post(
@@ -132,16 +147,24 @@ async def install_ui_endpoint(
 )
 async def run_ui_endpoint(ui_name: UiNameTypePydantic, um: UiManager = Depends(get_ui_manager)):
     """Triggers a UI process to start in the background."""
-    # This endpoint currently doesn't have a try...except block to refactor.
-    # Any errors from um.run_ui would be MalErrors from deeper layers.
-    task_id = str(uuid.uuid4())
-    um.run_ui(ui_name=ui_name, task_id=task_id)
-    return UiActionResponse(
-        success=True,
-        message=f"Request to run {ui_name} accepted.",
-        task_id=task_id,
-        set_as_active_on_completion=False,
-    )
+    try:
+        task_id = str(uuid.uuid4())
+        # um.run_ui is expected to raise MalError on failure.
+        um.run_ui(ui_name=ui_name, task_id=task_id)
+        return UiActionResponse(
+            success=True,
+            message=f"Request to run {ui_name} accepted.",
+            task_id=task_id,
+            set_as_active_on_completion=False,
+        )
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error running UI: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(f"An unhandled exception occurred during UI run: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="An unexpected internal error occurred during UI run."
+        )
 
 
 @router.post(
@@ -151,9 +174,18 @@ async def run_ui_endpoint(ui_name: UiNameTypePydantic, um: UiManager = Depends(g
 )
 async def stop_ui_endpoint(request: UiTaskRequest, um: UiManager = Depends(get_ui_manager)):
     """Sends a request to stop a running UI process."""
-    # This endpoint currently doesn't have a try...except block to refactor.
-    await um.stop_ui(task_id=request.task_id)
-    return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
+    try:
+        # um.stop_ui is expected to raise MalError on failure.
+        await um.stop_ui(task_id=request.task_id)
+        return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error stopping UI: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(f"An unhandled exception occurred during UI stop: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="An unexpected internal error occurred during UI stop."
+        )
 
 
 @router.post(
@@ -163,9 +195,24 @@ async def stop_ui_endpoint(request: UiTaskRequest, um: UiManager = Depends(get_u
 )
 async def cancel_ui_task_endpoint(request: UiTaskRequest, um: UiManager = Depends(get_ui_manager)):
     """Sends a cancellation request for an in-progress installation or repair."""
-    # This endpoint currently doesn't have a try...except block to refactor.
-    await um.cancel_ui_task(request.task_id)
-    return {"success": True, "message": f"Cancellation request for UI task {request.task_id} sent."}
+    try:
+        # um.cancel_ui_task is expected to raise MalError on failure.
+        await um.cancel_ui_task(request.task_id)
+        return {
+            "success": True,
+            "message": f"Cancellation request for UI task {request.task_id} sent.",
+        }
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error cancelling UI task: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(
+            f"An unhandled exception occurred during UI task cancellation: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred during UI task cancellation.",
+        )
 
 
 @router.delete(
@@ -176,13 +223,9 @@ async def cancel_ui_task_endpoint(request: UiTaskRequest, um: UiManager = Depend
 async def delete_ui_endpoint(ui_name: UiNameTypePydantic, um: UiManager = Depends(get_ui_manager)):
     """Deletes a UI environment's files from disk and unregisters it."""
     try:
-        # This currently relies on a boolean success from the service.
-        # Once um.delete_environment is refactored to raise MalError,
-        # this check will be removed and errors will be caught below.
-        if not await um.delete_environment(ui_name=ui_name):
-            # For now, keep as HTTPException. This will be refactored once
-            # the underlying service raises OperationFailedError.
-            raise HTTPException(status_code=500, detail=f"Failed to delete {ui_name} environment.")
+        # The um.delete_environment method is expected to raise MalError on failure,
+        # so the explicit success check is removed.
+        await um.delete_environment(ui_name=ui_name)
         return {"success": True, "message": f"{ui_name} environment deleted successfully."}
     # --- REFACTOR: Catch custom MalError first ---
     except MalError as e:
@@ -246,21 +289,34 @@ async def repair_and_adopt_endpoint(
     request: UiAdoptionRepairRequest, um: UiManager = Depends(get_ui_manager)
 ):
     """Triggers a repair-and-adopt process as a background task."""
-    # This endpoint currently doesn't have a try...except block to refactor.
-    # Any errors from um.repair_and_adopt_ui would be MalErrors from deeper layers.
-    task_id = str(uuid.uuid4())
-    um.repair_and_adopt_ui(
-        ui_name=request.ui_name,
-        path=pathlib.Path(request.path),
-        issues_to_fix=request.issues_to_fix,
-        task_id=task_id,
-    )
-    return UiActionResponse(
-        success=True,
-        message=f"Repair process for {request.ui_name} started.",
-        task_id=task_id,
-        set_as_active_on_completion=True,
-    )
+    try:
+        task_id = str(uuid.uuid4())
+        # um.repair_and_adopt_ui is expected to raise MalError on failure.
+        um.repair_and_adopt_ui(
+            ui_name=request.ui_name,
+            path=pathlib.Path(request.path),
+            issues_to_fix=request.issues_to_fix,
+            task_id=task_id,
+        )
+        return UiActionResponse(
+            success=True,
+            message=f"Repair process for {request.ui_name} started.",
+            task_id=task_id,
+            set_as_active_on_completion=True,
+        )
+    except MalError as e:
+        logger.error(
+            f"[{e.error_code}] Error during UI repair and adoption: {e.message}", exc_info=False
+        )
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(
+            f"An unhandled exception occurred during UI repair and adoption: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred during UI repair and adoption.",
+        )
 
 
 @router.post(
@@ -274,13 +330,9 @@ async def finalize_adoption_endpoint(
 ):
     """Finalizes the adoption of a healthy UI by simply registering it."""
     try:
-        # This currently relies on a boolean success from the service.
-        # Once um.finalize_adoption is refactored to raise MalError,
-        # this check will be removed and errors will be caught below.
-        if not um.finalize_adoption(request.ui_name, pathlib.Path(request.path)):
-            # For now, keep as HTTPException. This will be refactored once
-            # the underlying service raises OperationFailedError or BadRequestError.
-            raise HTTPException(status_code=500, detail="Failed to finalize adoption.")
+        # The um.finalize_adoption method is expected to raise MalError on failure,
+        # so the explicit success check is removed.
+        um.finalize_adoption(request.ui_name, pathlib.Path(request.path))
         return {"success": True, "message": f"{request.ui_name} adopted successfully."}
     # --- REFACTOR: Catch custom MalError first ---
     except MalError as e:

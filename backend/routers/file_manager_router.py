@@ -24,7 +24,7 @@ from dependencies import get_file_manager
 from core.services.file_manager import FileManager
 
 # --- NEW: Import custom error classes for standardized handling ---
-from core.errors import MalError, OperationFailedError, BadRequestError
+from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,26 @@ async def get_config_endpoint(fm: FileManager = Depends(get_file_manager)):
     """
     # This endpoint currently doesn't have a try...except block to refactor,
     # as fm.get_current_configuration() is expected to always return a config.
-    return MalFullConfiguration(**fm.get_current_configuration())
+    # If it were to fail, it would likely be a critical internal error.
+    try:
+        return MalFullConfiguration(**fm.get_current_configuration())
+    except MalError as e:
+        # Catch any MalError from the service layer and translate to HTTPException
+        logger.error(
+            f"[{e.error_code}] Error getting file manager configuration: {e.message}",
+            exc_info=False,
+        )
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        # Catch any other unexpected errors
+        logger.critical(
+            f"An unhandled exception occurred getting file manager configuration: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred while fetching configuration.",
+        )
 
 
 @router.post(
@@ -73,26 +92,37 @@ async def configure_paths_endpoint(
     Configures the application's base paths and model folder structure.
     Delegates the logic to the injected file_manager service.
     """
-    # This currently relies on a success boolean from the service.
-    # Once fm.configure_paths is refactored to raise MalError, this
-    # block will be updated to catch MalError.
-    success, message = fm.configure_paths(
-        base_path_str=config_request.base_path,
-        profile=config_request.profile,
-        custom_model_type_paths=config_request.custom_model_type_paths,
-        color_theme=config_request.color_theme,
-        config_mode=config_request.config_mode,
-        automatic_mode_ui=config_request.automatic_mode_ui,
-    )
-    if not success:
-        # For now, keep as HTTPException. This will be refactored once
-        # the underlying service raises BadRequestError or similar.
-        raise HTTPException(status_code=400, detail=message)
-    return PathConfigurationResponse(
-        success=True,
-        message=message,
-        current_config=MalFullConfiguration(**fm.get_current_configuration()),
-    )
+    try:
+        # The fm.configure_paths method is expected to raise MalError on failure,
+        # so the explicit success check is removed.
+        message = fm.configure_paths(
+            base_path_str=config_request.base_path,
+            profile=config_request.profile,
+            custom_model_type_paths=config_request.custom_model_type_paths,
+            color_theme=config_request.color_theme,
+            config_mode=config_request.config_mode,
+            automatic_mode_ui=config_request.automatic_mode_ui,
+        )
+        return PathConfigurationResponse(
+            success=True,
+            message=message,
+            current_config=MalFullConfiguration(**fm.get_current_configuration()),
+        )
+    except MalError as e:
+        # If the underlying service raises a MalError, translate it to an HTTPException
+        # using the error's status code and message.
+        logger.error(
+            f"[{e.error_code}] Error configuring file manager paths: {e.message}", exc_info=False
+        )
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        # Catch any other truly unexpected errors and log them as critical.
+        logger.critical(
+            f"An unhandled exception occurred during file manager configuration: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500, detail="An unexpected internal error occurred during configuration."
+        )
 
 
 @router.post(
@@ -104,25 +134,32 @@ async def download_file_endpoint(
     download_request: FileDownloadRequest, fm: FileManager = Depends(get_file_manager)
 ):
     """Initiates a model file download as a background task."""
-    if not fm.base_path:
-        # This is a specific validation, can remain as HTTPException
-        raise HTTPException(status_code=400, detail="Base path not configured.")
-    # This currently relies on a success dictionary from the service.
-    # Once fm.start_download_model_file is refactored to raise MalError,
-    # this block will be updated to catch MalError.
-    result = fm.start_download_model_file(
-        source=download_request.source,
-        repo_id=download_request.repo_id,
-        filename=download_request.filename,
-        model_type=download_request.model_type,
-        custom_sub_path=download_request.custom_sub_path,
-        revision=download_request.revision,
-    )
-    if not result.get("success"):
-        # For now, keep as HTTPException. This will be refactored once
-        # the underlying service raises OperationFailedError or similar.
-        raise HTTPException(status_code=400, detail=result.get("error", "Download failed."))
-    return FileDownloadResponse(**result)
+    try:
+        # The fm.start_download_model_file method is expected to raise MalError on failure,
+        # so the explicit success check is removed.
+        result = fm.start_download_model_file(
+            source=download_request.source,
+            repo_id=download_request.repo_id,
+            filename=download_request.filename,
+            model_type=download_request.model_type,
+            custom_sub_path=download_request.custom_sub_path,
+            revision=download_request.revision,
+        )
+        return FileDownloadResponse(**result)
+    except MalError as e:
+        # If the underlying service raises a MalError, translate it to an HTTPException
+        # using the error's status code and message.
+        logger.error(f"[{e.error_code}] Error initiating download: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        # Catch any other truly unexpected errors and log them as critical.
+        logger.critical(
+            f"An unhandled exception occurred during download initiation: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred during download initiation.",
+        )
 
 
 @router.post(
@@ -134,9 +171,21 @@ async def cancel_download_endpoint(
     request: DownloadTaskRequest, fm: FileManager = Depends(get_file_manager)
 ):
     """Sends a cancellation request for an in-progress download."""
-    # This endpoint doesn't have a try...except block to refactor.
-    await fm.cancel_download(request.download_id)
-    return {"success": True, "message": f"Cancellation request for {request.download_id} sent."}
+    try:
+        # fm.cancel_download is expected to raise MalError on failure.
+        await fm.cancel_download(request.download_id)
+        return {"success": True, "message": f"Cancellation request for {request.download_id} sent."}
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error cancelling download: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(
+            f"An unhandled exception occurred during download cancellation: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred during download cancellation.",
+        )
 
 
 @router.post(
@@ -148,9 +197,21 @@ async def dismiss_download_endpoint(
     request: DownloadTaskRequest, fm: FileManager = Depends(get_file_manager)
 ):
     """Removes a completed, failed, or cancelled task from the UI."""
-    # This endpoint doesn't have a try...except block to refactor.
-    await fm.dismiss_download(request.download_id)
-    return {"success": True, "message": f"Task {request.download_id} dismissed."}
+    try:
+        # fm.dismiss_download is expected to raise MalError on failure.
+        await fm.dismiss_download(request.download_id)
+        return {"success": True, "message": f"Task {request.download_id} dismissed."}
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error dismissing download: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(
+            f"An unhandled exception occurred during download dismissal: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred during download dismissal.",
+        )
 
 
 @router.get(
@@ -165,16 +226,9 @@ async def scan_host_directories_endpoint(
 ):
     """Endpoint to scan the host filesystem for directories, used by the folder selector."""
     try:
-        # This currently relies on a success dictionary from the service.
-        # Once fm.list_host_directories is refactored to raise MalError,
-        # this check will be removed and errors will be caught below.
+        # The fm.list_host_directories method is expected to raise MalError on failure,
+        # so the explicit success check is removed.
         result = await fm.list_host_directories(path_to_scan_str=path, max_depth=max_depth)
-        if not result.get("success"):
-            # For now, keep as HTTPException. This will be refactored once
-            # the underlying service raises BadRequestError or OperationFailedError.
-            raise HTTPException(
-                status_code=400, detail=result.get("error", "Failed to scan directories.")
-            )
         return ScanHostDirectoriesResponse(**result)
     # --- REFACTOR: Catch custom MalError first ---
     except MalError as e:
@@ -206,13 +260,19 @@ async def list_managed_files_endpoint(
     mode: str = Query("models", enum=["models", "explorer"]),
 ):
     """Lists the contents of the configured base model directory."""
-    if not fm.base_path:
-        # This is a specific validation, can remain as HTTPException
-        raise HTTPException(status_code=400, detail="Base path not configured.")
-    # This endpoint currently doesn't have a try...except block to refactor,
-    # as fm.list_managed_files() is expected to return a list or raise an error
-    # that would be handled by a higher-level middleware if not caught here.
-    return fm.list_managed_files(relative_path_str=path, mode=mode)
+    try:
+        # fm.list_managed_files is expected to raise MalError on failure.
+        return fm.list_managed_files(relative_path_str=path, mode=mode)
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error listing managed files: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(
+            f"An unhandled exception occurred listing managed files: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500, detail="An unexpected internal error occurred while listing files."
+        )
 
 
 @router.delete(
@@ -224,15 +284,19 @@ async def delete_managed_item_endpoint(
     request: LocalFileActionRequest, fm: FileManager = Depends(get_file_manager)
 ):
     """Deletes a file or directory from the managed path."""
-    # This currently relies on a success dictionary from the service.
-    # Once fm.delete_managed_item is refactored to raise MalError,
-    # this block will be updated to catch MalError.
-    result = await fm.delete_managed_item(relative_path_str=request.path)
-    if not result.get("success"):
-        # For now, keep as HTTPException. This will be refactored once
-        # the underlying service raises OperationFailedError or BadRequestError.
-        raise HTTPException(status_code=400, detail=result.get("error", "Deletion failed."))
-    return result
+    try:
+        # The fm.delete_managed_item method is expected to raise MalError on failure,
+        # so the explicit success check is removed.
+        result = await fm.delete_managed_item(relative_path_str=request.path)
+        return result
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error deleting managed item: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(f"An unhandled exception occurred during item deletion: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="An unexpected internal error occurred during deletion."
+        )
 
 
 @router.get(
@@ -244,12 +308,17 @@ async def get_file_preview_endpoint(
     path: str = Query(...), fm: FileManager = Depends(get_file_manager)
 ):
     """Gets the content of a text file for previewing in the UI."""
-    # This currently relies on a success dictionary from the service.
-    # Once fm.get_file_preview is refactored to raise MalError,
-    # this block will be updated to catch MalError.
-    result = await fm.get_file_preview(relative_path_str=path)
-    if not result.get("success"):
-        # For now, keep as HTTPException. This will be refactored once
-        # the underlying service raises EntityNotFoundError or BadRequestError.
-        raise HTTPException(status_code=400, detail=result.get("error", "Preview failed."))
-    return result
+    try:
+        # The fm.get_file_preview method is expected to raise MalError on failure,
+        # so the explicit success check is removed.
+        result = await fm.get_file_preview(relative_path_str=path)
+        return result
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error getting file preview: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(f"An unhandled exception occurred getting file preview: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred while getting file preview.",
+        )
