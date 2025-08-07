@@ -1,5 +1,5 @@
 // frontend/src/components/Environments/useUiManagement.tsx
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback } from 'react'; // --- FIX: Removed unused 'useMemo' import ---
 import {
     // API functions
     installUiAPI,
@@ -13,6 +13,7 @@ import {
     type UiNameType,
     type UiInstallRequest,
     type DownloadStatus,
+    type ManagedUiStatus,
 } from '~/api';
 import { useUiStore } from '../../state/uiStore';
 import { useTaskStore } from '../../state/taskStore';
@@ -22,16 +23,12 @@ import { useTaskStore } from '../../state/taskStore';
  *
  * @description
  * This custom hook encapsulates all the business logic, state management, and
- * API interactions for the UI Environments page. It handles fetching UI data,
- * managing modal states (install, adopt, delete), and orchestrating all user
- * actions like installing, running, stopping, and deleting UIs.
+ * API interactions for the UI Environments page.
  *
- * By extracting this logic from the `UiManagementPage` component, we achieve a
- * clean separation of concerns, making both the logic and the presentation
- * easier to manage and test.
- *
- * @returns An object containing all the state and action handlers needed by the
- * `UiManagementPage` component to render its UI.
+ * @refactor This hook has been significantly updated to manage unique UI instances.
+ * All actions (run, stop, delete) now operate on a specific `installation_id`.
+ * It provides the main `UiManagementPage` with a clean, instance-based dataset
+ * and the functions to interact with each instance.
  */
 export const useUiManagement = () => {
     // --- State from Zustand Stores ---
@@ -42,49 +39,42 @@ export const useUiManagement = () => {
     const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
     const [uiToInstall, setUiToInstall] = useState<AvailableUiItem | null>(null);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [uiToDelete, setUiToDelete] = useState<UiNameType | null>(null);
+    const [uiToDelete, setUiToDelete] = useState<ManagedUiStatus | null>(null);
     const [isAdoptModalOpen, setIsAdoptModalOpen] = useState(false);
 
     // --- Memoized Derived State ---
 
-    // Checks if a UI is involved in a pending or in-progress task.
+    // Checks if a specific UI instance is involved in a pending or in-progress task.
     const isUiBusy = useCallback(
-        (uiName: UiNameType): boolean => {
+        (installationId: string): boolean => {
+            const instance = uiStatuses.find((s) => s.installation_id === installationId);
+            if (!instance) return false;
+
             return Array.from(activeTasks.values()).some(
-                (d: DownloadStatus) =>
-                    d.filename === uiName &&
-                    ['pending', 'downloading', 'running'].includes(d.status),
+                (task: DownloadStatus) =>
+                    // Match running processes by their task ID
+                    (task.repo_id === 'UI Process' &&
+                        instance.running_task_id === task.download_id) ||
+                    // Match install/repair tasks by their display name (filename)
+                    (task.filename === instance.display_name &&
+                        ['pending', 'downloading', 'running'].includes(task.status)),
             );
         },
-        [activeTasks],
+        [activeTasks, uiStatuses],
     );
 
-    // Combines available UI data with live status data for rendering.
-    const combinedUiData = useMemo(() => {
-        const statusMap = new Map(uiStatuses.map((s) => [s.ui_name, s]));
-        return availableUis.map((ui: AvailableUiItem) => {
-            const status = statusMap.get(ui.ui_name);
-            return {
-                ...ui,
-                is_installed: status?.is_installed ?? false,
-                is_running: status?.is_running ?? false,
-                install_path: status?.install_path,
-                running_task_id: status?.running_task_id,
-            };
-        });
-    }, [availableUis, uiStatuses]);
-
-    // --- Action Handlers ---
+    // --- Action Handlers (now instance-based) ---
 
     const handleInstall = useCallback(
         async (request: UiInstallRequest) => {
             try {
                 const response = await installUiAPI(request);
                 if (response.success && response.set_as_active_on_completion) {
+                    // The taskStore will listen for this task's completion to auto-configure
                     addTaskToAutoConfigure(response.task_id);
                 }
             } catch (error: any) {
-                console.error(`Failed to start installation for ${request.ui_name}:`, error);
+                console.error(`Failed to start installation for ${request.display_name}:`, error);
                 // TODO: Implement a user-facing error notification system.
             }
             setIsInstallModalOpen(false);
@@ -92,11 +82,11 @@ export const useUiManagement = () => {
         [addTaskToAutoConfigure],
     );
 
-    const handleRun = useCallback(async (uiName: UiNameType) => {
+    const handleRun = useCallback(async (installationId: string) => {
         try {
-            await runUiAPI(uiName);
+            await runUiAPI(installationId);
         } catch (error: any) {
-            console.error(`Failed to start UI ${uiName}:`, error);
+            console.error(`Failed to start UI instance ${installationId}:`, error);
         }
     }, []);
 
@@ -111,20 +101,21 @@ export const useUiManagement = () => {
     const handleDelete = useCallback(async () => {
         if (!uiToDelete) return;
         try {
-            await deleteUiAPI(uiToDelete);
+            await deleteUiAPI(uiToDelete.installation_id);
             fetchUiData(); // Manually trigger a refresh after deletion.
         } catch (error: any) {
-            console.error(`Failed to delete UI ${uiToDelete}:`, error);
+            console.error(`Failed to delete UI ${uiToDelete.display_name}:`, error);
         }
         setIsDeleteConfirmOpen(false);
         setUiToDelete(null);
     }, [uiToDelete, fetchUiData]);
 
     const handleRepair = useCallback(
-        async (uiName: UiNameType, path: string, issuesToFix: string[]) => {
+        async (uiName: UiNameType, displayName: string, path: string, issuesToFix: string[]) => {
             try {
                 const response = await repairUiAPI({
                     ui_name: uiName,
+                    display_name: displayName,
                     path,
                     issues_to_fix: issuesToFix,
                 });
@@ -132,7 +123,7 @@ export const useUiManagement = () => {
                     addTaskToAutoConfigure(response.task_id);
                 }
             } catch (error: any) {
-                console.error(`Failed to start repair for ${uiName}:`, error);
+                console.error(`Failed to start repair for ${displayName}:`, error);
             }
             setIsAdoptModalOpen(false);
         },
@@ -140,12 +131,12 @@ export const useUiManagement = () => {
     );
 
     const handleFinalizeAdoption = useCallback(
-        async (uiName: UiNameType, path: string) => {
+        async (uiName: UiNameType, displayName: string, path: string) => {
             try {
-                await finalizeAdoptionAPI({ ui_name: uiName, path });
+                await finalizeAdoptionAPI({ ui_name: uiName, display_name: displayName, path });
                 fetchUiData(); // Refresh UI data after successful adoption.
             } catch (error: any) {
-                console.error(`Failed to finalize adoption for ${uiName}:`, error);
+                console.error(`Failed to finalize adoption for ${displayName}:`, error);
             }
             setIsAdoptModalOpen(false);
         },
@@ -158,8 +149,8 @@ export const useUiManagement = () => {
         setIsInstallModalOpen(true);
     };
 
-    const requestDelete = (uiName: UiNameType) => {
-        setUiToDelete(uiName);
+    const requestDelete = (ui: ManagedUiStatus) => {
+        setUiToDelete(ui);
         setIsDeleteConfirmOpen(true);
     };
 
@@ -167,13 +158,13 @@ export const useUiManagement = () => {
     return {
         // State
         isLoading,
-        combinedUiData,
+        installedUis: uiStatuses,
+        availableUis,
         isInstallModalOpen,
         uiToInstall,
         isDeleteConfirmOpen,
         uiToDelete,
         isAdoptModalOpen,
-        availableUis, // Pass this through for the Adopt modal
         // Actions
         isUiBusy,
         handleInstall,
