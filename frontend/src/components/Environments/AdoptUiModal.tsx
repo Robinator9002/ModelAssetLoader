@@ -1,9 +1,7 @@
 // frontend/src/components/Environments/AdoptUiModal.tsx
 import React, { useState, useEffect } from 'react';
 import {
-    // API functions
     analyzeUiForAdoptionAPI,
-    // Type definitions
     type UiNameType,
     type AvailableUiItem,
     type AdoptionAnalysisResponse,
@@ -18,6 +16,7 @@ import {
     AlertTriangle,
     CheckCircle,
     ShieldAlert,
+    CaseSensitive, // --- NEW: Import icon for the new input ---
 } from 'lucide-react';
 import FolderSelector from '../Files/FolderSelector';
 
@@ -26,8 +25,14 @@ interface AdoptUiModalProps {
     isOpen: boolean;
     onClose: () => void;
     availableUis: AvailableUiItem[];
-    onConfirmRepair: (uiName: UiNameType, path: string, issues: string[]) => void;
-    onConfirmFinalize: (uiName: UiNameType, path: string) => void;
+    // --- REFACTOR: Callbacks now include the display_name ---
+    onConfirmRepair: (
+        uiName: UiNameType,
+        displayName: string,
+        path: string,
+        issues: string[],
+    ) => void;
+    onConfirmFinalize: (uiName: UiNameType, displayName: string, path: string) => void;
 }
 
 // --- Helper Types ---
@@ -43,6 +48,8 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
     // --- State Management ---
     const [step, setStep] = useState<ModalStep>('initial');
     const [selectedUiName, setSelectedUiName] = useState<UiNameType | ''>('');
+    // --- NEW: Add state for the user-provided display name ---
+    const [displayName, setDisplayName] = useState<string>('');
     const [selectedPath, setSelectedPath] = useState<string>('');
     const [analysisResult, setAnalysisResult] = useState<AdoptionAnalysisResponse | null>(null);
     const [fixesToApply, setFixesToApply] = useState<Set<string>>(new Set());
@@ -55,6 +62,7 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
         if (isOpen) {
             setStep('initial');
             setSelectedUiName('');
+            setDisplayName(''); // --- NEW: Reset display name ---
             setSelectedPath('');
             setAnalysisResult(null);
             setFixesToApply(new Set());
@@ -62,10 +70,17 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
         }
     }, [isOpen]);
 
+    // --- NEW: Effect to auto-populate display name when UI type is selected ---
+    useEffect(() => {
+        if (selectedUiName) {
+            setDisplayName(selectedUiName);
+        }
+    }, [selectedUiName]);
+
     // --- Event Handlers ---
     const handleAnalyze = async () => {
-        if (!selectedUiName || !selectedPath) {
-            setError('Please select a UI type and a directory path.');
+        if (!selectedUiName || !selectedPath || !displayName.trim()) {
+            setError('Please select a UI type, provide an instance name, and a directory path.');
             return;
         }
         setError(null);
@@ -78,7 +93,6 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
             const result = await analyzeUiForAdoptionAPI(request);
             setAnalysisResult(result);
 
-            // Pre-select all default-enabled fixes.
             const defaultFixes = new Set(
                 result.issues
                     .filter((issue) => issue.is_fixable && issue.default_fix_enabled)
@@ -88,7 +102,7 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
             setStep('diagnosis');
         } catch (err: any) {
             setError(err.message || 'An unknown error occurred during analysis.');
-            setStep('initial'); // Revert to initial step on error
+            setStep('initial');
         }
     };
 
@@ -104,15 +118,16 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
         });
     };
 
+    // --- REFACTOR: Handlers now pass the display name to the callback ---
     const handleRepair = () => {
-        if (!selectedUiName || !selectedPath) return;
-        onConfirmRepair(selectedUiName, selectedPath, Array.from(fixesToApply));
+        if (!selectedUiName || !selectedPath || !displayName.trim()) return;
+        onConfirmRepair(selectedUiName, displayName.trim(), selectedPath, Array.from(fixesToApply));
         onClose();
     };
 
     const handleFinalize = () => {
-        if (!selectedUiName || !selectedPath) return;
-        onConfirmFinalize(selectedUiName, selectedPath);
+        if (!selectedUiName || !selectedPath || !displayName.trim()) return;
+        onConfirmFinalize(selectedUiName, displayName.trim(), selectedPath);
         onClose();
     };
 
@@ -138,6 +153,26 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
                         </option>
                     ))}
                 </select>
+            </div>
+            {/* --- NEW: Display Name Input Field --- */}
+            <div className="form-section">
+                <label htmlFor="displayNameAdopt" className="config-label">
+                    Instance Name
+                </label>
+                <div className="input-with-icon">
+                    <CaseSensitive size={18} className="input-icon" />
+                    <input
+                        type="text"
+                        id="displayNameAdopt"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="e.g., ComfyUI - Legacy"
+                        className="config-input"
+                    />
+                </div>
+                <p className="config-hint">
+                    Give this existing installation a unique, memorable name.
+                </p>
             </div>
             <div className="form-section">
                 <label htmlFor="installPath" className="config-label">
@@ -185,7 +220,7 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
                     <h3>Installation Healthy</h3>
                     <p>
                         This installation appears to be in perfect condition and is ready for
-                        adoption.
+                        adoption as '{displayName}'.
                     </p>
                 </div>
             );
@@ -194,7 +229,7 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
         return (
             <div className="diagnosis-view issues">
                 <HeartPulse size={48} className="icon-warning" />
-                <h3>Diagnosis Report</h3>
+                <h3>Diagnosis Report for '{displayName}'</h3>
                 <p>
                     We found some issues with this installation. You can choose to repair them
                     automatically.
@@ -205,7 +240,6 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
                             key={issue.code}
                             className={issue.is_fixable ? 'fixable' : 'not-fixable'}
                         >
-                            {/* The input remains a sibling to the label, which is correct for the global CSS */}
                             {issue.is_fixable && (
                                 <input
                                     type="checkbox"
@@ -215,7 +249,6 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
                                 />
                             )}
                             <label htmlFor={`fix-${issue.code}`}>
-                                {/* FIX: Wrap the text content in a div to treat it as a single grid item */}
                                 <div className="issue-text-content">
                                     <strong>{issue.message}</strong>
                                     {issue.is_fixable && <span>{issue.fix_description}</span>}
@@ -247,6 +280,9 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
     };
 
     const renderModalActions = () => {
+        const isAnalyzeDisabled =
+            !selectedUiName || !selectedPath || !displayName.trim() || step === 'analyzing';
+
         if (step === 'initial' || step === 'analyzing') {
             return (
                 <>
@@ -256,7 +292,7 @@ const AdoptUiModal: React.FC<AdoptUiModalProps> = ({
                     <button
                         onClick={handleAnalyze}
                         className="button button-primary"
-                        disabled={!selectedUiName || !selectedPath || step === 'analyzing'}
+                        disabled={isAnalyzeDisabled}
                     >
                         {step === 'analyzing' ? (
                             <Loader2 size={18} className="animate-spin" />
