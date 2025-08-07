@@ -1,27 +1,22 @@
 // frontend/src/components/ModelLoader/ModelSearchPage.tsx
 import React from 'react';
-// --- REFACTOR: Import the new custom hook ---
+// --- FIX: Import useNavigate to handle navigation directly ---
+import { useNavigate } from 'react-router-dom';
 import { useModelSearch } from './useModelSearch';
-
-// --- Component & Icon Imports ---
 import { type ModelListItem } from '~/api';
 import { Download, Info, Loader2, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react';
 
-interface ModelSearchPageProps {
-    onModelSelect: (model: ModelListItem) => void;
-}
+// --- FIX: The onModelSelect prop is no longer needed ---
+interface ModelSearchPageProps {}
 
 /**
- * @refactor This component has been completely refactored to be a "presentational"
- * or "dumb" component. All of its complex state management, data fetching, and
- * event handling logic has been extracted into the `useModelSearch` custom hook.
- *
- * The component's sole responsibility is now to render the UI based on the state
- * and functions provided by the hook, making it significantly cleaner and more
- * focused on the view layer.
+ * @refactor This component is now even simpler. Instead of calling a prop
+ * to set state in a parent component, it uses the `useNavigate` hook to
+ * directly navigate to the details page. This decouples it completely from App.tsx.
  */
-const ModelSearchPage: React.FC<ModelSearchPageProps> = ({ onModelSelect }) => {
-    // --- REFACTOR: All logic is now encapsulated in this single hook call ---
+const ModelSearchPage: React.FC<ModelSearchPageProps> = () => {
+    // --- Hooks ---
+    const navigate = useNavigate();
     const {
         searchParams,
         results,
@@ -40,6 +35,12 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({ onModelSelect }) => {
         handleScroll,
         scrollToTop,
     } = useModelSearch();
+
+    // --- Action Handlers ---
+    // --- FIX: This new handler navigates directly to the model details page ---
+    const handleModelSelect = (model: ModelListItem) => {
+        navigate(`/search/${model.source}/${model.id}`);
+    };
 
     // --- Render Logic ---
     return (
@@ -117,7 +118,8 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({ onModelSelect }) => {
                             <div
                                 key={model.id}
                                 className="result-item"
-                                onClick={() => onModelSelect(model)}
+                                // --- FIX: The main click action now navigates directly ---
+                                onClick={() => handleModelSelect(model)}
                             >
                                 <div className="result-item-info">
                                     <h3>{model.model_name}</h3>
@@ -129,7 +131,8 @@ const ModelSearchPage: React.FC<ModelSearchPageProps> = ({ onModelSelect }) => {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            onModelSelect(model);
+                                            // --- FIX: The info button also navigates ---
+                                            handleModelSelect(model);
                                         }}
                                         className="button-icon"
                                         title="View Details"

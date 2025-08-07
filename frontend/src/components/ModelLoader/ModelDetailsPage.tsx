@@ -1,28 +1,33 @@
 // frontend/src/components/ModelLoader/ModelDetailsPage.tsx
 import React, { useState, useEffect } from 'react';
+// --- FIX: Import useParams to read the model ID from the URL ---
+import { useParams, useNavigate } from 'react-router-dom';
 import {
     getModelDetails,
     type ModelDetails,
-    type ModelListItem,
+    type ModelFile, // --- FIX: Explicitly import ModelFile for clarity ---
 } from '~/api';
-// --- REFACTOR: Import the new modal store ---
 import { useModalStore } from '../../state/modalStore';
 import ReactMarkdown from 'react-markdown';
 import { Download, ArrowLeft, Loader2, AlertTriangle, FileText, Files } from 'lucide-react';
 
+// --- FIX: The component no longer needs to receive the selected model as a prop ---
 interface ModelDetailsPageProps {
-    selectedModel: ModelListItem;
     onBack: () => void;
-    // --- REFACTOR: The openDownloadModal prop is no longer needed ---
-    // openDownloadModal: (modelDetails: ModelDetails, specificFile?: ModelFile) => void;
 }
 
 /**
- * @refactor This component is now decoupled from App.tsx for modal control.
- * It uses the `useModalStore` to open the download modal directly, removing
- * the need for the `openDownloadModal` prop.
+ * @refactor This component is now self-sufficient. It uses `useParams`
+ * from react-router-dom to get the model's source and ID directly from the URL.
+ * This makes it independent of the parent component's state, solving the
+ * redirect loop and allowing for direct navigation and page refreshes.
  */
-const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ selectedModel, onBack }) => {
+const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ onBack }) => {
+    // --- Hooks ---
+    // --- FIX: Get routing parameters and navigation function from the router ---
+    const { source, modelId } = useParams<{ source: string; modelId: string }>();
+    const navigate = useNavigate();
+
     // --- State from Zustand Store ---
     const { openDownloadModal } = useModalStore();
 
@@ -33,20 +38,30 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ selectedModel, onBa
 
     // --- Data Fetching ---
     useEffect(() => {
+        // --- FIX: Fetch details using parameters from the URL. ---
+        // If source or modelId are missing, we can't fetch data, so redirect.
+        if (!source || !modelId) {
+            console.error('Missing source or modelId in URL, redirecting.');
+            navigate('/search');
+            return;
+        }
+
         const fetchDetails = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                const data = await getModelDetails(selectedModel.source, selectedModel.id);
+                // --- FIX: Use the URL params for the API call ---
+                const data = await getModelDetails(source, modelId);
                 setDetails(data);
             } catch (err: any) {
                 setError(err.message || 'Failed to load model details.');
+                console.error(err);
             } finally {
                 setIsLoading(false);
             }
         };
         fetchDetails();
-    }, [selectedModel]);
+    }, [source, modelId, navigate]); // --- FIX: Dependency array now relies on URL params ---
 
     // --- Helper Functions ---
     const formatFileSize = (bytes?: number | null): string => {
@@ -72,6 +87,9 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ selectedModel, onBa
             <div className="page-state-container">
                 <AlertTriangle size={32} className="icon-error" />
                 <p>{error}</p>
+                <button onClick={onBack} className="button mt-4">
+                    Back to Search
+                </button>
             </div>
         );
     }
@@ -80,6 +98,9 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ selectedModel, onBa
         return (
             <div className="page-state-container">
                 <p>Model details not found.</p>
+                <button onClick={onBack} className="button mt-4">
+                    Back to Search
+                </button>
             </div>
         );
     }
@@ -102,14 +123,13 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ selectedModel, onBa
                         <h2>
                             <Files size={20} /> Files ({details.siblings?.length || 0})
                         </h2>
-                        {/* --- REFACTOR: Call the store action directly --- */}
                         <button className="button" onClick={() => openDownloadModal(details)}>
                             <Download size={16} />
                             <span>Download All</span>
                         </button>
                     </header>
                     <ul className="files-list">
-                        {details.siblings?.map((file) => (
+                        {details.siblings?.map((file: ModelFile) => (
                             <li key={file.rfilename} className="file-item">
                                 <div className="file-item-info">
                                     <span className="file-item-name">{file.rfilename}</span>
@@ -117,7 +137,6 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ selectedModel, onBa
                                         {formatFileSize(file.size)}
                                     </span>
                                 </div>
-                                {/* --- REFACTOR: Call the store action directly --- */}
                                 <button
                                     onClick={() => openDownloadModal(details, file)}
                                     className="button-icon"

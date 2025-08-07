@@ -145,12 +145,14 @@ function AppContent() {
                         <p className="page-state-container">Loading configuration...</p>
                     ) : (
                         <Routes>
+                            {/* --- FIX: Redirect the root path to a default page --- */}
+                            {/* This makes `/search` the official landing page of the application. */}
+                            <Route path="/" element={<Navigate to="/search" replace />} />
+
                             <Route
                                 path="/search"
                                 element={<ModelSearchPage onModelSelect={setSelectedModel} />}
                             />
-                            {/* --- FIX: Pass the required 'selectedModel' prop to the component --- */}
-                            {/* If a user lands on this URL directly, selectedModel will be null, so we redirect them. */}
                             <Route
                                 path="/search/:source/:modelId"
                                 element={
@@ -170,7 +172,12 @@ function AppContent() {
                                 path="/configuration"
                                 element={<ConfigurationsPage managedUis={uiStatuses} />}
                             />
-                            <Route path="*" element={<UiManagementPage />} />
+
+                            {/* --- FIX: The wildcard route now redirects to the default page --- */}
+                            {/* This is a much safer pattern. Instead of rendering a component and trapping the user on a */}
+                            {/* potentially invalid URL, it redirects them to a known, valid location. This solves the issue */}
+                            {/* of getting stuck. */}
+                            <Route path="*" element={<Navigate to="/search" replace />} />
                         </Routes>
                     )}
                 </main>
