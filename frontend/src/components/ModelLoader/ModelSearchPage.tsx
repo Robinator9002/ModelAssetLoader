@@ -1,18 +1,10 @@
 // frontend/src/components/ModelLoader/ModelSearchPage.tsx
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import {
-    searchModels,
-    getModelDetails,
-    type SearchModelParams,
-    type ModelListItem,
-    type PaginatedModelListResponse,
-    // --- FIX: Removed unused ModelDetails import ---
-} from '~/api';
-// --- REFACTOR: Import the new modal store ---
-import { useModalStore } from '../../state/modalStore';
-// --- REFACTOR: Import the config store to check configuration status ---
-import { useConfigStore } from '../../state/configStore';
-// --- FIX: Added missing AlertTriangle import ---
+import React from 'react';
+// --- REFACTOR: Import the new custom hook ---
+import { useModelSearch } from './useModelSearch';
+
+// --- Component & Icon Imports ---
+import { type ModelListItem } from '~/api';
 import { Download, Info, Loader2, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react';
 
 interface ModelSearchPageProps {
@@ -20,145 +12,34 @@ interface ModelSearchPageProps {
 }
 
 /**
- * @refactor This component is now decoupled from App.tsx for modal control.
- * It uses the `useModalStore` to open the download modal directly and the
- * `useConfigStore` to check if the application is configured.
+ * @refactor This component has been completely refactored to be a "presentational"
+ * or "dumb" component. All of its complex state management, data fetching, and
+ * event handling logic has been extracted into the `useModelSearch` custom hook.
+ *
+ * The component's sole responsibility is now to render the UI based on the state
+ * and functions provided by the hook, making it significantly cleaner and more
+ * focused on the view layer.
  */
 const ModelSearchPage: React.FC<ModelSearchPageProps> = ({ onModelSelect }) => {
-    // --- State from Zustand Stores ---
-    const { openDownloadModal } = useModalStore();
-    const { pathConfig } = useConfigStore();
-    const isConfigurationDone = !!pathConfig.basePath;
-
-    // --- Local Component State ---
-    const [searchParams, setSearchParams] = useState<SearchModelParams>({
-        source: 'huggingface',
-        search: '',
-        author: '',
-        tags: [],
-        sort: 'lastModified',
-        direction: -1,
-        limit: 25,
-        page: 1,
-    });
-    const [results, setResults] = useState<ModelListItem[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
-    const [isFetchingDetails, setIsFetchingDetails] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [hasMore, setHasMore] = useState<boolean>(false);
-    const [currentPage, setCurrentPage] = useState<number>(1);
-    const [showScrollTop, setShowScrollTop] = useState(false);
-
-    const resultsContainerRef = useRef<HTMLDivElement>(null);
-
-    // --- Data Fetching ---
-    const performSearch = useCallback(
-        async (pageToLoad: number, isNewSearch: boolean = false) => {
-            if (isNewSearch) {
-                setIsLoading(true);
-                setResults([]);
-            } else {
-                setIsLoadingMore(true);
-            }
-            setError(null);
-
-            try {
-                const response: PaginatedModelListResponse = await searchModels({
-                    ...searchParams,
-                    page: pageToLoad,
-                });
-
-                if (response.items) {
-                    setResults((prev) =>
-                        isNewSearch ? response.items : [...prev, ...response.items],
-                    );
-                    setHasMore(response.has_more);
-                    setCurrentPage(pageToLoad);
-                } else {
-                    throw new Error('Invalid response from server.');
-                }
-            } catch (err) {
-                setError('Failed to search for models. Please try again later.');
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-                setIsLoadingMore(false);
-            }
-        },
-        [searchParams],
-    );
-
-    // --- Effects ---
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            performSearch(1, true);
-        }, 500);
-        return () => clearTimeout(handler);
-    }, [
-        searchParams.search,
-        searchParams.author,
-        searchParams.tags,
-        searchParams.sort,
-        searchParams.direction,
+    // --- REFACTOR: All logic is now encapsulated in this single hook call ---
+    const {
+        searchParams,
+        results,
+        isLoading,
+        isLoadingMore,
+        isFetchingDetails,
+        error,
+        hasMore,
+        isConfigurationDone,
+        showScrollTop,
+        resultsContainerRef,
+        handleInputChange,
         performSearch,
-    ]);
-
-    // --- Event Handlers ---
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setSearchParams((prev) => ({
-            ...prev,
-            page: 1,
-            [name]:
-                name === 'tags'
-                    ? value
-                          .split(',')
-                          .map((t) => t.trim())
-                          .filter(Boolean)
-                    : name === 'direction'
-                    ? parseInt(value, 10)
-                    : value,
-        }));
-    };
-
-    const handleLoadMore = () => {
-        if (hasMore && !isLoading && !isLoadingMore) {
-            performSearch(currentPage + 1);
-        }
-    };
-
-    const handleDirectDownloadClick = async (e: React.MouseEvent, model: ModelListItem) => {
-        e.stopPropagation();
-        if (!isConfigurationDone) {
-            alert('Please configure the base path in the settings first.');
-            return;
-        }
-        setIsFetchingDetails(model.id);
-        setError(null);
-        try {
-            const details = await getModelDetails(model.source, model.id);
-            if (details) {
-                openDownloadModal(details);
-            } else {
-                throw new Error(`Could not load details for ${model.id}.`);
-            }
-        } catch (err: any) {
-            setError(`Error fetching details for ${model.id}: ${err.message}`);
-        } finally {
-            setIsFetchingDetails(null);
-        }
-    };
-
-    const handleScroll = () => {
-        if (resultsContainerRef.current) {
-            setShowScrollTop(resultsContainerRef.current.scrollTop > 300);
-        }
-    };
-
-    const scrollToTop = () => {
-        resultsContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+        handleLoadMore,
+        handleDirectDownloadClick,
+        handleScroll,
+        scrollToTop,
+    } = useModelSearch();
 
     // --- Render Logic ---
     return (
