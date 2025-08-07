@@ -1,27 +1,24 @@
-# backend/routers/models.py
+# backend/routers/models_router.py
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+# --- REFACTOR: Import Depends for dependency injection ---
+from fastapi import APIRouter, HTTPException, Query, Depends
 
 # --- API Model Imports ---
-# Import the specific Pydantic models needed for these endpoints.
 from api.models import (
     ModelDetails,
     PaginatedModelListResponse,
     ModelListItem,
 )
 
-# --- Service Imports ---
-# This router needs access to the source_manager to perform its duties.
-# We will create this instance in a central place and import it.
-# For now, we assume it's available from a central dependencies file.
-from dependencies import source_manager
+# --- REFACTOR: Import the provider function and the service class for type hinting ---
+from dependencies import get_source_manager
+from core.source_manager import SourceManager
 
 logger = logging.getLogger(__name__)
 
 # Create an APIRouter instance. This is like a mini-FastAPI app.
-# All routes defined here will be prefixed with '/api', and grouped under the 'Models' tag in the docs.
 router = APIRouter(
     prefix="/api",
     tags=["Models"],
@@ -37,6 +34,9 @@ router = APIRouter(
     summary="Search Models from a Source",
 )
 async def search_models_endpoint(
+    # --- REFACTOR: Inject the SourceManager instance ---
+    sm: SourceManager = Depends(get_source_manager),
+    # Query parameters remain the same
     source: str = Query("huggingface"),
     search: Optional[str] = Query(None),
     author: Optional[str] = Query(None),
@@ -48,14 +48,12 @@ async def search_models_endpoint(
 ):
     """
     Endpoint for searching and paginating models from a given source.
-
-    This function was moved from main.py to this router to improve code
-    organization and separation of concerns. It delegates the actual search
-    logic to the `source_manager`.
+    It now delegates the search logic to the injected `source_manager`.
     """
     try:
         unique_tags = list(set(tags)) if tags else None
-        models_data, has_more = source_manager.search_models(
+        # --- REFACTOR: Use the injected instance 'sm' ---
+        models_data, has_more = sm.search_models(
             source=source,
             search_query=search,
             author=author,
@@ -81,15 +79,16 @@ async def search_models_endpoint(
     response_model=ModelDetails,
     summary="Get Model Details from a Source",
 )
-async def get_model_details_endpoint(source: str, model_id: str):
+async def get_model_details_endpoint(
+    source: str, model_id: str, sm: SourceManager = Depends(get_source_manager)
+):
     """
     Endpoint for retrieving detailed information about a specific model.
-
-    This function was also moved from main.py. It delegates the detail
-    retrieval logic to the `source_manager`.
+    It now delegates the detail retrieval logic to the injected `source_manager`.
     """
     try:
-        details_data = source_manager.get_model_details(model_id=model_id, source=source)
+        # --- REFACTOR: Use the injected instance 'sm' ---
+        details_data = sm.get_model_details(model_id=model_id, source=source)
         if not details_data:
             raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
         return ModelDetails(**details_data)
