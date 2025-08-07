@@ -44,18 +44,18 @@ M.A.L. is more than just a downloader. The goal is for it to be the central hub 
 -   [x] Add Adoption Mechanic for existing installations.
 -   [x] Implement robust cancellation for UI downloads and fix process start functionality.
 
-#### ⏳ **Phase 3: Architectural Rework** `(Close to Finish)`
+#### ✅ **Phase 3: Architectural Rework** `(Finished)`
 
 -   [x] Decomposed UI Management into specialized services (Process, Installation).
 -   [x] Decomposed File Management into specialized services (Filesystem, Downloader).
 -   [x] Refactored all API endpoints into domain-specific routers.
 -   [x] Established a dedicated, reusable API service layer on the frontend.
 -   [x] Implemented robust, decoupled state management with Zustand.
--   [ ] Formalize Dependency Injection with FastAPI `Depends`.
--   [ ] Create a new, custom error handling System.
--   [ ] Abstract complex frontend logic into custom hooks.
+-   [x] Formalize Dependency Injection with FastAPI `Depends`.
+-   [x] Create a new, custom error handling System.
+-   [x] Abstract complex frontend logic into custom hooks.
 
-#### 🎯 **Phase 4: Core Improvements** `(Starting Soon)`
+#### 🎯 **Phase 4: Core Improvements** `(Starting Now)`
 
 -   [ ] Overwork UI Management to allow changing paths and stacking multiple versions of one UI.
 -   [ ] Fix the start button for every individual AI and give better feedback during startup.
