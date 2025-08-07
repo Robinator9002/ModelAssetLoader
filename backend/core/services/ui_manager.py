@@ -5,13 +5,13 @@ import pathlib
 from typing import List
 
 from api.models import ManagedUiStatus
-from .constants.constants import UiNameType
-from .ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
-from .ui_management.ui_registry import UiRegistry
-from .ui_management.process_manager import ProcessManager
-from .ui_management.installation_manager import InstallationManager
-from .ui_management import ui_operator
-from .ui_management.ui_registry import UiRegistry
+from core.constants.constants import UiNameType
+from core.ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
+from core.ui_management.ui_registry import UiRegistry
+from core.ui_management.process_manager import ProcessManager
+from core.ui_management.installation_manager import InstallationManager
+from core.ui_management import ui_operator
+from core.ui_management.ui_registry import UiRegistry
 
 # --- NEW: Import custom error classes for standardized handling ---
 from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError

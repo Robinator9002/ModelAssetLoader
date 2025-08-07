@@ -7,14 +7,14 @@ from typing import Dict, Any, Optional, List, Tuple
 
 # --- Refactored Imports ---
 # Import the new, specialized class for filesystem operations.
-from .file_management.managed_file_system import ManagedFileSystem
-from .ui_management.ui_registry import UiRegistry
-from .file_management.config_manager import ConfigManager
-from .file_management.path_resolver import PathResolver
-from .file_management.model_downloader import ModelDownloader
-from .file_management.host_scanner import HostScanner
-from .file_management.download_tracker import download_tracker
-from .constants.constants import (
+from core.file_management.managed_file_system import ManagedFileSystem
+from core.ui_management.ui_registry import UiRegistry
+from core.file_management.config_manager import ConfigManager
+from core.file_management.path_resolver import PathResolver
+from core.file_management.model_downloader import ModelDownloader
+from core.file_management.host_scanner import HostScanner
+from core.file_management.download_tracker import download_tracker
+from core.constants.constants import (
     ModelType,
     UiProfileType,
     ColorThemeType,

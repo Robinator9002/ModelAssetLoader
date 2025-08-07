@@ -2,9 +2,9 @@
 import logging
 from typing import List, Dict, Optional, Any, Tuple
 
-from .sources.base import APISource
-from .sources.hf_source import HuggingFaceSource
-from .ui_management.ui_registry import UiRegistry
+from core.sources.base import APISource
+from core.sources.hf_source import HuggingFaceSource
+from core.ui_management.ui_registry import UiRegistry
 # --- NEW: Import custom error classes for standardized handling ---
 from core.errors import BadRequestError
 
