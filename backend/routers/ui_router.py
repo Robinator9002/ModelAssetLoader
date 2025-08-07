@@ -23,7 +23,7 @@ from api.models import (
 
 # --- REFACTOR: Import the provider function and the service class for type hinting ---
 from dependencies import get_ui_manager
-from core.ui_manager import UiManager
+from core.services.ui_manager import UiManager
 from core.constants.constants import UI_REPOSITORIES
 
 # --- NEW: Import custom error classes for standardized handling ---

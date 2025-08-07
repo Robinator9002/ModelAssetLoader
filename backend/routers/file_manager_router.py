@@ -21,7 +21,7 @@ from api.models import (
 
 # --- REFACTOR: Import the provider function and the service class for type hinting ---
 from dependencies import get_file_manager
-from core.file_manager import FileManager
+from core.services.file_manager import FileManager
 
 # --- NEW: Import custom error classes for standardized handling ---
 from core.errors import MalError, OperationFailedError, BadRequestError

@@ -3,9 +3,9 @@ import logging
 
 # --- Core Service Imports ---
 # Import the main manager classes that represent our application's core services.
-from core.source_manager import SourceManager
-from core.file_manager import FileManager
-from core.ui_manager import UiManager
+from core.services.source_manager import SourceManager
+from core.services.file_manager import FileManager
+from core.services.ui_manager import UiManager
 from core.ui_management.ui_registry import UiRegistry
 
 logger = logging.getLogger(__name__)

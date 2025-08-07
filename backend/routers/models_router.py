@@ -14,7 +14,7 @@ from api.models import (
 
 # --- REFACTOR: Import the provider function and the service class for type hinting ---
 from dependencies import get_source_manager
-from core.source_manager import SourceManager
+from core.services.source_manager import SourceManager
 
 # --- NEW: Import custom error classes for standardized handling ---
 from core.errors import MalError, EntityNotFoundError, ExternalApiError, OperationFailedError
