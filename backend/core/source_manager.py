@@ -4,6 +4,9 @@ from typing import List, Dict, Optional, Any, Tuple
 
 from .sources.base import APISource
 from .sources.hf_source import HuggingFaceSource
+from .ui_management.ui_registry import UiRegistry
+# --- NEW: Import custom error classes for standardized handling ---
+from core.errors import BadRequestError
 
 # To add a new source (e.g., Civitai):
 # 1. Create a `civitai_source.py` that implements `APISource`.
@@ -55,16 +58,21 @@ class SourceManager:
 
         Returns:
             A tuple of (results_list, has_more_flag).
+        @refactor: This method now raises BadRequestError for unregistered sources.
         """
         # For now, default to 'huggingface' if no source is specified.
         # A multi-source search would require more complex logic for merging and pagination.
         target_source_name = source or "huggingface"
 
         if target_source_name not in self.sources:
-            raise ValueError(f"Source '{target_source_name}' is not registered.")
+            # --- REFACTOR: Raise BadRequestError for an invalid source ---
+            raise BadRequestError(f"Source '{target_source_name}' is not registered or supported.")
 
         logger.info(f"Delegating search to '{target_source_name}' source.")
         target_source = self.sources[target_source_name]
+        # The search_models method of the target_source (e.g., HuggingFaceSource)
+        # will be refactored to raise ExternalApiError or other MalErrors.
+        # This method will then simply propagate those errors.
         return target_source.search_models(**kwargs)
 
     def get_model_details(self, model_id: str, source: str) -> Optional[Dict[str, Any]]:
@@ -77,13 +85,19 @@ class SourceManager:
 
         Returns:
             A dictionary with detailed model information, or None if not found.
+        @refactor: This method now raises BadRequestError for unregistered sources,
+        and delegates to the source which will raise EntityNotFoundError or ExternalApiError.
         """
         if source not in self.sources:
+            # --- REFACTOR: Raise BadRequestError for an invalid source ---
             logger.error(
                 f"Attempted to get details from unregistered source: '{source}'"
             )
-            return None
+            raise BadRequestError(f"Source '{source}' is not registered or supported.")
 
         logger.info(f"Delegating detail request for '{model_id}' to '{source}' source.")
         target_source = self.sources[source]
+        # The get_model_details method of the target_source (e.g., HuggingFaceSource)
+        # will be refactored to raise EntityNotFoundError or ExternalApiError.
+        # This method will then simply propagate those errors.
         return target_source.get_model_details(model_id=model_id)

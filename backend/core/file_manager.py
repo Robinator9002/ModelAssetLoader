@@ -20,6 +20,9 @@ from .constants.constants import (
     ColorThemeType,
 )
 
+# --- NEW: Import custom error classes for standardized handling ---
+from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,13 +37,13 @@ class FileManager:
     role is now to coordinate between its various specialized sub-managers.
     """
 
-    def __init__(self):
+    def __init__(self, ui_registry: UiRegistry):
         """
         Initializes all the specialized manager components, including the new
         ManagedFileSystem for direct file operations.
         """
         # 1. Create the single source of truth for UI paths.
-        self.ui_registry = UiRegistry()
+        self.ui_registry = ui_registry
         # 2. Initialize the configuration manager, giving it access to the registry.
         self.config = ConfigManager(ui_registry=self.ui_registry)
         # 3. Initialize all other specialized managers.
@@ -64,6 +67,7 @@ class FileManager:
 
     def get_current_configuration(self) -> Dict[str, Any]:
         """Gets the full, current application configuration."""
+        # This method is expected to always succeed in returning a configuration.
         return self.config.get_current_configuration()
 
     def configure_paths(
@@ -75,7 +79,12 @@ class FileManager:
         config_mode: Optional[str] = None,
         automatic_mode_ui: Optional[str] = None,
     ) -> Tuple[bool, str]:
-        """Configures the application paths and settings by delegating to the ConfigManager."""
+        """
+        Configures the application paths and settings by delegating to the ConfigManager.
+        @refactor: This method still returns a success boolean and message for now.
+        It will be refactored to raise exceptions directly once ConfigManager.update_configuration
+        is updated to raise MalError.
+        """
         changed, message = self.config.update_configuration(
             base_path_str,
             profile,
@@ -84,6 +93,7 @@ class FileManager:
             config_mode,
             automatic_mode_ui,
         )
+        # For now, retain the success check. Once ConfigManager raises errors, this will change.
         success = "failed" not in message
         return success, message
 
@@ -99,18 +109,30 @@ class FileManager:
         custom_sub_path: Optional[str] = None,
         revision: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Starts a model file download as a background task."""
+        """
+        Starts a model file download as a background task.
+        @refactor: This method now raises BadRequestError instead of returning error dictionaries.
+        """
         if source != "huggingface":
-            return {"success": False, "error": f"Source '{source}' is not supported."}
+            raise BadRequestError(message=f"Source '{source}' is not supported for downloads.")
         if not self.base_path:
-            return {"success": False, "error": "Base path is not configured."}
+            raise BadRequestError(
+                message="Base path is not configured. Please configure it before downloading."
+            )
 
         final_save_path = self.paths.resolve_final_save_path(filename, model_type, custom_sub_path)
         if not final_save_path:
-            return {"success": False, "error": f"Could not resolve save path for '{model_type}'."}
+            raise OperationFailedError(
+                operation_name="Resolve Download Path",
+                original_exception=Exception(
+                    f"Could not resolve save path for model type '{model_type}' and filename '{filename}'."
+                ),
+            )
 
         download_id = str(uuid.uuid4())
         download_task = asyncio.create_task(
+            # The downloader.download_model_file method will be refactored to raise MalError directly.
+            # This call here will then propagate that error up if it's not handled within the task itself.
             self.downloader.download_model_file(
                 download_id=download_id,
                 repo_id=repo_id,
@@ -127,6 +149,8 @@ class FileManager:
             task=download_task,
         )
         logger.info(f"Queued download {download_id} for '{filename}' -> '{final_save_path}'.")
+        # Return a success dictionary as this is a background task initiation,
+        # and the actual download success/failure is tracked via download_tracker.
         return {"success": True, "message": "Download started.", "download_id": download_id}
 
     async def cancel_download(self, download_id: str):
@@ -145,7 +169,14 @@ class FileManager:
     async def list_host_directories(
         self, path_to_scan_str: Optional[str] = None, max_depth: int = 1
     ) -> Dict[str, Any]:
-        """Asynchronously lists directories on the host system."""
+        """
+        Asynchronously lists directories on the host system.
+        @refactor: This method now directly returns the result of the scanner,
+        assuming the scanner will raise MalError on failure.
+        """
+        # The scanner.list_host_directories method will be refactored to raise MalError
+        # (e.g., BadRequestError if path is invalid, OperationFailedError for other issues).
+        # This method will then simply return its result, letting errors bubble up.
         return await self.scanner.list_host_directories(path_to_scan_str, max_depth)
 
     # --- DELEGATED FILE SYSTEM OPERATIONS ---
@@ -155,13 +186,31 @@ class FileManager:
     def list_managed_files(
         self, relative_path_str: Optional[str], mode: str = "explorer"
     ) -> Dict[str, Any]:
-        """Delegates the listing of managed files to the filesystem manager."""
+        """
+        Delegates the listing of managed files to the filesystem manager.
+        @refactor: This method now directly returns the result of the filesystem manager,
+        assuming the filesystem manager will raise MalError on failure.
+        """
+        # The fs.list_managed_files method will be refactored to raise MalError
+        # (e.g., BadRequestError for invalid paths, OperationFailedError for other issues).
         return self.fs.list_managed_files(relative_path_str, mode)
 
     async def delete_managed_item(self, relative_path_str: str) -> Dict[str, Any]:
-        """Delegates the deletion of a managed item to the filesystem manager."""
+        """
+        Delegates the deletion of a managed item to the filesystem manager.
+        @refactor: This method now directly returns the result of the filesystem manager,
+        assuming the filesystem manager will raise MalError on failure.
+        """
+        # The fs.delete_managed_item method will be refactored to raise MalError
+        # (e.g., EntityNotFoundError if item not found, OperationFailedError for deletion issues).
         return await self.fs.delete_managed_item(relative_path_str)
 
     async def get_file_preview(self, relative_path_str: str) -> Dict[str, Any]:
-        """Delegates fetching a file preview to the filesystem manager."""
+        """
+        Delegates fetching a file preview to the filesystem manager.
+        @refactor: This method now directly returns the result of the filesystem manager,
+        assuming the filesystem manager will raise MalError on failure.
+        """
+        # The fs.get_file_preview method will be refactored to raise MalError
+        # (e.g., EntityNotFoundError if file not found, BadRequestError if not a text file).
         return await self.fs.get_file_preview(relative_path_str)
