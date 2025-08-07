@@ -1,7 +1,6 @@
 // frontend/src/api/services/ui.tsx
 import apiClient from '../client';
 import type {
-    UiNameType,
     AvailableUiItem,
     AllUiStatusResponse,
     UiInstallRequest,
@@ -70,14 +69,18 @@ export const installUiAPI = async (request: UiInstallRequest): Promise<UiActionR
 };
 
 /**
- * Sends a request to run an installed UI.
- * @param {UiNameType} uiName - The name of the UI to run.
+ * @refactor {CRITICAL} Updated function to accept `installationId` instead of `uiName`.
+ * This aligns with the backend's instance-based routing.
+ *
+ * Sends a request to run an installed UI instance.
+ * @param {string} installationId - The unique ID of the UI instance to run.
  * @returns {Promise<UiActionResponse>} A promise that resolves with the response from the server, including a task ID.
  * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
  */
-export const runUiAPI = async (uiName: UiNameType): Promise<UiActionResponse> => {
+export const runUiAPI = async (installationId: string): Promise<UiActionResponse> => {
     try {
-        const response = await apiClient.post<UiActionResponse>(`/uis/${uiName}/run`);
+        // --- FIX: The URL now uses the installationId parameter ---
+        const response = await apiClient.post<UiActionResponse>(`/uis/run/${installationId}`);
         return response.data;
     } catch (error) {
         const axiosError = error as any;
@@ -132,16 +135,20 @@ export const cancelUiTaskAPI = async (
 };
 
 /**
- * Sends a request to delete/uninstall a UI.
- * @param {UiNameType} uiName - The name of the UI to delete.
+ * @refactor {CRITICAL} Updated function to accept `installationId` instead of `uiName`.
+ * This aligns with the backend's instance-based routing for deletion.
+ *
+ * Sends a request to delete/uninstall a UI instance.
+ * @param {string} installationId - The unique ID of the UI instance to delete.
  * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
  * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
  */
 export const deleteUiAPI = async (
-    uiName: UiNameType,
+    installationId: string,
 ): Promise<{ success: boolean; message: string }> => {
     try {
-        const response = await apiClient.delete(`/uis/${uiName}`);
+        // --- FIX: The URL now uses the installationId parameter for the DELETE request ---
+        const response = await apiClient.delete(`/uis/${installationId}`);
         return response.data;
     } catch (error) {
         const axiosError = error as any;
