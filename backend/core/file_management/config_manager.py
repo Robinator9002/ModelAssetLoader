@@ -13,6 +13,9 @@ from ..constants.constants import (
     UiNameType,
 )
 
+# --- NEW: Import custom error classes for standardized handling (global import) ---
+from core.errors import MalError, OperationFailedError, BadRequestError
+
 ConfigurationMode = Literal["automatic", "manual"]
 logger = logging.getLogger(__name__)
 
@@ -56,7 +59,12 @@ class ConfigManager:
         return self._manual_base_path
 
     def _load_config(self):
-        """Loads configuration from the JSON file if it exists."""
+        """
+        Loads configuration from the JSON file if it exists.
+        @refactor: Error handling remains as logging and resetting to defaults,
+                   as this is a non-critical startup operation where graceful
+                   recovery is preferred over crashing.
+        """
         if not CONFIG_FILE_PATH.exists():
             logger.info("Configuration file not found. Using default settings.")
             return
@@ -80,28 +88,42 @@ class ConfigManager:
         except (json.JSONDecodeError, TypeError) as e:
             logger.error(f"Error reading configuration file: {e}. Using defaults.")
             self._reset_to_defaults()
+        except Exception as e:
+            # Catch any other unexpected errors during config loading
+            logger.critical(
+                f"An unhandled exception occurred during config loading: {e}", exc_info=True
+            )
+            self._reset_to_defaults()
 
     def _save_config(self):
-        """Saves the current configuration to the JSON file."""
-        CONFIG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        # --- MODIFIED: We now use the property to get the effective base_path ---
-        # The saved 'base_path' in the JSON should reflect the *effective* path at save time.
-        # This is important for the frontend to correctly display the current path.
-        config_data = {
-            "base_path": str(self.base_path) if self.base_path else None,
-            "ui_profile": self.ui_profile,
-            "custom_model_type_paths": self.custom_model_type_paths,
-            "color_theme": self.color_theme,
-            "config_mode": self.config_mode,
-            "automatic_mode_ui": self.automatic_mode_ui,
-        }
-
+        """
+        Saves the current configuration to the JSON file.
+        @refactor: Error handling remains as logging, as this is a background
+                   persistence operation where logging is sufficient.
+        """
         try:
+            CONFIG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            # --- MODIFIED: We now use the property to get the effective base_path ---
+            # The saved 'base_path' in the JSON should reflect the *effective* path at save time.
+            # This is important for the frontend to correctly display the current path.
+            config_data = {
+                "base_path": str(self.base_path) if self.base_path else None,
+                "ui_profile": self.ui_profile,
+                "custom_model_type_paths": self.custom_model_type_paths,
+                "color_theme": self.color_theme,
+                "config_mode": self.config_mode,
+                "automatic_mode_ui": self.automatic_mode_ui,
+            }
+
             with open(CONFIG_FILE_PATH, "w") as f:
                 json.dump(config_data, f, indent=4)
             logger.info(f"Configuration saved to {CONFIG_FILE_PATH}")
         except IOError as e:
-            logger.error(f"Error saving configuration file: {e}")
+            logger.error(f"Error saving configuration file: {e}", exc_info=True)
+        except Exception as e:
+            logger.critical(
+                f"An unhandled exception occurred during config saving: {e}", exc_info=True
+            )
 
     def _reset_to_defaults(self):
         """Resets the configuration to a clean default state."""
@@ -133,9 +155,12 @@ class ConfigManager:
         color_theme: Optional[ColorThemeType],
         config_mode: Optional[ConfigurationMode],
         automatic_mode_ui: Optional[UiNameType],
-    ) -> Tuple[bool, str]:
+    ) -> (
+        None
+    ):  # --- REFACTOR: Changed return type from Tuple[bool, str] to None, will raise on failure ---
         """
         Updates and saves the configuration based on user input.
+        @refactor: Now raises BadRequestError for invalid input.
         """
         changed = False
 
@@ -152,9 +177,9 @@ class ConfigManager:
             new_manual_path = pathlib.Path(base_path_str) if base_path_str else None
             if new_manual_path != self._manual_base_path:
                 if new_manual_path and not new_manual_path.is_dir():
-                    return (
-                        False,
-                        f"Error: The provided base path '{new_manual_path}' is not a valid directory.",
+                    # --- REFACTOR: Raise BadRequestError for invalid directory ---
+                    raise BadRequestError(
+                        message=f"The provided base path '{new_manual_path}' is not a valid directory."
                     )
                 self._manual_base_path = new_manual_path
                 self.automatic_mode_ui = None
@@ -176,7 +201,12 @@ class ConfigManager:
             changed = True
 
         if changed:
-            self._save_config()
-            return True, "Configuration updated successfully."
-
-        return False, "No changes detected in configuration."
+            try:
+                self._save_config()
+            except Exception as e:  # Catch any errors during saving the config
+                raise OperationFailedError(
+                    operation_name="Save Configuration",
+                    original_exception=e,
+                    message="Failed to save configuration after update.",
+                ) from e
+            # --- REFACTOR: No return needed on success ---
