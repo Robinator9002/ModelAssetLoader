@@ -76,7 +76,8 @@ export interface PathConfigurationRequest {
     custom_model_type_paths?: Record<string, string> | null;
     color_theme?: ColorThemeType | null;
     config_mode?: ConfigurationMode | null;
-    automatic_mode_ui?: UiNameType | null;
+    // --- REFACTOR: This now sends the unique ID of the installation ---
+    automatic_mode_ui?: string | null;
 }
 
 export interface MalFullConfiguration {
@@ -85,7 +86,8 @@ export interface MalFullConfiguration {
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
     config_mode: ConfigurationMode | null;
-    automatic_mode_ui: UiNameType | null;
+    // --- REFACTOR: This now holds the unique ID of the installation ---
+    automatic_mode_ui: string | null;
 }
 
 export interface PathConfigurationResponse {
@@ -177,11 +179,17 @@ export interface AvailableUiItem {
 
 export interface UiInstallRequest {
     ui_name: UiNameType;
+    // --- NEW: Add a user-provided name for the new instance ---
+    display_name: string;
     custom_install_path: string | null;
     set_as_active: boolean;
 }
 
 export interface ManagedUiStatus {
+    // --- NEW: Add the unique ID and display name for the instance ---
+    installation_id: string;
+    display_name: string;
+    // --- The ui_name now refers to the *type* of UI (e.g., ComfyUI) ---
     ui_name: UiNameType;
     is_installed: boolean;
     is_running: boolean;
@@ -222,12 +230,16 @@ export interface UiAdoptionAnalysisRequest {
 }
 
 export interface UiAdoptionRepairRequest {
+    // --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameType;
+    display_name: string;
     path: string;
     issues_to_fix: string[];
 }
 
 export interface UiAdoptionFinalizeRequest {
+    // --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameType;
+    display_name: string;
     path: string;
 }
