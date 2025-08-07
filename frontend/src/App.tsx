@@ -15,7 +15,8 @@ import FileManagerPage from './components/FileManager/FileManagerPage';
 import UiManagementPage from './components/Environments/UiManagementPage';
 import appIcon from '/icon.png';
 
-// --- Zustand Store Imports ---
+// --- API & Store Imports ---
+import { runUiAPI, stopUiAPI } from '~/api'; // <-- NEW: Import API functions for quick start
 import { useConfigStore } from './state/configStore';
 import { useUiStore } from './state/uiStore';
 import { useTaskStore } from './state/taskStore';
@@ -82,14 +83,44 @@ function AppContent() {
         return 'completed';
     }, [activeTasks]);
 
+    /**
+     * @refactor {CRITICAL} This logic is now corrected to properly handle the instance-based architecture.
+     * It uses the `installation_id` for lookup in 'automatic' mode, fixing a major bug.
+     */
     const activeUiForQuickStart = useMemo(() => {
-        const targetUiName =
-            pathConfig.configMode === 'automatic'
-                ? pathConfig.automaticModeUi
-                : pathConfig.uiProfile;
-        if (!targetUiName || targetUiName === 'Custom') return null;
-        return uiStatuses.find((s) => s.ui_name === targetUiName) || null;
+        if (pathConfig.configMode === 'automatic') {
+            const targetId = pathConfig.automaticModeUi; // This is the installation_id
+            if (!targetId) return null;
+            // Find the specific instance by its unique ID.
+            return uiStatuses.find((s) => s.installation_id === targetId) || null;
+        } else {
+            // In manual mode, the behavior is less specific. We find the first installed
+            // instance that matches the selected profile type (e.g., 'A1111').
+            const targetProfile = pathConfig.uiProfile;
+            if (!targetProfile || targetProfile === 'Custom') return null;
+            return uiStatuses.find((s) => s.ui_name === targetProfile) || null;
+        }
     }, [pathConfig, uiStatuses]);
+
+    /**
+     * @feature {IMPLEMENT} Implemented the start/stop logic for the quick-start button.
+     * This function is now passed to the Navbar and handles the API calls.
+     */
+    const handleQuickStart = useCallback(() => {
+        if (!activeUiForQuickStart) return;
+
+        if (activeUiForQuickStart.is_running && activeUiForQuickStart.running_task_id) {
+            console.log(`Stopping UI task: ${activeUiForQuickStart.running_task_id}`);
+            stopUiAPI(activeUiForQuickStart.running_task_id).catch((err) =>
+                console.error('Failed to stop UI via quick-start:', err),
+            );
+        } else if (activeUiForQuickStart.is_installed) {
+            console.log(`Starting UI instance: ${activeUiForQuickStart.installation_id}`);
+            runUiAPI(activeUiForQuickStart.installation_id).catch((err) =>
+                console.error('Failed to start UI via quick-start:', err),
+            );
+        }
+    }, [activeUiForQuickStart]);
 
     // --- Render Logic ---
     return (
@@ -102,21 +133,19 @@ function AppContent() {
             />
             <div className="app-content-pusher">
                 <header className="app-header-placeholder">
-                    <img
-                        src={appIcon}
-                        style={{ width: '2rem', height: 'auto' }}
-                        alt="M.A.L. Icon"
-                    />
+                    <img src={appIcon} alt="M.A.L. Icon" />
                     <h1>M.A.L.</h1>
                 </header>
                 <Navbar
                     onToggleDownloads={() => setDownloadsSidebarOpen((p) => !p)}
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeTasks.size}
-                    activeUiName={activeUiForQuickStart?.ui_name || null}
+                    // --- FIX: Pass the correct display_name to the button ---
+                    activeUiName={activeUiForQuickStart?.display_name || null}
                     isUiInstalled={activeUiForQuickStart?.is_installed || false}
                     isUiRunning={activeUiForQuickStart?.is_running || false}
-                    onQuickStart={() => console.log('Quick Start Clicked')}
+                    // --- FIX: Wire up the actual handler function ---
+                    onQuickStart={handleQuickStart}
                 />
                 <main className="main-content-area">
                     {isConfigLoading ? (
@@ -125,15 +154,10 @@ function AppContent() {
                         <Routes>
                             <Route path="/" element={<Navigate to="/search" replace />} />
                             <Route path="/search" element={<ModelSearchPage />} />
-
-                            {/* --- FIX: Use a splat (*) route to capture multi-segment model IDs --- */}
-                            {/* This tells the router to match `/search/:source/` and then treat the rest of the URL */}
-                            {/* as a single parameter, correctly handling IDs like `google/gemma-7b`. */}
                             <Route
                                 path="/search/:source/*"
                                 element={<ModelDetailsPage onBack={handleBackToSearch} />}
                             />
-
                             <Route path="/files" element={<FileManagerPage />} />
                             <Route path="/environments" element={<UiManagementPage />} />
                             <Route
