@@ -8,10 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # --- Refactored Imports ---
 # Import the download_tracker singleton directly.
+from backend.routers import file_manager_router, models_router
 from core.file_management.download_tracker import download_tracker
 
 # Import the new API routers.
-from routers import models, file_manager, ui
+from backend.routers import ui_router
 
 # --- Logging Configuration ---
 # Set up a consistent logging format for the entire application.
@@ -46,9 +47,9 @@ app.add_middleware(
 # This is the core of the refactoring. Instead of defining all endpoints in this
 # file, we include the organized, feature-specific routers.
 logger.info("Including API routers...")
-app.include_router(models.router)
-app.include_router(file_manager.router)
-app.include_router(ui.router)
+app.include_router(models_router.router)
+app.include_router(file_manager_router.router)
+app.include_router(ui_router.router)
 logger.info("API routers included successfully.")
 
 
