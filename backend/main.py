@@ -8,11 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # --- Refactored Imports ---
 # Import the download_tracker singleton directly.
-from backend.routers import file_manager_router, models_router
+from routers import file_manager_router, models_router, ui_router
 from core.file_management.download_tracker import download_tracker
-
-# Import the new API routers.
-from backend.routers import ui_router
 
 # --- Logging Configuration ---
 # Set up a consistent logging format for the entire application.
