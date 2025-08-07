@@ -8,6 +8,12 @@ from typing import Dict, Optional
 # This assumes a standard project structure.
 from ..constants.constants import CONFIG_FILE_DIR, UiNameType
 
+# --- NEW: Import custom error classes for standardized handling (global import) ---
+# Although not directly used for raising errors within this file's current logic,
+# it's good practice for consistency and future expansion.
+from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
+
+
 logger = logging.getLogger(__name__)
 
 # Define the path for our new registry file within the existing config directory.
@@ -34,6 +40,7 @@ class UiRegistry:
         """
         Loads the installation paths from the JSON file.
         If the file doesn't exist or is corrupt, it returns an empty dictionary.
+        @refactor: No change to error handling here, as graceful recovery (empty dict) is desired.
         """
         if not INSTALLATIONS_FILE_PATH.exists():
             logger.info("ui_installations.json not found. A new one will be created if needed.")
@@ -53,7 +60,10 @@ class UiRegistry:
             return {}
 
     def _save_installations(self):
-        """Saves the current state of the installation paths to the JSON file."""
+        """
+        Saves the current state of the installation paths to the JSON file.
+        @refactor: No change to error handling here, as logging the failure is sufficient.
+        """
         try:
             # Ensure the parent config directory exists.
             CONFIG_FILE_DIR.mkdir(exist_ok=True)
@@ -66,13 +76,19 @@ class UiRegistry:
         """
         Adds or updates the installation path for a given UI and saves the registry.
         The path is stored as an absolute, resolved string.
+        @refactor: This method relies on _save_installations for error handling.
+        Any path resolution errors (e.g., OSError from .resolve()) will propagate
+        to the caller (UiManager.finalize_adoption), which is already set to catch them.
         """
         logger.info(f"Registering installation for '{ui_name}' at path: '{install_path.resolve()}'")
         self._installations[ui_name] = str(install_path.resolve())
         self._save_installations()
 
     def remove_installation(self, ui_name: UiNameType):
-        """Removes an installation record for a given UI and saves the registry."""
+        """
+        Removes an installation record for a given UI and saves the registry.
+        @refactor: This method relies on _save_installations for error handling.
+        """
         if ui_name in self._installations:
             logger.info(f"Unregistering installation for '{ui_name}'.")
             del self._installations[ui_name]
