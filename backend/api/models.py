@@ -26,10 +26,6 @@ class ModelListItem(BaseModel):
     model_name: str = Field(
         ..., description="The name of the model, typically derived from the ID."
     )
-    # --- FIX: Renamed field to snake_case and added an alias. ---
-    # This aligns the Python code with the standard PEP 8 naming convention (snake_case)
-    # while ensuring it correctly deserializes the camelCase 'lastModified' key
-    # from the incoming JSON data from the Hugging Face API.
     last_modified: Optional[datetime] = Field(
         None, alias="lastModified", description="Timestamp of the last modification."
     )
@@ -39,7 +35,6 @@ class ModelListItem(BaseModel):
     downloads: Optional[int] = Field(None, description="Number of downloads.")
     likes: Optional[int] = Field(None, description="Number of likes.")
 
-    # Allow population by alias
     class Config:
         populate_by_name = True
 
@@ -74,7 +69,6 @@ class ModelDetails(ModelListItem):
 
 
 # --- Types for FileManager Configuration and Operations ---
-# Import from constants to ensure single source of truth
 from core.constants.constants import UiNameType, ModelType, UiProfileType, ColorThemeType
 
 UiProfileTypePydantic = UiProfileType
@@ -95,7 +89,10 @@ class MalFullConfiguration(BaseModel):
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
     config_mode: Optional[ConfigurationModePydantic]
-    automatic_mode_ui: Optional[UiNameTypePydantic] = Field(None)
+    # --- REFACTOR: This now stores the unique ID of the installation, not the UI name ---
+    automatic_mode_ui: Optional[str] = Field(
+        None, description="The unique installation_id for the UI in 'automatic' mode."
+    )
 
     class Config:
         populate_by_name = True
@@ -109,8 +106,9 @@ class PathConfigurationRequest(BaseModel):
     custom_model_type_paths: Optional[Dict[str, str]] = Field(None)
     color_theme: Optional[ColorThemeTypePydantic] = Field(None)
     config_mode: Optional[ConfigurationModePydantic] = Field(None)
-    automatic_mode_ui: Optional[UiNameTypePydantic] = Field(
-        None, description="The selected UI for 'automatic' mode."
+    # --- REFACTOR: This now sends the unique ID of the installation ---
+    automatic_mode_ui: Optional[str] = Field(
+        None, description="The selected installation_id for 'automatic' mode."
     )
 
 
@@ -144,8 +142,6 @@ class FileDownloadResponse(BaseModel):
 
 
 # --- Models for Local File Management ---
-
-
 class LocalFileItem(BaseModel):
     """Represents a file or directory within the managed base_path."""
 
@@ -156,11 +152,6 @@ class LocalFileItem(BaseModel):
         None, description="Size of the file in bytes (null for directories)."
     )
     last_modified: datetime = Field(..., description="Timestamp of the last modification.")
-
-    # --- COMMENT: This model previously had a 'type' alias which is unnecessary ---
-    # Pydantic v2 automatically handles aliasing for snake_case fields from
-    # camelCase JSON, so an explicit alias is not needed here. We keep it
-    # in other models for clarity or compatibility where needed.
 
 
 class LocalFileActionRequest(BaseModel):
@@ -209,8 +200,6 @@ class ScanHostDirectoriesResponse(BaseModel):
 
 
 # --- UI Environment Management Models ---
-
-
 class AvailableUiItem(BaseModel):
     """Represents a UI that is available for installation."""
 
@@ -225,6 +214,8 @@ class UiInstallRequest(BaseModel):
     """Request model for installing a UI environment."""
 
     ui_name: UiNameTypePydantic
+    # --- NEW: Add a user-provided name for the new instance ---
+    display_name: str = Field(..., description="A user-friendly name for this UI instance.")
     custom_install_path: Optional[str] = Field(
         None, description="An optional user-provided absolute path for the installation."
     )
@@ -235,8 +226,12 @@ class UiInstallRequest(BaseModel):
 
 
 class ManagedUiStatus(BaseModel):
-    """Represents the status of a single managed UI environment."""
+    """Represents the status of a single managed UI environment instance."""
 
+    # --- NEW: Add the unique ID and display name for the instance ---
+    installation_id: str = Field(..., description="The unique identifier for this installation.")
+    display_name: str = Field(..., description="The user-friendly name for this installation.")
+    # --- The ui_name now refers to the *type* of UI (e.g., ComfyUI) ---
     ui_name: UiNameTypePydantic
     is_installed: bool = Field(..., description="Indicates if the UI environment directory exists.")
     is_running: bool = Field(..., description="Indicates if the UI process is currently running.")
@@ -272,9 +267,15 @@ class UiStopRequest(BaseModel):
     task_id: str = Field(..., description="The task_id of the running process to be stopped.")
 
 
+# --- NEW: Add a model for updating an existing UI instance ---
+class UpdateUiInstanceRequest(BaseModel):
+    """Request model for updating an existing UI instance's details."""
+
+    display_name: Optional[str] = Field(None, description="The new user-friendly name.")
+    path: Optional[str] = Field(None, description="The new absolute path for the installation.")
+
+
 # --- UI Environment Adoption Models ---
-
-
 class UiAdoptionAnalysisRequest(BaseModel):
     """Request model for analyzing a potential UI installation for adoption."""
 
@@ -317,7 +318,9 @@ class AdoptionAnalysisResponse(BaseModel):
 class UiAdoptionRepairRequest(BaseModel):
     """Request model to trigger a repair process for an adoption candidate."""
 
+    # --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameTypePydantic
+    display_name: str = Field(..., description="A user-friendly name for this new UI instance.")
     path: str = Field(..., description="The absolute path to the directory to be repaired.")
     issues_to_fix: List[str] = Field(
         ..., description="A list of issue codes to be addressed by the repair process."
@@ -327,5 +330,7 @@ class UiAdoptionRepairRequest(BaseModel):
 class UiAdoptionFinalizeRequest(BaseModel):
     """Request model to finalize the adoption of a UI, adding it to the registry."""
 
+    # --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameTypePydantic
+    display_name: str = Field(..., description="A user-friendly name for this new UI instance.")
     path: str = Field(..., description="The absolute path to the directory to be adopted.")
