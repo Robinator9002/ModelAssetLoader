@@ -7,6 +7,9 @@ from typing import Dict, Any, List, TypedDict, Optional
 from ..constants.constants import UI_REPOSITORIES, UiNameType
 from .ui_installer import get_dependency_report
 
+# --- NEW: Import custom error classes for standardized handling (global import) ---
+from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,26 +52,34 @@ class UiAdopter:
         It checks for critical files, the virtual environment, and other markers
         to determine the health and adoptability of the installation.
 
-        Returns:
-            A dictionary containing the analysis results.
+        @refactor: This method now raises BadRequestError if the UI type is invalid,
+                   or OperationFailedError if a critical analysis step fails.
         """
         logger.info(f"Starting adoption analysis for '{self.ui_name}' at '{self.path}'...")
 
         if not self.ui_info:
-            self._add_issue(
-                code="INVALID_UI_TYPE",
-                message=f"'{self.ui_name}' is not a recognized UI type.",
-                is_fixable=False,
-            )
+            # --- REFACTOR: Raise BadRequestError if UI type is not recognized ---
+            raise BadRequestError(f"'{self.ui_name}' is not a recognized UI type for adoption.")
+
+        try:
+            self._check_path_validity()
+            self._check_start_script()
+            self._check_requirements_file()
+            await self._check_venv_and_dependencies()
+
+            logger.info(f"Analysis complete. Found {len(self.issues)} issue(s).")
             return self._get_final_result()
-
-        self._check_path_validity()
-        self._check_start_script()
-        self._check_requirements_file()
-        await self._check_venv_and_dependencies()
-
-        logger.info(f"Analysis complete. Found {len(self.issues)} issue(s).")
-        return self._get_final_result()
+        except MalError:
+            # Re-raise any MalError that might be raised by helper methods directly.
+            raise
+        except Exception as e:
+            # Catch any other unexpected errors during analysis and wrap them.
+            logger.critical(
+                f"An unhandled exception occurred during adoption analysis: {e}", exc_info=True
+            )
+            raise OperationFailedError(
+                operation_name=f"Analyze adoption candidate '{self.ui_name}'", original_exception=e
+            )
 
     def _add_issue(
         self,
@@ -101,46 +112,50 @@ class UiAdopter:
         }
 
     def _check_path_validity(self):
-        """Checks if the provided path exists and is a directory."""
+        """
+        Checks if the provided path exists and is a directory.
+        @refactor: This method now raises BadRequestError for invalid paths.
+        """
         if not self.path.exists():
-            self._add_issue(
-                code="PATH_NOT_FOUND",
-                message=f"The specified directory does not exist: {self.path}",
-                is_fixable=False,
-            )
+            # --- REFACTOR: Raise BadRequestError ---
+            raise BadRequestError(f"The specified directory does not exist: {self.path}")
         elif not self.path.is_dir():
-            self._add_issue(
-                code="PATH_IS_NOT_DIRECTORY",
-                message=f"The specified path is a file, not a directory: {self.path}",
-                is_fixable=False,
-            )
+            # --- REFACTOR: Raise BadRequestError ---
+            raise BadRequestError(f"The specified path is a file, not a directory: {self.path}")
 
     def _check_start_script(self):
-        """Checks for the presence of the UI's main start script."""
+        """
+        Checks for the presence of the UI's main start script.
+        @refactor: This method now raises EntityNotFoundError if the script is missing.
+        """
         start_script = self.ui_info.get("start_script")
         if not start_script or not (self.path / start_script).is_file():
-            self._add_issue(
-                code="MISSING_START_SCRIPT",
+            # --- REFACTOR: Raise EntityNotFoundError ---
+            raise EntityNotFoundError(
+                entity_name="Start Script",
+                entity_id=f"'{start_script}' for UI '{self.ui_name}' at '{self.path}'",
                 message=f"The main start script ('{start_script}') could not be found. This is a strong indicator that this is not a valid {self.ui_name} installation.",
-                is_fixable=False,
-                fix_description="Re-clone the repository to restore missing files.",
             )
 
     def _check_requirements_file(self):
-        """Checks for the presence of the requirements.txt file."""
+        """
+        Checks for the presence of the requirements.txt file.
+        @refactor: This method now raises EntityNotFoundError if the file is missing.
+        """
         req_file = self.ui_info.get("requirements_file")
         if not req_file or not (self.path / req_file).is_file():
-            self._add_issue(
-                code="MISSING_REQUIREMENTS_FILE",
+            # --- REFACTOR: Raise EntityNotFoundError ---
+            raise EntityNotFoundError(
+                entity_name="Requirements File",
+                entity_id=f"'{req_file}' for UI '{self.ui_name}' at '{self.path}'",
                 message=f"The dependency file ('{req_file}') is missing. A virtual environment cannot be reliably created or validated without it.",
-                is_fixable=False,
-                fix_description="Re-clone the repository to restore missing files.",
             )
 
     async def _check_venv_and_dependencies(self):
         """
         Checks for the venv's existence, its basic integrity, and whether all
         required dependencies from requirements.txt are installed.
+        @refactor: This method now raises OperationFailedError for critical venv issues.
         """
         venv_path = self.path / "venv"
         if not venv_path.is_dir():
@@ -160,28 +175,41 @@ class UiAdopter:
         )
 
         if not python_exe_path.is_file():
-            self._add_issue(
-                code="VENV_INCOMPLETE",
+            # --- REFACTOR: Raise OperationFailedError for incomplete venv ---
+            raise OperationFailedError(
+                operation_name="Venv Integrity Check",
+                original_exception=FileNotFoundError(
+                    f"Python executable missing in venv: {python_exe_path}"
+                ),
                 message="A 'venv' directory exists, but the Python executable is missing. The environment seems to be corrupt or incomplete.",
-                is_fixable=True,
-                fix_description="Re-create the virtual environment to fix it.",
-                default_fix_enabled=True,
             )
-            return
 
         req_file = self.ui_info.get("requirements_file")
         req_path = self.path / req_file
         if not req_path.is_file():
+            # This case should ideally be caught by _check_requirements_file,
+            # but as a safeguard, if it's still missing here, we return.
             return
 
         logger.info(f"Checking dependency integrity for '{self.ui_name}'...")
         extra_packages = self.ui_info.get("extra_packages")
-        report = await get_dependency_report(
-            venv_python=python_exe_path,
-            req_path=req_path,
-            extra_packages=extra_packages,
-            progress_callback=None,
-        )
+        try:
+            report = await get_dependency_report(
+                venv_python=python_exe_path,
+                req_path=req_path,
+                extra_packages=extra_packages,
+                progress_callback=None,
+            )
+        except MalError:
+            # Re-raise MalErrors from get_dependency_report directly.
+            raise
+        except Exception as e:
+            # Wrap any other unexpected errors from get_dependency_report.
+            raise OperationFailedError(
+                operation_name="Get Dependency Report",
+                original_exception=e,
+                message=f"Failed to get dependency report for '{self.ui_name}'.",
+            )
 
         packages_to_install = report.get("install", [])
         if packages_to_install:
