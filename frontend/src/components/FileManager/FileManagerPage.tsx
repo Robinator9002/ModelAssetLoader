@@ -13,7 +13,7 @@ import { Loader2, AlertTriangle, ArrowLeft, RefreshCw, Home, Info } from 'lucide
 import FileItem from './FileItem';
 import ConfirmModal from '../Layout/ConfirmModal';
 import FilePreview from './FilePreview';
-import ViewModeSwitcher from './ViewModeSwitcher';
+import ViewModeSwitcher from '../Switchers/ViewModeSwitcher';
 
 /**
  * @refactor This component is now self-sufficient. It fetches its own configuration

@@ -6,7 +6,7 @@ import './App.css';
 
 // --- Component Imports ---
 import Navbar from './components/Layout/Navbar';
-import ThemeSwitcher from './components/Theme/ThemeSwitcher';
+import ThemeSwitcher from './components/Switchers/ThemeSwitcher';
 import ModelSearchPage from './components/ModelLoader/ModelSearchPage';
 import ModelDetailsPage from './components/ModelLoader/ModelDetailsPage';
 import ConfigurationsPage from './components/Files/ConfigurationsPage';
