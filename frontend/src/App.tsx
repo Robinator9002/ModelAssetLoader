@@ -1,6 +1,5 @@
 // frontend/src/App.tsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
-// --- REFACTOR: Import routing components from react-router-dom ---
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
 
@@ -22,16 +21,8 @@ import { useUiStore } from './state/uiStore';
 import { useTaskStore } from './state/taskStore';
 import { useModalStore } from './state/modalStore';
 
-// --- API & Type Imports ---
-import { type ModelListItem } from '~/api';
-
 export type DownloadSummaryStatus = 'idle' | 'downloading' | 'error' | 'completed';
 
-/**
- * @refactor This is the new root component that handles routing.
- * The main App logic is moved to the `AppContent` component to allow
- * it to access routing hooks like `useNavigate`.
- */
 function App() {
     return (
         <BrowserRouter>
@@ -40,10 +31,6 @@ function App() {
     );
 }
 
-/**
- * The main application component, now responsible for layout and state orchestration.
- * Routing is handled by the parent `App` component.
- */
 function AppContent() {
     // --- Hooks ---
     const navigate = useNavigate();
@@ -62,7 +49,6 @@ function AppContent() {
         useModalStore();
 
     // --- Local View State ---
-    const [selectedModel, setSelectedModel] = useState<ModelListItem | null>(null);
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
 
     // --- Effects ---
@@ -76,13 +62,6 @@ function AppContent() {
         document.body.className = theme === 'light' ? 'light-theme' : '';
     }, [theme]);
 
-    useEffect(() => {
-        if (selectedModel) {
-            // The state is passed here, but the component needs the prop for direct rendering
-            navigate(`/search/${selectedModel.source}/${selectedModel.id}`);
-        }
-    }, [selectedModel, navigate]);
-
     // --- Callbacks ---
     const handleDownloadsStarted = useCallback(() => {
         closeDownloadModal();
@@ -90,7 +69,6 @@ function AppContent() {
     }, [closeDownloadModal]);
 
     const handleBackToSearch = () => {
-        setSelectedModel(null);
         navigate('/search');
     };
 
@@ -145,38 +123,23 @@ function AppContent() {
                         <p className="page-state-container">Loading configuration...</p>
                     ) : (
                         <Routes>
-                            {/* --- FIX: Redirect the root path to a default page --- */}
-                            {/* This makes `/search` the official landing page of the application. */}
                             <Route path="/" element={<Navigate to="/search" replace />} />
+                            <Route path="/search" element={<ModelSearchPage />} />
 
+                            {/* --- FIX: Use a splat (*) route to capture multi-segment model IDs --- */}
+                            {/* This tells the router to match `/search/:source/` and then treat the rest of the URL */}
+                            {/* as a single parameter, correctly handling IDs like `google/gemma-7b`. */}
                             <Route
-                                path="/search"
-                                element={<ModelSearchPage onModelSelect={setSelectedModel} />}
+                                path="/search/:source/*"
+                                element={<ModelDetailsPage onBack={handleBackToSearch} />}
                             />
-                            <Route
-                                path="/search/:source/:modelId"
-                                element={
-                                    selectedModel ? (
-                                        <ModelDetailsPage
-                                            selectedModel={selectedModel}
-                                            onBack={handleBackToSearch}
-                                        />
-                                    ) : (
-                                        <Navigate to="/search" replace />
-                                    )
-                                }
-                            />
+
                             <Route path="/files" element={<FileManagerPage />} />
                             <Route path="/environments" element={<UiManagementPage />} />
                             <Route
                                 path="/configuration"
                                 element={<ConfigurationsPage managedUis={uiStatuses} />}
                             />
-
-                            {/* --- FIX: The wildcard route now redirects to the default page --- */}
-                            {/* This is a much safer pattern. Instead of rendering a component and trapping the user on a */}
-                            {/* potentially invalid URL, it redirects them to a known, valid location. This solves the issue */}
-                            {/* of getting stuck. */}
                             <Route path="*" element={<Navigate to="/search" replace />} />
                         </Routes>
                     )}

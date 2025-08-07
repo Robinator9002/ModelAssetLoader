@@ -1,32 +1,23 @@
 // frontend/src/components/ModelLoader/ModelDetailsPage.tsx
 import React, { useState, useEffect } from 'react';
-// --- FIX: Import useParams to read the model ID from the URL ---
-import { useParams, useNavigate } from 'react-router-dom';
-import {
-    getModelDetails,
-    type ModelDetails,
-    type ModelFile, // --- FIX: Explicitly import ModelFile for clarity ---
-} from '~/api';
+import { useParams } from 'react-router-dom';
+import { getModelDetails, type ModelDetails, type ModelFile } from '~/api';
 import { useModalStore } from '../../state/modalStore';
 import ReactMarkdown from 'react-markdown';
 import { Download, ArrowLeft, Loader2, AlertTriangle, FileText, Files } from 'lucide-react';
 
-// --- FIX: The component no longer needs to receive the selected model as a prop ---
 interface ModelDetailsPageProps {
     onBack: () => void;
 }
 
 /**
- * @refactor This component is now self-sufficient. It uses `useParams`
- * from react-router-dom to get the model's source and ID directly from the URL.
- * This makes it independent of the parent component's state, solving the
- * redirect loop and allowing for direct navigation and page refreshes.
+ * @refactor This component is now self-sufficient and more robust. It patiently
+ * waits for the router to provide the URL parameters before fetching data,
+ * which solves the redirect loop.
  */
 const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ onBack }) => {
     // --- Hooks ---
-    // --- FIX: Get routing parameters and navigation function from the router ---
-    const { source, modelId } = useParams<{ source: string; modelId: string }>();
-    const navigate = useNavigate();
+    const { source, '*': modelId } = useParams<{ source: string; '*': string }>();
 
     // --- State from Zustand Store ---
     const { openDownloadModal } = useModalStore();
@@ -38,30 +29,31 @@ const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ onBack }) => {
 
     // --- Data Fetching ---
     useEffect(() => {
-        // --- FIX: Fetch details using parameters from the URL. ---
-        // If source or modelId are missing, we can't fetch data, so redirect.
-        if (!source || !modelId) {
-            console.error('Missing source or modelId in URL, redirecting.');
-            navigate('/search');
-            return;
-        }
+        // --- FIX: The main logic change is here. ---
+        // We now only proceed to fetch data if `source` and `modelId` are actually
+        // present. If they are `undefined` on the initial render, this `if` block
+        // is skipped. The component will re-render when the router provides the
+        // params, and on that second render, this block will execute.
+        if (source && modelId) {
+            const fetchDetails = async () => {
+                setIsLoading(true);
+                setError(null);
+                try {
+                    const data = await getModelDetails(source, modelId);
+                    setDetails(data);
+                } catch (err: any) {
+                    setError(err.message || 'Failed to load model details.');
+                    console.error(err);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
 
-        const fetchDetails = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                // --- FIX: Use the URL params for the API call ---
-                const data = await getModelDetails(source, modelId);
-                setDetails(data);
-            } catch (err: any) {
-                setError(err.message || 'Failed to load model details.');
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchDetails();
-    }, [source, modelId, navigate]); // --- FIX: Dependency array now relies on URL params ---
+            fetchDetails();
+        }
+        // --- FIX: By removing the `else` block that was causing the redirect, ---
+        // we break the loop. The component now correctly waits for its data.
+    }, [source, modelId]); // --- FIX: `navigate` is no longer needed as a dependency.
 
     // --- Helper Functions ---
     const formatFileSize = (bytes?: number | null): string => {
