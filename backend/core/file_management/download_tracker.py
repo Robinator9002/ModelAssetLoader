@@ -13,6 +13,11 @@ from typing import (
 )
 from dataclasses import dataclass, field
 
+# --- NEW: Import custom error classes for standardized handling (global import) ---
+# While DownloadTracker primarily consumes error messages rather than raising MalErrors,
+# importing them globally ensures consistency in the codebase.
+from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
+
 logger = logging.getLogger(__name__)
 
 # --- Define a strict type for download/task states ---
@@ -54,7 +59,15 @@ class DownloadStatus:
 
 
 class DownloadTracker:
-    """A singleton-like class to track and manage all active downloads and tasks."""
+    """
+    A singleton-like class to track and manage all active downloads and tasks.
+
+    This class is designed to be resilient and primarily focuses on broadcasting
+    status updates to the frontend. It consumes error messages from other parts
+    of the application (which should be raising MalErrors) and formats them
+    for display in the UI. It does not typically raise MalErrors itself,
+    as its role is to report, not to be a source of, application-level errors.
+    """
 
     _instance = None
 
@@ -72,11 +85,19 @@ class DownloadTracker:
         )
 
     async def _broadcast(self, data: Dict[str, Any]):
+        """
+        Internal method to send updates via the registered broadcast callback.
+        @refactor: Error handling for the broadcast itself.
+        """
         if self.broadcast_callback:
             try:
                 await self.broadcast_callback(data)
             except Exception as e:
+                # Catching any exception during broadcast to prevent tracker from failing.
+                # This is a critical internal component, so its resilience is key.
                 logger.error(f"Error during broadcast: {e}", exc_info=True)
+                # We don't raise a MalError here because the tracker's job is to report,
+                # not to fail itself if the reporting mechanism has an issue.
 
     def start_tracking(
         self, download_id: str, repo_id: str, filename: str, task: asyncio.Task
@@ -128,6 +149,7 @@ class DownloadTracker:
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
     async def complete_download(self, download_id: str, final_path: str):
+        """Marks a tracked task as completed."""
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             status.status = "completed"
@@ -138,6 +160,10 @@ class DownloadTracker:
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
     async def fail_download(self, download_id: str, error_message: str, cancelled: bool = False):
+        """
+        Marks a tracked task as failed or cancelled and updates the UI.
+        This is the primary method for other components to report errors to the tracker.
+        """
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             status.status = "cancelled" if cancelled else "error"
@@ -145,8 +171,16 @@ class DownloadTracker:
             status.status_text = "Failed" if not cancelled else "Cancelled"
             logger.error(f"Download {download_id} failed/cancelled: {error_message}")
             await self._broadcast({"type": "update", "data": status.to_dict()})
+        else:
+            logger.warning(
+                f"Attempted to fail/cancel download {download_id}, but it was not found in tracking."
+            )
 
     async def cancel_and_remove(self, download_id: str):
+        """
+        Requests cancellation of a running download task and removes it from tracking.
+        @refactor: No MalError raised here, as it's a control operation.
+        """
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             if status.task and not status.task.done():
@@ -154,16 +188,28 @@ class DownloadTracker:
                 status.task.cancel()
             else:
                 logger.warning(
-                    f"Cancellation for {download_id} requested, but task is not running."
+                    f"Cancellation for {download_id} requested, but task is not running or already done."
                 )
+            # Immediately remove from tracking after attempting cancellation
+            await self.remove_download(download_id)
+        else:
+            logger.warning(
+                f"Attempted to cancel and remove download {download_id}, but it was not found in tracking."
+            )
 
     async def remove_download(self, download_id: str):
+        """Removes a finished task from the tracker."""
         if download_id in self.active_downloads:
             logger.info(f"Removing download {download_id} from tracking.")
             del self.active_downloads[download_id]
             await self._broadcast({"type": "remove", "download_id": download_id})
+        else:
+            logger.warning(
+                f"Attempted to remove download {download_id}, but it was not found in tracking."
+            )
 
     def get_all_statuses(self) -> List[Dict[str, Any]]:
+        """Returns a list of all current download/task statuses."""
         return [status.to_dict() for status in self.active_downloads.values()]
 
 
