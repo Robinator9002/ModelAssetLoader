@@ -10,8 +10,8 @@ interface FileItemProps {
 }
 
 // Helper to format file size
-const formatBytes = (bytes: number, decimals = 2): string => {
-    if (bytes === 0) return '0 Bytes';
+const formatBytes = (bytes: number | null, decimals = 2): string => {
+    if (bytes === null || bytes === 0) return '0 Bytes';
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -20,7 +20,8 @@ const formatBytes = (bytes: number, decimals = 2): string => {
 };
 
 const FileItem: React.FC<FileItemProps> = ({ item, onNavigate, onDelete }) => {
-    const Icon = item.type === 'directory' ? Folder : FileText;
+    // --- FIX: Changed item.type to item.item_type to match the API type definition ---
+    const Icon = item.item_type === 'directory' ? Folder : FileText;
 
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent navigation when clicking delete
@@ -34,14 +35,14 @@ const FileItem: React.FC<FileItemProps> = ({ item, onNavigate, onDelete }) => {
     return (
         <div className="file-item-card" onClick={handleNavigateClick} title={item.name}>
             <div className="file-item-icon-wrapper">
-                <Icon size={48} className={`file-item-icon type-${item.type}`} />
+                {/* --- FIX: Changed item.type to item.item_type --- */}
+                <Icon size={48} className={`file-item-icon type-${item.item_type}`} />
             </div>
             <div className="file-item-details">
                 <p className="file-item-name">{item.name}</p>
                 <p className="file-item-meta">
-                    {item.type === 'file' && item.size !== null
-                        ? formatBytes(item.size)
-                        : 'Directory'}
+                    {/* --- FIX: Changed item.type to item.item_type --- */}
+                    {item.item_type === 'file' ? formatBytes(item.size) : 'Directory'}
                 </p>
             </div>
             <div className="file-item-actions">
