@@ -4,9 +4,7 @@ import pathlib
 import uuid
 from typing import List
 
-# --- REFACTOR: Import Depends for dependency injection ---
 from fastapi import APIRouter, HTTPException, Body, status, Depends
-from pydantic import BaseModel
 
 # --- API Model Imports ---
 from api.models import (
@@ -21,25 +19,21 @@ from api.models import (
     UiAdoptionFinalizeRequest,
 )
 
-# --- REFACTOR: Import the provider function and the service class for type hinting ---
 from dependencies import get_ui_manager
 from core.services.ui_manager import UiManager
 from core.constants.constants import UI_REPOSITORIES
-
-# --- NEW: Import custom error classes for standardized handling ---
-from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
+from core.errors import MalError
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
-# --- Pydantic models for request bodies specific to this router ---
 class UiTaskRequest(BaseModel):
     """Request model for actions targeting a UI task by its ID."""
 
     task_id: str
 
 
-# --- Router Definition ---
 router = APIRouter(
     prefix="/api/uis",
     tags=["UIs"],
@@ -56,8 +50,6 @@ router = APIRouter(
 )
 async def list_available_uis_endpoint():
     """Returns a list of all UIs that are defined in the backend constants."""
-    # This endpoint is simple and doesn't require the manager or complex error handling.
-    # If UI_REPOSITORIES were to be dynamically loaded and fail, a try-except would be needed.
     return [
         AvailableUiItem(
             ui_name=name,
@@ -71,12 +63,11 @@ async def list_available_uis_endpoint():
 @router.get(
     "/status",
     response_model=AllUiStatusResponse,
-    summary="Get Status of All Registered UIs",
+    summary="Get Status of All Registered UI Instances",
 )
 async def get_all_ui_statuses_endpoint(um: UiManager = Depends(get_ui_manager)):
-    """Gets the live installation and running status of all managed UIs."""
+    """Gets the live installation and running status of all managed UI instances."""
     try:
-        # Any errors from um.get_all_statuses would be MalErrors from deeper layers.
         return AllUiStatusResponse(items=await um.get_all_statuses())
     except MalError as e:
         logger.error(f"[{e.error_code}] Error getting all UI statuses: {e.message}", exc_info=False)
@@ -94,37 +85,27 @@ async def get_all_ui_statuses_endpoint(um: UiManager = Depends(get_ui_manager)):
 @router.post(
     "/install",
     response_model=UiActionResponse,
-    summary="Install a UI Environment",
+    summary="Install a New UI Instance",
 )
 async def install_ui_endpoint(
     request: UiInstallRequest = Body(...), um: UiManager = Depends(get_ui_manager)
 ):
-    """Triggers the installation of a UI environment as a background task."""
+    """Triggers the installation of a new UI instance as a background task."""
     task_id = str(uuid.uuid4())
-    # Path logic remains in the router as it's directly related to the request payload.
-    install_path = um.get_default_install_path(request.ui_name)
-    if request.custom_install_path:
-        install_path = pathlib.Path(request.custom_install_path)
-
     try:
-        # The responsibility for path creation/validation and raising appropriate
-        # errors (like BadRequestError for invalid paths or OperationFailedError for
-        # permission issues) should ideally be handled within the FileManager or
-        # a dedicated utility, and then propagated as MalError.
-        # Here, we ensure the parent directory exists, and let the service handle deeper issues.
-        install_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Delegate the actual installation logic to the injected ui_manager.
-        # um.install_ui_environment is expected to raise MalError on failure.
+        # --- REFACTOR: Pass the new display_name to the manager ---
         um.install_ui_environment(
             ui_name=request.ui_name,
-            install_path=install_path,
+            display_name=request.display_name,
+            # Path logic remains simple here; manager/installer handles complexity
+            install_path=(
+                pathlib.Path(request.custom_install_path) if request.custom_install_path else None
+            ),
             task_id=task_id,
         )
-
         return UiActionResponse(
             success=True,
-            message=f"Installation for {request.ui_name} started.",
+            message=f"Installation for '{request.display_name}' started.",
             task_id=task_id,
             set_as_active_on_completion=request.set_as_active,
         )
@@ -140,20 +121,20 @@ async def install_ui_endpoint(
         )
 
 
+# --- REFACTOR: Route now uses installation_id ---
 @router.post(
-    "/{ui_name}/run",
+    "/run/{installation_id}",
     response_model=UiActionResponse,
-    summary="Run an Installed UI",
+    summary="Run an Installed UI Instance",
 )
-async def run_ui_endpoint(ui_name: UiNameTypePydantic, um: UiManager = Depends(get_ui_manager)):
-    """Triggers a UI process to start in the background."""
+async def run_ui_endpoint(installation_id: str, um: UiManager = Depends(get_ui_manager)):
+    """Triggers a UI process to start in the background using its unique ID."""
     try:
         task_id = str(uuid.uuid4())
-        # um.run_ui is expected to raise MalError on failure.
-        um.run_ui(ui_name=ui_name, task_id=task_id)
+        um.run_ui(installation_id=installation_id, task_id=task_id)
         return UiActionResponse(
             success=True,
-            message=f"Request to run {ui_name} accepted.",
+            message=f"Request to run UI instance {installation_id} accepted.",
             task_id=task_id,
             set_as_active_on_completion=False,
         )
@@ -173,9 +154,8 @@ async def run_ui_endpoint(ui_name: UiNameTypePydantic, um: UiManager = Depends(g
     summary="Stop a Running UI Process",
 )
 async def stop_ui_endpoint(request: UiTaskRequest, um: UiManager = Depends(get_ui_manager)):
-    """Sends a request to stop a running UI process."""
+    """Sends a request to stop a running UI process by its task ID."""
     try:
-        # um.stop_ui is expected to raise MalError on failure.
         await um.stop_ui(task_id=request.task_id)
         return {"success": True, "message": f"Stop request for task {request.task_id} sent."}
     except MalError as e:
@@ -196,7 +176,6 @@ async def stop_ui_endpoint(request: UiTaskRequest, um: UiManager = Depends(get_u
 async def cancel_ui_task_endpoint(request: UiTaskRequest, um: UiManager = Depends(get_ui_manager)):
     """Sends a cancellation request for an in-progress installation or repair."""
     try:
-        # um.cancel_ui_task is expected to raise MalError on failure.
         await um.cancel_ui_task(request.task_id)
         return {
             "success": True,
@@ -215,28 +194,26 @@ async def cancel_ui_task_endpoint(request: UiTaskRequest, um: UiManager = Depend
         )
 
 
+# --- REFACTOR: Route now uses installation_id ---
 @router.delete(
-    "/{ui_name}",
+    "/{installation_id}",
     status_code=status.HTTP_200_OK,
-    summary="Delete a Registered UI Environment",
+    summary="Delete a Registered UI Instance",
 )
-async def delete_ui_endpoint(ui_name: UiNameTypePydantic, um: UiManager = Depends(get_ui_manager)):
-    """Deletes a UI environment's files from disk and unregisters it."""
+async def delete_ui_endpoint(installation_id: str, um: UiManager = Depends(get_ui_manager)):
+    """Deletes a UI instance's files from disk and unregisters it."""
     try:
-        # The um.delete_environment method is expected to raise MalError on failure,
-        # so the explicit success check is removed.
-        await um.delete_environment(ui_name=ui_name)
-        return {"success": True, "message": f"{ui_name} environment deleted successfully."}
-    # --- REFACTOR: Catch custom MalError first ---
+        await um.delete_environment(installation_id=installation_id)
+        return {"success": True, "message": f"UI instance {installation_id} deleted successfully."}
     except MalError as e:
         logger.error(
-            f"[{e.error_code}] Error deleting UI environment '{ui_name}': {e.message}",
+            f"[{e.error_code}] Error deleting UI instance '{installation_id}': {e.message}",
             exc_info=False,
         )
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
         logger.critical(
-            f"An unhandled exception occurred deleting UI environment '{ui_name}': {e}",
+            f"An unhandled exception occurred deleting UI instance '{installation_id}': {e}",
             exc_info=True,
         )
         raise HTTPException(
@@ -262,14 +239,12 @@ async def analyze_adoption_endpoint(
             request.ui_name, pathlib.Path(request.path)
         )
         return AdoptionAnalysisResponse(**analysis_result)
-    # --- REFACTOR: Catch custom MalError first ---
     except MalError as e:
         logger.error(
             f"[{e.error_code}] Error during adoption analysis: {e.message}", exc_info=False
         )
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        # Catch any other truly unexpected errors and log them as critical.
         logger.critical(
             f"An unhandled exception occurred during adoption analysis: {e}", exc_info=True
         )
@@ -291,16 +266,17 @@ async def repair_and_adopt_endpoint(
     """Triggers a repair-and-adopt process as a background task."""
     try:
         task_id = str(uuid.uuid4())
-        # um.repair_and_adopt_ui is expected to raise MalError on failure.
+        # --- REFACTOR: Pass the new display_name to the manager ---
         um.repair_and_adopt_ui(
             ui_name=request.ui_name,
+            display_name=request.display_name,
             path=pathlib.Path(request.path),
             issues_to_fix=request.issues_to_fix,
             task_id=task_id,
         )
         return UiActionResponse(
             success=True,
-            message=f"Repair process for {request.ui_name} started.",
+            message=f"Repair process for '{request.display_name}' started.",
             task_id=task_id,
             set_as_active_on_completion=True,
         )
@@ -330,20 +306,18 @@ async def finalize_adoption_endpoint(
 ):
     """Finalizes the adoption of a healthy UI by simply registering it."""
     try:
-        # The um.finalize_adoption method is expected to raise MalError on failure,
-        # so the explicit success check is removed.
-        um.finalize_adoption(request.ui_name, pathlib.Path(request.path))
-        return {"success": True, "message": f"{request.ui_name} adopted successfully."}
-    # --- REFACTOR: Catch custom MalError first ---
+        # --- REFACTOR: Pass the new display_name to the manager ---
+        um.finalize_adoption(request.ui_name, request.display_name, pathlib.Path(request.path))
+        return {"success": True, "message": f"'{request.display_name}' adopted successfully."}
     except MalError as e:
         logger.error(
-            f"[{e.error_code}] Error finalizing adoption for '{request.ui_name}': {e.message}",
+            f"[{e.error_code}] Error finalizing adoption for '{request.display_name}': {e.message}",
             exc_info=False,
         )
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
         logger.critical(
-            f"An unhandled exception occurred finalizing adoption for '{request.ui_name}': {e}",
+            f"An unhandled exception occurred finalizing adoption for '{request.display_name}': {e}",
             exc_info=True,
         )
         raise HTTPException(
