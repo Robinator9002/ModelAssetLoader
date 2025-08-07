@@ -16,6 +16,19 @@ from api.models import (
 from dependencies import get_source_manager
 from core.source_manager import SourceManager
 
+# --- NEW: Import custom error classes for standardized handling ---
+from core.errors import MalError, EntityNotFoundError, ExternalApiError, OperationFailedError
+
+# --- NEW: Import specific Hugging Face Hub exceptions for precise error handling ---
+# These imports are necessary for Recipe 2: External API Failures
+from huggingface_hub.utils import (
+    RepositoryNotFoundError,
+    GatedRepoError,
+    HFValidationError,
+    HfHubHTTPError,
+)
+
+
 logger = logging.getLogger(__name__)
 
 # Create an APIRouter instance. This is like a mini-FastAPI app.
@@ -69,9 +82,18 @@ async def search_models_endpoint(
             limit=limit,
             has_more=has_more,
         )
+    # --- REFACTOR: Catch custom MalError first ---
+    except MalError as e:
+        # If the underlying service raises a MalError, translate it to an HTTPException
+        # using the error's status code and message.
+        logger.error(f"[{e.error_code}] Error in search_models: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error in search_models: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal error during model search.")
+        # Catch any other truly unexpected errors and log them as critical.
+        logger.critical(f"An unhandled exception occurred during model search: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="An unexpected internal error occurred during model search."
+        )
 
 
 @router.get(
@@ -90,11 +112,32 @@ async def get_model_details_endpoint(
         # --- REFACTOR: Use the injected instance 'sm' ---
         details_data = sm.get_model_details(model_id=model_id, source=source)
         if not details_data:
+            # This check will likely be removed once get_model_details raises EntityNotFoundError
+            # directly instead of returning None for not found cases.
             raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
         return ModelDetails(**details_data)
+    # --- REFACTOR: Apply Recipe 2 for Hugging Face specific errors ---
+    except RepositoryNotFoundError:
+        # This is a specific "not found" case from Hugging Face Hub
+        logger.info(f"Model repository '{model_id}' not found via Hugging Face Hub.")
+        raise EntityNotFoundError(entity_name="Model", entity_id=model_id)
+    except (GatedRepoError, HFValidationError, HfHubHTTPError) as e:
+        # These are general failures from the external Hugging Face API
+        logger.error(f"API error for {model_id} from Hugging Face Hub: {e}")
+        raise ExternalApiError(service_name="Hugging Face Hub", original_exception=e)
+    # --- Keep re-raising HTTPExceptions directly to let FastAPI handle them ---
     except HTTPException:
-        # Re-raise HTTPExceptions directly to let FastAPI handle them.
         raise
+    # --- REFACTOR: Catch custom MalError first for other application-specific errors ---
+    except MalError as e:
+        logger.error(
+            f"[{e.error_code}] Error in get_model_details for '{model_id}': {e.message}",
+            exc_info=False,
+        )
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error in get_model_details for '{model_id}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An internal error occurred.")
+        # Catch any other truly unexpected errors and log them as critical.
+        logger.critical(
+            f"An unhandled exception occurred getting details for '{model_id}': {e}", exc_info=True
+        )
+        raise HTTPException(status_code=500, detail="An unexpected internal error occurred.")

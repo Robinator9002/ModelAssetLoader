@@ -23,6 +23,9 @@ from api.models import (
 from dependencies import get_file_manager
 from core.file_manager import FileManager
 
+# --- NEW: Import custom error classes for standardized handling ---
+from core.errors import MalError, OperationFailedError, BadRequestError
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,6 +56,8 @@ async def get_config_endpoint(fm: FileManager = Depends(get_file_manager)):
     Returns the full, current application configuration.
     The FileManager instance is now injected by FastAPI.
     """
+    # This endpoint currently doesn't have a try...except block to refactor,
+    # as fm.get_current_configuration() is expected to always return a config.
     return MalFullConfiguration(**fm.get_current_configuration())
 
 
@@ -68,6 +73,9 @@ async def configure_paths_endpoint(
     Configures the application's base paths and model folder structure.
     Delegates the logic to the injected file_manager service.
     """
+    # This currently relies on a success boolean from the service.
+    # Once fm.configure_paths is refactored to raise MalError, this
+    # block will be updated to catch MalError.
     success, message = fm.configure_paths(
         base_path_str=config_request.base_path,
         profile=config_request.profile,
@@ -77,6 +85,8 @@ async def configure_paths_endpoint(
         automatic_mode_ui=config_request.automatic_mode_ui,
     )
     if not success:
+        # For now, keep as HTTPException. This will be refactored once
+        # the underlying service raises BadRequestError or similar.
         raise HTTPException(status_code=400, detail=message)
     return PathConfigurationResponse(
         success=True,
@@ -95,7 +105,11 @@ async def download_file_endpoint(
 ):
     """Initiates a model file download as a background task."""
     if not fm.base_path:
+        # This is a specific validation, can remain as HTTPException
         raise HTTPException(status_code=400, detail="Base path not configured.")
+    # This currently relies on a success dictionary from the service.
+    # Once fm.start_download_model_file is refactored to raise MalError,
+    # this block will be updated to catch MalError.
     result = fm.start_download_model_file(
         source=download_request.source,
         repo_id=download_request.repo_id,
@@ -105,6 +119,8 @@ async def download_file_endpoint(
         revision=download_request.revision,
     )
     if not result.get("success"):
+        # For now, keep as HTTPException. This will be refactored once
+        # the underlying service raises OperationFailedError or similar.
         raise HTTPException(status_code=400, detail=result.get("error", "Download failed."))
     return FileDownloadResponse(**result)
 
@@ -118,6 +134,7 @@ async def cancel_download_endpoint(
     request: DownloadTaskRequest, fm: FileManager = Depends(get_file_manager)
 ):
     """Sends a cancellation request for an in-progress download."""
+    # This endpoint doesn't have a try...except block to refactor.
     await fm.cancel_download(request.download_id)
     return {"success": True, "message": f"Cancellation request for {request.download_id} sent."}
 
@@ -131,6 +148,7 @@ async def dismiss_download_endpoint(
     request: DownloadTaskRequest, fm: FileManager = Depends(get_file_manager)
 ):
     """Removes a completed, failed, or cancelled task from the UI."""
+    # This endpoint doesn't have a try...except block to refactor.
     await fm.dismiss_download(request.download_id)
     return {"success": True, "message": f"Task {request.download_id} dismissed."}
 
@@ -147,16 +165,33 @@ async def scan_host_directories_endpoint(
 ):
     """Endpoint to scan the host filesystem for directories, used by the folder selector."""
     try:
+        # This currently relies on a success dictionary from the service.
+        # Once fm.list_host_directories is refactored to raise MalError,
+        # this check will be removed and errors will be caught below.
         result = await fm.list_host_directories(path_to_scan_str=path, max_depth=max_depth)
         if not result.get("success"):
+            # For now, keep as HTTPException. This will be refactored once
+            # the underlying service raises BadRequestError or OperationFailedError.
             raise HTTPException(
                 status_code=400, detail=result.get("error", "Failed to scan directories.")
             )
         return ScanHostDirectoriesResponse(**result)
+    # --- REFACTOR: Catch custom MalError first ---
+    except MalError as e:
+        # If the underlying service raises a MalError, translate it to an HTTPException
+        # using the error's status code and message.
+        logger.error(
+            f"[{e.error_code}] Error scanning host directories: {e.message}", exc_info=False
+        )
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error scanning host directories: {e}", exc_info=True)
+        # Catch any other truly unexpected errors and log them as critical.
+        logger.critical(
+            f"An unhandled exception occurred during host directory scan: {e}", exc_info=True
+        )
         raise HTTPException(
-            status_code=500, detail="An internal server error occurred while scanning directories."
+            status_code=500,
+            detail="An unexpected internal error occurred while scanning directories.",
         )
 
 
@@ -172,7 +207,11 @@ async def list_managed_files_endpoint(
 ):
     """Lists the contents of the configured base model directory."""
     if not fm.base_path:
+        # This is a specific validation, can remain as HTTPException
         raise HTTPException(status_code=400, detail="Base path not configured.")
+    # This endpoint currently doesn't have a try...except block to refactor,
+    # as fm.list_managed_files() is expected to return a list or raise an error
+    # that would be handled by a higher-level middleware if not caught here.
     return fm.list_managed_files(relative_path_str=path, mode=mode)
 
 
@@ -185,8 +224,13 @@ async def delete_managed_item_endpoint(
     request: LocalFileActionRequest, fm: FileManager = Depends(get_file_manager)
 ):
     """Deletes a file or directory from the managed path."""
+    # This currently relies on a success dictionary from the service.
+    # Once fm.delete_managed_item is refactored to raise MalError,
+    # this block will be updated to catch MalError.
     result = await fm.delete_managed_item(relative_path_str=request.path)
     if not result.get("success"):
+        # For now, keep as HTTPException. This will be refactored once
+        # the underlying service raises OperationFailedError or BadRequestError.
         raise HTTPException(status_code=400, detail=result.get("error", "Deletion failed."))
     return result
 
@@ -200,7 +244,12 @@ async def get_file_preview_endpoint(
     path: str = Query(...), fm: FileManager = Depends(get_file_manager)
 ):
     """Gets the content of a text file for previewing in the UI."""
+    # This currently relies on a success dictionary from the service.
+    # Once fm.get_file_preview is refactored to raise MalError,
+    # this block will be updated to catch MalError.
     result = await fm.get_file_preview(relative_path_str=path)
     if not result.get("success"):
+        # For now, keep as HTTPException. This will be refactored once
+        # the underlying service raises EntityNotFoundError or BadRequestError.
         raise HTTPException(status_code=400, detail=result.get("error", "Preview failed."))
     return result
