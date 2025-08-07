@@ -23,12 +23,10 @@
 @import url('./style/Files/FolderSelector.css');
 @import url('./style/Files/ConfigurationsPage.css');
 @import url('./style/Files/UiProfileSelector.css');
-@import url('./style/Files/ConfigModeSwitcher.css');
 
 @import url('./style/FileManager/FileItem.css');
 @import url('./style/FileManager/FileManager.css');
 @import url('./style/FileManager/FilePreview.css');
-@import url('./style/FileManager/ViewModeSwitcher.css');
 
 @import url('./style/Downloads/DownloadSidebar.css');
 @import url('./style/Downloads/DownloadModal.css');
@@ -36,7 +34,9 @@
 @import url('./style/ModelLoader/ModelSearchPage.css');
 @import url('./style/ModelLoader/ModelDetailsPage.css');
 
-@import url('./style/Theme/ThemeSwitcher.css');
+@import url('./style/Switchers/ConfigModeSwitcher.css');
+@import url('./style/Switchers/ViewModeSwitcher.css');
+@import url('./style/Switchers/ThemeSwitcher.css');
 
 /* --- Main Application Layout --- */
 
