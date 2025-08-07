@@ -10,7 +10,7 @@ import {
     Loader2,
     StopCircle,
     ClipboardCheck,
-    Package, // --- NEW: Icon for available UIs ---
+    Package,
 } from 'lucide-react';
 import InstallUiModal from './InstallUiModal';
 import ConfirmModal from '../Layout/ConfirmModal';
@@ -21,14 +21,14 @@ import AdoptUiModal from './AdoptUiModal';
  * unique UI instances, rather than a combined list of UI types. It now has two
  * distinct sections: one for managing installed instances and another for installing
  * new UIs from the list of available types. All actions are now correctly
-
  * wired up to use the unique `installation_id`.
  */
 const UiManagementPage: React.FC = () => {
     const {
         isLoading,
-        installedUis, // --- REFACTOR: Use the direct list of installed instances ---
+        installedUis,
         availableUis,
+        activeTasks, // --- FIX: Destructure the newly provided activeTasks state ---
         isInstallModalOpen,
         uiToInstall,
         isDeleteConfirmOpen,
@@ -110,7 +110,7 @@ const UiManagementPage: React.FC = () => {
                                 <div className="modal-actions ui-card-actions">
                                     <button
                                         className="button button-danger"
-                                        onClick={() => requestDelete(ui)} // --- FIX: Pass the full ui object ---
+                                        onClick={() => requestDelete(ui)}
                                         title="Delete this instance."
                                         disabled={busy}
                                     >
@@ -127,7 +127,7 @@ const UiManagementPage: React.FC = () => {
                                     ) : (
                                         <button
                                             className="button button-success"
-                                            onClick={() => handleRun(ui.installation_id)} // --- FIX: Pass installation_id ---
+                                            onClick={() => handleRun(ui.installation_id)}
                                             disabled={busy}
                                         >
                                             <Play size={18} /> Start
@@ -172,7 +172,8 @@ const UiManagementPage: React.FC = () => {
                 onClose={() => setIsInstallModalOpen(false)}
                 uiToInstall={uiToInstall}
                 onConfirmInstall={handleInstall}
-                isSubmitting={!!uiToInstall && activeTasks.size > 0} // Simplified busy check for install
+                // --- FIX: Use the now-available activeTasks map for the check ---
+                isSubmitting={!!uiToInstall && activeTasks.size > 0}
             />
             <AdoptUiModal
                 isOpen={isAdoptModalOpen}
@@ -183,7 +184,6 @@ const UiManagementPage: React.FC = () => {
             />
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}
-                // --- FIX: Use the display_name from the uiToDelete object ---
                 title={`Delete ${uiToDelete?.display_name}?`}
                 message={`Are you sure you want to permanently delete the '${uiToDelete?.display_name}' instance? This action cannot be undone.`}
                 onConfirm={handleDelete}
