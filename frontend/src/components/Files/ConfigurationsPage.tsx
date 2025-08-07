@@ -9,7 +9,6 @@ import {
     type UiNameType,
 } from '~/api';
 import { useConfigStore } from '../../state/configStore';
-// --- REFACTOR: Import the new specialized components ---
 import AutomaticModeSettings from './AutomaticModeSettings';
 import ManualModeSettings from './ManualModeSettings';
 import {
@@ -26,12 +25,6 @@ interface ConfigurationsPageProps {
     managedUis: (ManagedUiStatus & { default_profile_name?: UiProfileType })[];
 }
 
-/**
- * @refactor This component has been decomposed. It no longer contains the complex
- * JSX for both automatic and manual modes. Instead, it conditionally renders the
- * specialized `AutomaticModeSettings` or `ManualModeSettings` components, acting
- * as a container and orchestrator for the overall settings logic.
- */
 const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) => {
     // --- State from Zustand Store ---
     const {
@@ -230,13 +223,21 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
             </div>
 
             <div className="config-main-content">
-                {/* --- REFACTOR: Conditionally render the specialized components --- */}
                 {configMode === 'automatic' ? (
-                    <AutomaticModeSettings
-                        installedUis={installedUis}
-                        selectedManagedUi={selectedManagedUi}
-                        onSelectUi={handleManagedUiSelect}
-                    />
+                    // --- CHANGE 1: Wrap the component in a config-card ---
+                    <div className="config-card">
+                        <h2 className="config-card-header">
+                            <PackageCheck size={20} />
+                            Step 1 & 2: Select Managed UI
+                        </h2>
+                        <div className="config-card-body">
+                            <AutomaticModeSettings
+                                installedUis={installedUis}
+                                selectedManagedUi={selectedManagedUi}
+                                onSelectUi={handleManagedUiSelect}
+                            />
+                        </div>
+                    </div>
                 ) : (
                     <ManualModeSettings
                         manualBasePath={manualBasePath}
@@ -246,43 +247,47 @@ const ConfigurationsPage: React.FC<ConfigurationsPageProps> = ({ managedUis }) =
                     />
                 )}
 
-                <div className={`config-card ${!selectedProfile ? 'disabled-card' : ''}`}>
-                    <h2 className="config-card-header">
-                        <Settings size={20} />
-                        Step 3: Fine-Tune Model Paths
-                    </h2>
-                    <div className="config-card-body">
-                        <p className="config-hint">
-                            These paths are relative to your base folder:{' '}
-                            <code>{effectiveBasePath || '...'}</code>
-                        </p>
-                        <div className="custom-paths-list">
-                            {modelTypesForPaths.map((mType) => (
-                                <div key={mType} className="custom-path-entry">
-                                    <label
-                                        htmlFor={`modelPath-${mType}`}
-                                        className="custom-path-label"
-                                    >
-                                        {mType}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id={`modelPath-${mType}`}
-                                        value={modelPaths[mType] || ''}
-                                        placeholder={`e.g., models/${mType.toLowerCase()}`}
-                                        onChange={(e) =>
-                                            setModelPaths((prev) => ({
-                                                ...prev,
-                                                [mType]: e.target.value.trim(),
-                                            }))
-                                        }
-                                        className="config-input"
-                                    />
-                                </div>
-                            ))}
+                {/* --- CHANGE 2: Conditionally render the next step --- */}
+                {/* This card will now only appear if a UI is selected in Automatic mode, or at all times in Manual mode */}
+                {(configMode === 'automatic' && selectedManagedUi) || configMode === 'manual' ? (
+                    <div className={`config-card ${!selectedProfile ? 'disabled-card' : ''}`}>
+                        <h2 className="config-card-header">
+                            <Settings size={20} />
+                            Step 3: Fine-Tune Model Paths
+                        </h2>
+                        <div className="config-card-body">
+                            <p className="config-hint">
+                                These paths are relative to your base folder:{' '}
+                                <code>{effectiveBasePath || '...'}</code>
+                            </p>
+                            <div className="custom-paths-list">
+                                {modelTypesForPaths.map((mType) => (
+                                    <div key={mType} className="custom-path-entry">
+                                        <label
+                                            htmlFor={`modelPath-${mType}`}
+                                            className="custom-path-label"
+                                        >
+                                            {mType}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id={`modelPath-${mType}`}
+                                            value={modelPaths[mType] || ''}
+                                            placeholder={`e.g., models/${mType.toLowerCase()}`}
+                                            onChange={(e) =>
+                                                setModelPaths((prev) => ({
+                                                    ...prev,
+                                                    [mType]: e.target.value.trim(),
+                                                }))
+                                            }
+                                            className="config-input"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : null}
             </div>
 
             <div className="config-footer">
