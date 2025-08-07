@@ -1,26 +1,10 @@
 // frontend/src/components/Environments/UiManagementPage.tsx
-import React, { useState, useMemo, useCallback } from 'react';
+import React from 'react';
+// --- REFACTOR: Import the new custom hook ---
+import { useUiManagement } from './useUiManagement';
+
+// --- Component & Icon Imports ---
 import {
-    // --- REFACTOR: Import API functions directly ---
-    installUiAPI,
-    runUiAPI,
-    stopUiAPI,
-    deleteUiAPI,
-    repairUiAPI,
-    finalizeAdoptionAPI,
-    // Type definitions
-    type AvailableUiItem,
-    type UiNameType,
-    type UiInstallRequest,
-    type DownloadStatus, // <-- FIX: Import DownloadStatus for typing
-} from '~/api';
-import {
-    // --- FIX: Corrected store imports to be direct paths ---
-    useUiStore,
-} from '../../state/uiStore';
-import { useTaskStore } from '../../state/taskStore';
-import {
-    // Icons
     Layers,
     Download,
     Trash2,
@@ -30,147 +14,44 @@ import {
     StopCircle,
     ClipboardCheck,
 } from 'lucide-react';
-// Component Imports
 import InstallUiModal from './InstallUiModal';
 import ConfirmModal from '../Layout/ConfirmModal';
 import AdoptUiModal from './AdoptUiModal';
 
 /**
- * @refactor This component is now self-sufficient, fetching its own data from
- * Zustand stores and containing its own logic for handling user actions by
- * calling the API directly. All `on...` props have been removed.
+ * @refactor This component has been completely refactored to be a "presentational"
+ * or "dumb" component. All of its complex state management, data fetching, and
+ * event handling logic has been extracted into the `useUiManagement` custom hook.
+ *
+ * The component's sole responsibility is now to render the UI based on the state
+ * and functions provided by the hook. This makes the component significantly
+ * cleaner, easier to read, and focused only on the view layer.
  */
 const UiManagementPage: React.FC = () => {
-    // --- State from Zustand Stores ---
-    const { availableUis, uiStatuses, fetchUiData, isLoading } = useUiStore();
-    const { activeTasks, addTaskToAutoConfigure } = useTaskStore();
-
-    // --- Local View State (for modals) ---
-    const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-    const [uiToInstall, setUiToInstall] = useState<AvailableUiItem | null>(null);
-    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [uiToDelete, setUiToDelete] = useState<UiNameType | null>(null);
-    const [isAdoptModalOpen, setIsAdoptModalOpen] = useState(false);
-
-    // --- Memoized Derived State ---
-
-    // Checks if a UI is involved in a pending or in-progress task.
-    const isUiBusy = useCallback(
-        (uiName: UiNameType): boolean => {
-            // --- FIX: Explicitly type 'd' as DownloadStatus ---
-            return Array.from(activeTasks.values()).some(
-                (d: DownloadStatus) =>
-                    d.filename === uiName &&
-                    ['pending', 'downloading', 'running'].includes(d.status),
-            );
-        },
-        [activeTasks],
-    );
-
-    // Combines available UI data with live status data for rendering.
-    const combinedUiData = useMemo(() => {
-        const statusMap = new Map(uiStatuses.map((s) => [s.ui_name, s]));
-        // --- FIX: Explicitly type 'ui' as AvailableUiItem ---
-        return availableUis.map((ui: AvailableUiItem) => {
-            const status = statusMap.get(ui.ui_name);
-            return {
-                ...ui,
-                is_installed: status?.is_installed ?? false,
-                is_running: status?.is_running ?? false,
-                install_path: status?.install_path,
-                running_task_id: status?.running_task_id,
-            };
-        });
-    }, [availableUis, uiStatuses]);
-
-    // --- Action Handlers (Logic now lives here) ---
-
-    const handleInstall = useCallback(
-        async (request: UiInstallRequest) => {
-            try {
-                const response = await installUiAPI(request);
-                if (response.success && response.set_as_active_on_completion) {
-                    addTaskToAutoConfigure(response.task_id);
-                }
-            } catch (error: any) {
-                console.error(`Failed to start installation for ${request.ui_name}:`, error);
-                // TODO: Implement a user-facing error notification system.
-            }
-            setIsInstallModalOpen(false);
-        },
-        [addTaskToAutoConfigure],
-    );
-
-    const handleRun = useCallback(async (uiName: UiNameType) => {
-        try {
-            await runUiAPI(uiName);
-        } catch (error: any) {
-            console.error(`Failed to start UI ${uiName}:`, error);
-        }
-    }, []);
-
-    const handleStop = useCallback(async (taskId: string) => {
-        try {
-            await stopUiAPI(taskId);
-        } catch (error: any) {
-            console.error(`Failed to stop UI task ${taskId}:`, error);
-        }
-    }, []);
-
-    const handleDelete = useCallback(async () => {
-        if (!uiToDelete) return;
-        try {
-            await deleteUiAPI(uiToDelete);
-            fetchUiData(); // Manually trigger a refresh after deletion.
-        } catch (error: any) {
-            console.error(`Failed to delete UI ${uiToDelete}:`, error);
-        }
-        setIsDeleteConfirmOpen(false);
-        setUiToDelete(null);
-    }, [uiToDelete, fetchUiData]);
-
-    const handleRepair = useCallback(
-        async (uiName: UiNameType, path: string, issuesToFix: string[]) => {
-            try {
-                const response = await repairUiAPI({
-                    ui_name: uiName,
-                    path,
-                    issues_to_fix: issuesToFix,
-                });
-                if (response.success) {
-                    addTaskToAutoConfigure(response.task_id);
-                }
-            } catch (error: any) {
-                console.error(`Failed to start repair for ${uiName}:`, error);
-            }
-            setIsAdoptModalOpen(false);
-        },
-        [addTaskToAutoConfigure],
-    );
-
-    const handleFinalizeAdoption = useCallback(
-        async (uiName: UiNameType, path: string) => {
-            try {
-                await finalizeAdoptionAPI({ ui_name: uiName, path });
-                fetchUiData(); // Refresh UI data after successful adoption.
-            } catch (error: any) {
-                console.error(`Failed to finalize adoption for ${uiName}:`, error);
-            }
-            setIsAdoptModalOpen(false);
-        },
-        [fetchUiData],
-    );
-
-    // --- Modal Control Handlers ---
-    const openInstallModal = (ui: AvailableUiItem) => {
-        setUiToInstall(ui);
-        setIsInstallModalOpen(true);
-    };
-
-    const requestDelete = (uiName: UiNameType) => {
-        setUiToDelete(uiName);
-        setIsDeleteConfirmOpen(true);
-    };
+    // --- REFACTOR: All logic is now encapsulated in this single hook call ---
+    const {
+        isLoading,
+        combinedUiData,
+        isInstallModalOpen,
+        uiToInstall,
+        isDeleteConfirmOpen,
+        uiToDelete,
+        isAdoptModalOpen,
+        availableUis,
+        isUiBusy,
+        handleInstall,
+        handleRun,
+        handleStop,
+        handleDelete,
+        handleRepair,
+        handleFinalizeAdoption,
+        openInstallModal,
+        requestDelete,
+        setIsInstallModalOpen,
+        setIsDeleteConfirmOpen,
+        setUiToDelete,
+        setIsAdoptModalOpen,
+    } = useUiManagement();
 
     // --- Render Logic ---
 
@@ -299,11 +180,7 @@ const UiManagementPage: React.FC = () => {
                 onClose={() => setIsInstallModalOpen(false)}
                 uiToInstall={uiToInstall}
                 onConfirmInstall={handleInstall}
-                isSubmitting={
-                    !!uiToInstall &&
-                    isUiBusy(uiToInstall.ui_name) &&
-                    !uiStatuses.find((s) => s.ui_name === uiToInstall.ui_name)?.is_installed
-                }
+                isSubmitting={!!uiToInstall && isUiBusy(uiToInstall.ui_name)}
             />
             <AdoptUiModal
                 isOpen={isAdoptModalOpen}
@@ -317,7 +194,10 @@ const UiManagementPage: React.FC = () => {
                 title={`Delete ${uiToDelete}?`}
                 message={`Are you sure you want to permanently delete the installation for ${uiToDelete}? This action cannot be undone.`}
                 onConfirm={handleDelete}
-                onCancel={() => setIsDeleteConfirmOpen(false)}
+                onCancel={() => {
+                    setIsDeleteConfirmOpen(false);
+                    setUiToDelete(null);
+                }}
                 confirmText="Yes, Delete"
                 isDanger={true}
             />
