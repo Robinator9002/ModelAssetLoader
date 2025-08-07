@@ -52,6 +52,7 @@ M.A.L. is more than just a downloader. The goal is for it to be the central hub 
 -   [x] Established a dedicated, reusable API service layer on the frontend.
 -   [x] Implemented robust, decoupled state management with Zustand.
 -   [ ] Formalize Dependency Injection with FastAPI `Depends`.
+-   [ ] Create a new, custom error handling System.
 -   [ ] Abstract complex frontend logic into custom hooks.
 
 #### 🎯 **Phase 4: Core Improvements** `(Starting Soon)`
