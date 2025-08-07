@@ -1,14 +1,9 @@
 // frontend/src/components/FileManager/FileManagerPage.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-    // --- REFACTOR: Import API functions directly ---
-    listManagedFilesAPI,
-    deleteManagedItemAPI,
-    type LocalFileItem,
-    type ViewMode,
-} from '~/api';
-// --- REFACTOR: Import Zustand store to get config state ---
-import { useConfigStore } from '../../state/configStore';
+import React from 'react';
+// --- REFACTOR: Import the new custom hook ---
+import { useFileManager } from './useFileManager';
+
+// --- Component & Icon Imports ---
 import { Loader2, AlertTriangle, ArrowLeft, RefreshCw, Home, Info } from 'lucide-react';
 import FileItem from './FileItem';
 import ConfirmModal from '../Layout/ConfirmModal';
@@ -16,99 +11,40 @@ import FilePreview from './FilePreview';
 import ViewModeSwitcher from '../Switchers/ViewModeSwitcher';
 
 /**
- * @refactor This component is now self-sufficient. It fetches its own configuration
- * state from the `useConfigStore` and manages all its internal state and API calls
- * for file management, completely decoupling it from App.tsx.
+ * @refactor This component has been completely refactored to be a "presentational"
+ * or "dumb" component. All of its complex state management, data fetching, and
+ * event handling logic has been extracted into the `useFileManager` custom hook.
+ *
+ * The component's sole responsibility is now to render the UI based on the state
+ * and functions provided by the hook. This makes the component significantly
+ * cleaner, easier to read, and focused only on the view layer.
  */
 const FileManagerPage: React.FC = () => {
-    // --- State from Zustand Store ---
-    const { pathConfig, isLoading: isConfigLoading } = useConfigStore();
-    const isConfigurationDone = !!pathConfig.basePath;
-
-    // --- Local Component State ---
-    const [items, setItems] = useState<LocalFileItem[]>([]);
-    const [currentPath, setCurrentPath] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<ViewMode>('models');
-    const [itemToDelete, setItemToDelete] = useState<LocalFileItem | null>(null);
-    const [itemToPreview, setItemToPreview] = useState<LocalFileItem | null>(null);
-
-    // --- Core Data Fetching Logic ---
-    const fetchFiles = useCallback(
-        async (path: string | null, mode: ViewMode) => {
-            if (!isConfigurationDone) {
-                // Don't attempt to fetch if the base path isn't set.
-                setIsLoading(false);
-                return;
-            }
-            setIsLoading(true);
-            setError(null);
-            try {
-                const response = await listManagedFilesAPI(path, mode);
-                setItems(response.items);
-                setCurrentPath(response.path);
-            } catch (err: any) {
-                setError(err.message || 'Failed to load files. Is the backend running?');
-                setItems([]);
-            } finally {
-                setIsLoading(false);
-            }
-        },
-        [isConfigurationDone],
-    ); // Re-run if config status changes
-
-    // --- Effects ---
-    // Initial fetch and re-fetch when viewMode or configuration status changes.
-    useEffect(() => {
-        fetchFiles(null, viewMode);
-    }, [viewMode, fetchFiles, isConfigurationDone]);
-
-    // --- Action Handlers ---
-    const handleNavigate = (item: LocalFileItem) => {
-        if (item.item_type === 'directory') {
-            fetchFiles(item.path, viewMode);
-        } else {
-            setItemToPreview(item);
-        }
-    };
-
-    const navigateUp = () => {
-        if (!currentPath) return;
-        // Improved logic for finding the parent path
-        const parts = currentPath.replace(/\\/g, '/').split('/');
-        const parentPath = parts.slice(0, -1).join('/');
-        fetchFiles(parentPath || null, viewMode);
-    };
-
-    const navigateHome = () => {
-        fetchFiles(null, viewMode);
-    };
-
-    const handleRefresh = () => {
-        fetchFiles(currentPath, viewMode);
-    };
-
-    const handleDeleteRequest = (item: LocalFileItem) => {
-        setItemToDelete(item);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!itemToDelete) return;
-        try {
-            await deleteManagedItemAPI(itemToDelete.path);
-            handleRefresh(); // Refresh the view after deletion
-        } catch (err: any) {
-            setError(`Failed to delete ${itemToDelete.name}: ${err.message}`);
-        } finally {
-            setItemToDelete(null);
-        }
-    };
+    // --- REFACTOR: All logic is now encapsulated in this single hook call ---
+    const {
+        items,
+        currentPath,
+        isLoading,
+        error,
+        viewMode,
+        itemToDelete,
+        itemToPreview,
+        isConfigurationDone,
+        setViewMode,
+        handleNavigate,
+        navigateUp,
+        navigateHome,
+        handleRefresh,
+        handleDeleteRequest,
+        handleConfirmDelete,
+        setItemToDelete,
+        setItemToPreview,
+    } = useFileManager();
 
     // --- Render Logic ---
-
+    // This helper function determines what to display in the main content area.
     const renderContent = () => {
-        if (isLoading || isConfigLoading) {
+        if (isLoading) {
             return (
                 <div className="page-state-container">
                     <Loader2 size={32} className="animate-spin" />
