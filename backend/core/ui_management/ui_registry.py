@@ -3,20 +3,16 @@ import json
 import logging
 import pathlib
 
-# --- REFACTOR: Import TypedDict for defining the new data structure ---
 from typing import Dict, Optional, TypedDict
 
 from ..constants.constants import CONFIG_FILE_DIR, UiNameType
-from core.errors import MalError, OperationFailedError
+from core.errors import MalError, OperationFailedError, EntityNotFoundError
 
 logger = logging.getLogger(__name__)
 
 INSTALLATIONS_FILE_PATH = CONFIG_FILE_DIR / "ui_installations.json"
 
 
-# --- REFACTOR: Define a TypedDict for Installation Details ---
-# This creates a formal, type-checked structure for each registered UI instance.
-# It's the core of the change, allowing us to store more than just a path.
 class InstallationDetails(TypedDict):
     """Represents the data stored for a single managed UI installation."""
 
@@ -28,18 +24,10 @@ class InstallationDetails(TypedDict):
 class UiRegistry:
     """
     Manages the persistent registry of unique UI installations.
-
-    @refactor This class has been significantly reworked. It no longer assumes a
-    1-to-1 relationship between a UI type (e.g., 'ComfyUI') and an installation.
-    Instead, it now manages a dictionary of unique installation instances,
-    each identified by a unique ID. This is the foundational change required
-    to support multiple, named instances of the same UI.
     """
 
     def __init__(self):
         """Initializes the registry by loading data from the file."""
-        # --- REFACTOR: The internal dictionary now maps a unique installation_id (str)
-        # to the detailed InstallationDetails dictionary. ---
         self._installations: Dict[str, InstallationDetails] = self._load_installations()
         logger.info(
             f"UI Registry initialized with {len(self._installations)} registered installations."
@@ -48,14 +36,12 @@ class UiRegistry:
     def _load_installations(self) -> Dict[str, InstallationDetails]:
         """
         Loads the installation data from the JSON file.
-        Gracefully handles missing or corrupt files by returning an empty dictionary.
         """
         if not INSTALLATIONS_FILE_PATH.exists():
             return {}
         try:
             with open(INSTALLATIONS_FILE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # --- REFACTOR: Add more robust validation for the new structure ---
                 if isinstance(data, dict) and all(
                     isinstance(k, str) and isinstance(v, dict) and "path" in v and "ui_name" in v
                     for k, v in data.items()
@@ -77,10 +63,8 @@ class UiRegistry:
                 json.dump(self._installations, f, indent=4)
         except IOError as e:
             logger.error(f"Error saving UI installations file: {e}", exc_info=True)
-            # In a production scenario, we might want to raise an OperationFailedError here
-            # if saving is absolutely critical. For now, logging is sufficient.
+            raise OperationFailedError(operation_name="Save UI installations", original_exception=e)
 
-    # --- REFACTOR: `add_installation` now requires more details ---
     def add_installation(
         self,
         installation_id: str,
@@ -90,12 +74,6 @@ class UiRegistry:
     ):
         """
         Adds or updates an installation instance in the registry.
-
-        Args:
-            installation_id: The unique identifier for this instance.
-            ui_name: The type of the UI (e.g., 'ComfyUI').
-            display_name: The user-provided name for this instance.
-            install_path: The absolute path to the installation directory.
         """
         resolved_path_str = str(install_path.resolve())
         logger.info(
@@ -108,7 +86,35 @@ class UiRegistry:
         }
         self._save_installations()
 
-    # --- REFACTOR: All public methods now operate on `installation_id` ---
+    # --- NEW: Method to update an existing installation ---
+    def update_installation(
+        self,
+        installation_id: str,
+        new_display_name: Optional[str] = None,
+        new_path: Optional[pathlib.Path] = None,
+    ):
+        """
+        Updates the details of an existing installation.
+
+        Args:
+            installation_id: The ID of the instance to update.
+            new_display_name: The new display name, if provided.
+            new_path: The new absolute path, if provided.
+        """
+        if installation_id not in self._installations:
+            raise EntityNotFoundError(entity_name="UI Installation", entity_id=installation_id)
+
+        if new_display_name:
+            self._installations[installation_id]["display_name"] = new_display_name
+            logger.info(f"Updated display name for '{installation_id}' to '{new_display_name}'.")
+
+        if new_path:
+            resolved_path_str = str(new_path.resolve())
+            self._installations[installation_id]["path"] = resolved_path_str
+            logger.info(f"Updated path for '{installation_id}' to '{resolved_path_str}'.")
+
+        self._save_installations()
+
     def remove_installation(self, installation_id: str):
         """Removes an installation record from the registry by its unique ID."""
         if installation_id in self._installations:
