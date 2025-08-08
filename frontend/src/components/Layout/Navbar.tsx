@@ -1,6 +1,5 @@
 // frontend/src/components/Layout/Navbar.tsx
 import React from 'react';
-// --- REFACTOR: Import NavLink for routing ---
 import { NavLink } from 'react-router-dom';
 import {
     Search,
@@ -15,9 +14,7 @@ import {
     Power,
 } from 'lucide-react';
 import { type DownloadSummaryStatus } from '../../App';
-import { type UiNameType } from '~/api';
 
-// --- REFACTOR: The key now corresponds to the route path ---
 export interface NavItemConfig {
     key: string;
     label: string;
@@ -41,7 +38,12 @@ interface NavbarProps {
     onToggleDownloads: () => void;
     downloadStatus: DownloadSummaryStatus;
     downloadCount: number;
-    activeUiName: UiNameType | null;
+    /**
+     * @fix {TYPESCRIPT} Changed type from `UiNameType | null` to `string | null`.
+     * This is the fix for the TypeScript error. The quick-start button now correctly
+     * accepts any user-defined `display_name` string, not just the restrictive enum.
+     */
+    activeUiName: string | null;
     isUiInstalled: boolean;
     isUiRunning: boolean;
     onQuickStart: () => void;
@@ -77,11 +79,8 @@ const Navbar: React.FC<NavbarProps> = ({
                 <ul className="navbar-tabs-list">
                     {navItems.map((item) => (
                         <li key={item.key} className="navbar-tab-item">
-                            {/* --- REFACTOR: Replaced button with NavLink --- */}
                             <NavLink
                                 to={item.key}
-                                // The `className` prop can be a function to conditionally apply classes.
-                                // `isActive` is automatically provided by NavLink.
                                 className={({ isActive }) =>
                                     `navbar-tab-button ${isActive ? 'active' : ''}`
                                 }
