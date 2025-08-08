@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import pathlib
-import uuid  # --- FIX: Import uuid for generating installation IDs ---
+import uuid
 from typing import List
 
 from api.models import ManagedUiStatus
@@ -13,7 +13,6 @@ from core.ui_management.process_manager import ProcessManager
 from core.ui_management.installation_manager import InstallationManager
 from core.ui_management import ui_operator
 
-# --- NEW: Import custom error classes for standardized handling ---
 from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -39,10 +38,9 @@ class UiManager:
         It combines data from the registry and the process manager.
         """
         statuses: List[ManagedUiStatus] = []
-        # --- FIX: Get running UIs mapped by installation_id ---
-        running_ui_map = self.process_manager.get_running_tasks()
+        # --- FIX: Call the new, correct method on the process_manager ---
+        running_ui_map = self.process_manager.get_running_tasks_by_installation_id()
 
-        # --- FIX: Use the correct method `get_all_installations` and iterate over the new structure ---
         for installation_id, details in self.registry.get_all_installations().items():
             install_path = pathlib.Path(details["path"])
             if not install_path.is_dir():
@@ -68,7 +66,6 @@ class UiManager:
 
     # --- Delegated Lifecycle Methods ---
 
-    # --- FIX: Update signatures to pass all required data down to the installation_manager ---
     def install_ui_environment(
         self,
         ui_name: UiNameType,
@@ -77,12 +74,13 @@ class UiManager:
         task_id: str,
     ):
         installation_id = str(uuid.uuid4())
-        # A default path can be constructed here if not provided, for example:
-        # resolved_path = install_path or SOME_DEFAULT_BASE_PATH / display_name
+        # This logic assumes install_path is always provided by the router layer.
+        # If it can be None, a default path should be constructed here.
         self.installation_manager.start_install(
-            ui_name, display_name, install_path, task_id, installation_id
+            ui_name, install_path, task_id, installation_id, display_name
         )
 
+    # --- FIX: Pass installation_id to the process_manager ---
     def run_ui(self, installation_id: str, task_id: str):
         self.process_manager.start_process(installation_id, task_id)
 
@@ -98,7 +96,10 @@ class UiManager:
             raise EntityNotFoundError(entity_name="UI Installation", entity_id=installation_id)
 
         install_path = pathlib.Path(details["path"])
-        running_task_id = self.process_manager.get_running_tasks().get(installation_id)
+        # --- FIX: Use the correct method to find the running task ---
+        running_task_id = self.process_manager.get_running_tasks_by_installation_id().get(
+            installation_id
+        )
 
         if running_task_id:
             logger.warning(
@@ -124,7 +125,6 @@ class UiManager:
         adopter = UiAdopter(ui_name, path)
         return await adopter.analyze()
 
-    # --- FIX: Update signatures to pass all required data ---
     def repair_and_adopt_ui(
         self,
         ui_name: UiNameType,
@@ -138,7 +138,6 @@ class UiManager:
             ui_name, path, issues_to_fix, task_id, installation_id, display_name
         )
 
-    # --- FIX: Update signatures to pass all required data ---
     def finalize_adoption(self, ui_name: UiNameType, display_name: str, path: pathlib.Path):
         try:
             installation_id = str(uuid.uuid4())
