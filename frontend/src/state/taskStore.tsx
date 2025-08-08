@@ -25,10 +25,10 @@ interface TaskState {
     ws: WebSocket | null;
     // --- PHASE 2.4 MODIFICATION: Add connection status and management state ---
     wsStatus: WsConnectionStatus;
-    reconnectTimeoutId: NodeJS.Timeout | null;
+    reconnectTimeoutId: number | null; // Use number for browser's setTimeout ID
 
     // Actions
-    initializeConnection: () => void; // Renamed from 'connect'
+    initializeConnection: () => void;
     disconnect: () => void;
     addTaskToAutoConfigure: (taskId: string) => void;
     dismissTask: (taskId: string) => Promise<void>;
@@ -48,10 +48,16 @@ export const useTaskStore = create<TaskState>((set, get) => {
     let reconnectAttempts = 0;
 
     const connect = () => {
+        const { ws: currentWs, reconnectTimeoutId } = get();
         // Prevent multiple parallel connection attempts
-        if (get().ws && get().ws?.readyState < 2) {
+        if (currentWs && currentWs.readyState < 2) {
             console.log('WebSocket connection attempt already in progress or established.');
             return;
+        }
+        // Clear any pending reconnect timeout if we are manually connecting
+        if (reconnectTimeoutId) {
+            clearTimeout(reconnectTimeoutId);
+            set({ reconnectTimeoutId: null });
         }
 
         console.log(`Attempting to connect (Attempt: ${reconnectAttempts + 1})...`);
@@ -76,7 +82,6 @@ export const useTaskStore = create<TaskState>((set, get) => {
                             ),
                         });
                         break;
-
                     case 'update':
                         const status: DownloadStatus = data.data;
                         if (status?.download_id) {
@@ -121,7 +126,6 @@ export const useTaskStore = create<TaskState>((set, get) => {
                             }
                         }
                         break;
-
                     case 'remove':
                         if (data.download_id) {
                             set((state) => {
@@ -143,9 +147,9 @@ export const useTaskStore = create<TaskState>((set, get) => {
 
                 console.log(`Will attempt to reconnect in ${delay / 1000}s...`);
                 const timeoutId = setTimeout(connect, delay);
-                set({ reconnectTimeoutId: timeoutId });
+                set({ reconnectTimeoutId: timeoutId as any }); // Cast to any to satisfy Node/Browser type mismatch
             },
-            onError: (error) => {
+            onError: (error: Event) => {
                 console.error('WebSocket error observed:', error);
                 // The onClose event will be triggered automatically after an error,
                 // so the reconnection logic will be handled there.
@@ -175,7 +179,9 @@ export const useTaskStore = create<TaskState>((set, get) => {
             if (reconnectTimeoutId) {
                 clearTimeout(reconnectTimeoutId);
             }
+            // Set onclose to null before closing to prevent the reconnect logic from firing.
             if (ws) {
+                ws.onclose = null;
                 ws.close();
             }
             set({ ws: null, wsStatus: 'disconnected', reconnectTimeoutId: null });
