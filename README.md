@@ -60,6 +60,7 @@ M.A.L. is more than just a downloader. The goal is for it to be the central hub 
 -   [x] Fix the start button for every individual AI and give better feedback during startup.
 -   [x] Overwork Error Messages to be more descriptive and user-friendly.
 -   [ ] Overwork UI Management to allow changing paths and stacking multiple versions of one UI.
+-   [ ] Move the Hooks into a new Subfolder
 
 #### 🏁 **Phase 5: The M.A.L. Platform** `(Final Steps)`
 
