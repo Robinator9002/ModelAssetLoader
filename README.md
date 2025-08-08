@@ -57,9 +57,9 @@ M.A.L. is more than just a downloader. The goal is for it to be the central hub 
 
 #### 🎯 **Phase 4: Core Improvements** `(Starting Now)`
 
+-   [x] Fix the start button for every individual AI and give better feedback during startup.
+-   [x] Overwork Error Messages to be more descriptive and user-friendly.
 -   [ ] Overwork UI Management to allow changing paths and stacking multiple versions of one UI.
--   [ ] Fix the start button for every individual AI and give better feedback during startup.
--   [ ] Overwork Error Messages to be more descriptive and user-friendly.
 
 #### 🏁 **Phase 5: The M.A.L. Platform** `(Final Steps)`
 
