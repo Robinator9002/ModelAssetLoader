@@ -1,5 +1,6 @@
 // frontend/src/api/services/models.tsx
 import apiClient from '../client';
+import { handleApiError } from '../errorHandler';
 import type { SearchModelParams, PaginatedModelListResponse, ModelDetails } from '../types';
 
 /**
@@ -13,7 +14,7 @@ import type { SearchModelParams, PaginatedModelListResponse, ModelDetails } from
  * Searches for models based on a variety of filter criteria.
  * @param {SearchModelParams} params - The parameters for the search query, including filters, sorting, and pagination.
  * @returns {Promise<PaginatedModelListResponse>} A promise that resolves to a paginated list of models.
- * @throws Will throw an error if the network request fails.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const searchModels = async (
     params: SearchModelParams,
@@ -23,7 +24,7 @@ export const searchModels = async (
         return response.data;
     } catch (error) {
         console.error('Error in searchModels:', error);
-        throw error;
+        throw handleApiError(error, 'Failed to search for models.');
     }
 };
 
@@ -32,7 +33,7 @@ export const searchModels = async (
  * @param {string} source - The source of the model (e.g., 'huggingface').
  * @param {string} modelId - The unique identifier of the model.
  * @returns {Promise<ModelDetails>} A promise that resolves to the detailed model information.
- * @throws Will throw an error if the network request fails.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const getModelDetails = async (source: string, modelId: string): Promise<ModelDetails> => {
     try {
@@ -43,6 +44,6 @@ export const getModelDetails = async (source: string, modelId: string): Promise<
         return response.data;
     } catch (error) {
         console.error('Error in getModelDetails:', error);
-        throw error;
+        throw handleApiError(error, 'Failed to fetch model details.');
     }
 };
