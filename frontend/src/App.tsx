@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'; // --- FIX: Import useRef ---
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
 
@@ -45,19 +45,19 @@ function AppContent() {
         setTheme,
     } = useConfigStore();
     const { uiStatuses, fetchUiData } = useUiStore();
-    // --- PHASE 2.4 MODIFICATION: Get WebSocket status and the new initializer function ---
     const { activeTasks, wsStatus, initializeConnection, dismissTask } = useTaskStore();
     const { isDownloadModalOpen, modelForDownload, specificFileForDownload, closeDownloadModal } =
         useModalStore();
 
     // --- Local View State ---
     const [isDownloadsSidebarOpen, setDownloadsSidebarOpen] = useState(false);
+    // --- FIX: Add a ref to track the previous number of tasks ---
+    const prevTaskCount = useRef(activeTasks.size);
 
     // --- Effects ---
     useEffect(() => {
         loadInitialConfig();
         fetchUiData();
-        // --- PHASE 2.4 MODIFICATION: Use the robust connection initializer ---
         initializeConnection();
     }, [loadInitialConfig, fetchUiData, initializeConnection]);
 
@@ -65,9 +65,21 @@ function AppContent() {
         document.body.className = theme === 'light' ? 'light-theme' : '';
     }, [theme]);
 
+    // --- FIX: Add an effect to automatically open the sidebar when a new task is added ---
+    useEffect(() => {
+        // If the number of tasks has increased, a new task was just added.
+        if (activeTasks.size > prevTaskCount.current) {
+            setDownloadsSidebarOpen(true);
+        }
+        // Update the ref to the current count for the next render.
+        prevTaskCount.current = activeTasks.size;
+    }, [activeTasks]);
+
     // --- Callbacks ---
     const handleDownloadsStarted = useCallback(() => {
         closeDownloadModal();
+        // This will now be handled by the useEffect above, but we can keep it
+        // for immediate feedback if desired, or remove it. For now, it's harmless.
         setDownloadsSidebarOpen(true);
     }, [closeDownloadModal]);
 
@@ -101,12 +113,10 @@ function AppContent() {
         if (!activeUiForQuickStart) return;
 
         if (activeUiForQuickStart.is_running && activeUiForQuickStart.running_task_id) {
-            console.log(`Stopping UI task: ${activeUiForQuickStart.running_task_id}`);
             stopUiAPI(activeUiForQuickStart.running_task_id).catch((err) =>
                 console.error('Failed to stop UI via quick-start:', err),
             );
         } else if (activeUiForQuickStart.is_installed) {
-            console.log(`Starting UI instance: ${activeUiForQuickStart.installation_id}`);
             runUiAPI(activeUiForQuickStart.installation_id).catch((err) =>
                 console.error('Failed to start UI via quick-start:', err),
             );
@@ -135,7 +145,6 @@ function AppContent() {
                     isUiInstalled={activeUiForQuickStart?.is_installed || false}
                     isUiRunning={activeUiForQuickStart?.is_running || false}
                     onQuickStart={handleQuickStart}
-                    // --- PHASE 2.4 MODIFICATION: Pass the live WebSocket status to the Navbar ---
                     wsStatus={wsStatus}
                 />
                 <main className="main-content-area">
