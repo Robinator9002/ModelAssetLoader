@@ -11,29 +11,26 @@ import {
     StopCircle,
     ClipboardCheck,
     Package,
+    Edit, // --- NEW: Import the Edit icon ---
 } from 'lucide-react';
 import InstallUiModal from './InstallUiModal';
 import ConfirmModal from '../Layout/ConfirmModal';
 import AdoptUiModal from './AdoptUiModal';
+import EditUiModal from './EditUiModal'; // --- NEW: Import the EditUiModal component ---
 
-/**
- * @refactor This component has been completely refactored to render a list of
- * unique UI instances, rather than a combined list of UI types. It now has two
- * distinct sections: one for managing installed instances and another for installing
- * new UIs from the list of available types. All actions are now correctly
- * wired up to use the unique `installation_id`.
- */
 const UiManagementPage: React.FC = () => {
     const {
         isLoading,
         installedUis,
         availableUis,
-        activeTasks, // --- FIX: Destructure the newly provided activeTasks state ---
+        activeTasks,
         isInstallModalOpen,
         uiToInstall,
         isDeleteConfirmOpen,
         uiToDelete,
         isAdoptModalOpen,
+        isEditModalOpen, // --- NEW: Destructure edit modal state ---
+        uiToEdit, // --- NEW: Destructure edit modal state ---
         isUiBusy,
         handleInstall,
         handleRun,
@@ -41,12 +38,15 @@ const UiManagementPage: React.FC = () => {
         handleDelete,
         handleRepair,
         handleFinalizeAdoption,
+        handleUpdateSuccess, // --- NEW: Destructure update handler ---
         openInstallModal,
         requestDelete,
+        openEditModal, // --- NEW: Destructure modal opener ---
         setIsInstallModalOpen,
         setIsDeleteConfirmOpen,
         setUiToDelete,
         setIsAdoptModalOpen,
+        closeEditModal, // --- NEW: Destructure modal closer ---
     } = useUiManagement();
 
     if (isLoading && installedUis.length === 0) {
@@ -71,7 +71,6 @@ const UiManagementPage: React.FC = () => {
                     </button>
                 </div>
 
-                {/* --- Section for Installed Instances --- */}
                 <h2 className="ui-section-header">Installed Instances</h2>
                 <div className="ui-management-grid">
                     {installedUis.map((ui) => {
@@ -116,6 +115,15 @@ const UiManagementPage: React.FC = () => {
                                     >
                                         <Trash2 size={18} />
                                     </button>
+                                    {/* --- NEW: Add the Edit button --- */}
+                                    <button
+                                        className="button"
+                                        onClick={() => openEditModal(ui)}
+                                        title="Edit this instance."
+                                        disabled={busy}
+                                    >
+                                        <Edit size={18} />
+                                    </button>
                                     {ui.is_running && ui.running_task_id ? (
                                         <button
                                             className="button button-warning"
@@ -139,7 +147,6 @@ const UiManagementPage: React.FC = () => {
                     })}
                 </div>
 
-                {/* --- Section for Available UIs to Install --- */}
                 <h2 className="ui-section-header">Available to Install</h2>
                 <div className="ui-management-grid">
                     {availableUis.map((ui) => (
@@ -172,7 +179,6 @@ const UiManagementPage: React.FC = () => {
                 onClose={() => setIsInstallModalOpen(false)}
                 uiToInstall={uiToInstall}
                 onConfirmInstall={handleInstall}
-                // --- FIX: Use the now-available activeTasks map for the check ---
                 isSubmitting={!!uiToInstall && activeTasks.size > 0}
             />
             <AdoptUiModal
@@ -193,6 +199,13 @@ const UiManagementPage: React.FC = () => {
                 }}
                 confirmText="Yes, Delete"
                 isDanger={true}
+            />
+            {/* --- NEW: Render the EditUiModal --- */}
+            <EditUiModal
+                isOpen={isEditModalOpen}
+                onClose={closeEditModal}
+                uiToEdit={uiToEdit}
+                onUpdateSuccess={handleUpdateSuccess}
             />
         </>
     );
