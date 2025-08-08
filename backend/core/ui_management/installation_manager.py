@@ -55,21 +55,44 @@ class InstallationManager:
 
     # --- Public Methods for Installation & Repair ---
 
-    def start_install(self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str):
+    # --- PHASE 2.1 MODIFICATION: Update signature to accept all necessary IDs and names ---
+    def start_install(
+        self,
+        ui_name: UiNameType,
+        install_path: pathlib.Path,
+        task_id: str,
+        installation_id: str,
+        display_name: str,
+    ):
         """
         Starts the UI installation process as a background asyncio task.
         """
-        task = asyncio.create_task(self._install_ui_environment(ui_name, install_path, task_id))
-        download_tracker.start_tracking(task_id, "UI Installation", ui_name, task)
+        task = asyncio.create_task(
+            self._install_ui_environment(
+                ui_name, install_path, task_id, installation_id, display_name
+            )
+        )
+        download_tracker.start_tracking(task_id, "UI Installation", display_name, task)
 
+    # --- PHASE 2.1 MODIFICATION: Update signature to accept all necessary IDs and names ---
     def start_repair(
-        self, ui_name: UiNameType, path: pathlib.Path, issues_to_fix: List[str], task_id: str
+        self,
+        ui_name: UiNameType,
+        path: pathlib.Path,
+        issues_to_fix: List[str],
+        task_id: str,
+        installation_id: str,
+        display_name: str,
     ):
         """
         Starts the UI repair and adoption process as a background asyncio task.
         """
-        task = asyncio.create_task(self._run_repair_process(ui_name, path, issues_to_fix, task_id))
-        download_tracker.start_tracking(task_id, "UI Adoption Repair", ui_name, task)
+        task = asyncio.create_task(
+            self._run_repair_process(
+                ui_name, path, issues_to_fix, task_id, installation_id, display_name
+            )
+        )
+        download_tracker.start_tracking(task_id, "UI Adoption Repair", display_name, task)
 
     async def cancel_task(self, task_id: str):
         """
@@ -106,8 +129,14 @@ class InstallationManager:
 
     # --- Core Workflow Implementations ---
 
+    # --- PHASE 2.1 MODIFICATION: Update signature to accept all necessary IDs and names ---
     async def _install_ui_environment(
-        self, ui_name: UiNameType, install_path: pathlib.Path, task_id: str
+        self,
+        ui_name: UiNameType,
+        install_path: pathlib.Path,
+        task_id: str,
+        installation_id: str,
+        display_name: str,
     ):
         """The core async method that orchestrates the complete installation of a new UI."""
         await asyncio.sleep(0.1)  # Allow tracker to register the task
@@ -156,9 +185,15 @@ class InstallationManager:
             )
 
             await download_tracker.update_task_progress(task_id, 90.0, "Finalizing installation...")
-            # --- REFACTOR: ui_registry.add_installation will raise MalError directly ---
-            self.ui_registry.add_installation(ui_name, install_path)
-            await download_tracker.complete_download(task_id, f"Successfully installed {ui_name}.")
+            # --- PHASE 2.1 MODIFICATION: Use the full, correct signature to register the instance ---
+            self.ui_registry.add_installation(installation_id, ui_name, display_name, install_path)
+
+            # --- PHASE 2.1 MODIFICATION: Pass the new installation_id to the completion tracker ---
+            await download_tracker.complete_download(
+                task_id,
+                f"Successfully installed {display_name}.",
+                installation_id=installation_id,
+            )
         except asyncio.CancelledError:
             await download_tracker.fail_download(
                 task_id, "Installation was cancelled by user.", cancelled=True
@@ -166,13 +201,14 @@ class InstallationManager:
         # --- REFACTOR: Catch MalError first, then generic Exception ---
         except MalError as e:
             logger.error(
-                f"Installation process for {ui_name} failed with MalError: {e.message}",
+                f"Installation process for {display_name} failed with MalError: {e.message}",
                 exc_info=False,
             )
             await download_tracker.fail_download(task_id, e.message)
         except Exception as e:
             logger.critical(
-                f"An unhandled exception occurred during installation for {ui_name}!", exc_info=True
+                f"An unhandled exception occurred during installation for {display_name}!",
+                exc_info=True,
             )
             await download_tracker.fail_download(
                 task_id, f"A critical internal error occurred: {e}"
@@ -180,8 +216,15 @@ class InstallationManager:
         finally:
             self.active_tasks.pop(task_id, None)
 
+    # --- PHASE 2.1 MODIFICATION: Update signature to accept all necessary IDs and names ---
     async def _run_repair_process(
-        self, ui_name: UiNameType, path: pathlib.Path, issues_to_fix: List[str], task_id: str
+        self,
+        ui_name: UiNameType,
+        path: pathlib.Path,
+        issues_to_fix: List[str],
+        task_id: str,
+        installation_id: str,
+        display_name: str,
     ):
         """The core async method that performs the repair actions for UI adoption."""
         await asyncio.sleep(0.1)
@@ -223,10 +266,14 @@ class InstallationManager:
                 )
 
             await download_tracker.update_task_progress(task_id, 95, "Finalizing adoption...")
-            # --- REFACTOR: ui_registry.add_installation will raise MalError directly ---
-            self.ui_registry.add_installation(ui_name, path)
+            # --- PHASE 2.1 MODIFICATION: Use the full, correct signature to register the instance ---
+            self.ui_registry.add_installation(installation_id, ui_name, display_name, path)
+
+            # --- PHASE 2.1 MODIFICATION: Pass the new installation_id to the completion tracker ---
             await download_tracker.complete_download(
-                task_id, f"Successfully repaired and adopted {ui_name}."
+                task_id,
+                f"Successfully repaired and adopted {display_name}.",
+                installation_id=installation_id,
             )
         except asyncio.CancelledError:
             await download_tracker.fail_download(
@@ -235,12 +282,13 @@ class InstallationManager:
         # --- REFACTOR: Catch MalError first, then generic Exception ---
         except MalError as e:
             logger.error(
-                f"Repair process for {ui_name} failed with MalError: {e.message}", exc_info=False
+                f"Repair process for {display_name} failed with MalError: {e.message}",
+                exc_info=False,
             )
             await download_tracker.fail_download(task_id, e.message)
         except Exception as e:
             logger.critical(
-                f"An unhandled exception occurred during repair for {ui_name}!", exc_info=True
+                f"An unhandled exception occurred during repair for {display_name}!", exc_info=True
             )
             await download_tracker.fail_download(
                 task_id, f"A critical internal error occurred: {e}"

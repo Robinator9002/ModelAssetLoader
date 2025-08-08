@@ -38,9 +38,13 @@ class DownloadStatus:
     total_size_bytes: int = 0
     downloaded_bytes: int = 0
     error_message: Optional[str] = None
-    status_text: Optional[str] = None  # ADDED: For in-progress status messages
+    status_text: Optional[str] = None
     target_path: Optional[str] = None
     task: Optional[asyncio.Task] = field(default=None, repr=False, compare=False)
+    # --- PHASE 2.1 MODIFICATION: Add field to carry the installation ID ---
+    # This field will be populated upon successful completion of a UI installation
+    # or repair task, and broadcast to the frontend.
+    installation_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Converts the dataclass to a dictionary, excluding the task object."""
@@ -53,8 +57,10 @@ class DownloadStatus:
             "total_size_bytes": self.total_size_bytes,
             "downloaded_bytes": self.downloaded_bytes,
             "error_message": self.error_message,
-            "status_text": self.status_text,  # ADDED
+            "status_text": self.status_text,
             "target_path": self.target_path,
+            # --- PHASE 2.1 MODIFICATION: Include new field in serialization ---
+            "installation_id": self.installation_id,
         }
 
 
@@ -143,20 +149,29 @@ class DownloadTracker:
                 status.status = "downloading"
 
             status.progress = round(progress, 2)
-            # CHANGED: Use the new dedicated field for status text.
             status.status_text = status_text
 
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
-    async def complete_download(self, download_id: str, final_path: str):
-        """Marks a tracked task as completed."""
+    # --- PHASE 2.1 MODIFICATION: Update signature to accept installation_id ---
+    async def complete_download(
+        self, download_id: str, final_path: str, installation_id: Optional[str] = None
+    ):
+        """
+        Marks a tracked task as completed and includes the installation_id if provided.
+        """
         if download_id in self.active_downloads:
             status = self.active_downloads[download_id]
             status.status = "completed"
             status.progress = 100.0
             status.target_path = final_path
             status.status_text = "Completed"
-            logger.info(f"Download {download_id} completed. Path: {final_path}")
+            # --- PHASE 2.1 MODIFICATION: Set the installation_id on the status object ---
+            status.installation_id = installation_id
+            logger.info(
+                f"Download {download_id} completed. Path: {final_path}. "
+                f"Installation ID: {installation_id}"
+            )
             await self._broadcast({"type": "update", "data": status.to_dict()})
 
     async def fail_download(self, download_id: str, error_message: str, cancelled: bool = False):
