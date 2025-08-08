@@ -16,7 +16,7 @@ import UiManagementPage from './components/Environments/UiManagementPage';
 import appIcon from '/icon.png';
 
 // --- API & Store Imports ---
-import { runUiAPI, stopUiAPI } from '~/api'; // <-- NEW: Import API functions for quick start
+import { runUiAPI, stopUiAPI } from '~/api';
 import { useConfigStore } from './state/configStore';
 import { useUiStore } from './state/uiStore';
 import { useTaskStore } from './state/taskStore';
@@ -45,7 +45,8 @@ function AppContent() {
         setTheme,
     } = useConfigStore();
     const { uiStatuses, fetchUiData } = useUiStore();
-    const { activeTasks, connect, dismissTask } = useTaskStore();
+    // --- PHASE 2.4 MODIFICATION: Get WebSocket status and the new initializer function ---
+    const { activeTasks, wsStatus, initializeConnection, dismissTask } = useTaskStore();
     const { isDownloadModalOpen, modelForDownload, specificFileForDownload, closeDownloadModal } =
         useModalStore();
 
@@ -56,8 +57,9 @@ function AppContent() {
     useEffect(() => {
         loadInitialConfig();
         fetchUiData();
-        connect();
-    }, [loadInitialConfig, fetchUiData, connect]);
+        // --- PHASE 2.4 MODIFICATION: Use the robust connection initializer ---
+        initializeConnection();
+    }, [loadInitialConfig, fetchUiData, initializeConnection]);
 
     useEffect(() => {
         document.body.className = theme === 'light' ? 'light-theme' : '';
@@ -83,29 +85,18 @@ function AppContent() {
         return 'completed';
     }, [activeTasks]);
 
-    /**
-     * @refactor {CRITICAL} This logic is now corrected to properly handle the instance-based architecture.
-     * It uses the `installation_id` for lookup in 'automatic' mode, fixing a major bug.
-     */
     const activeUiForQuickStart = useMemo(() => {
         if (pathConfig.configMode === 'automatic') {
-            const targetId = pathConfig.automaticModeUi; // This is the installation_id
+            const targetId = pathConfig.automaticModeUi;
             if (!targetId) return null;
-            // Find the specific instance by its unique ID.
             return uiStatuses.find((s) => s.installation_id === targetId) || null;
         } else {
-            // In manual mode, the behavior is less specific. We find the first installed
-            // instance that matches the selected profile type (e.g., 'A1111').
             const targetProfile = pathConfig.uiProfile;
             if (!targetProfile || targetProfile === 'Custom') return null;
             return uiStatuses.find((s) => s.ui_name === targetProfile) || null;
         }
     }, [pathConfig, uiStatuses]);
 
-    /**
-     * @feature {IMPLEMENT} Implemented the start/stop logic for the quick-start button.
-     * This function is now passed to the Navbar and handles the API calls.
-     */
     const handleQuickStart = useCallback(() => {
         if (!activeUiForQuickStart) return;
 
@@ -140,12 +131,12 @@ function AppContent() {
                     onToggleDownloads={() => setDownloadsSidebarOpen((p) => !p)}
                     downloadStatus={downloadSummaryStatus}
                     downloadCount={activeTasks.size}
-                    // --- FIX: Pass the correct display_name to the button ---
                     activeUiName={activeUiForQuickStart?.display_name || null}
                     isUiInstalled={activeUiForQuickStart?.is_installed || false}
                     isUiRunning={activeUiForQuickStart?.is_running || false}
-                    // --- FIX: Wire up the actual handler function ---
                     onQuickStart={handleQuickStart}
+                    // --- PHASE 2.4 MODIFICATION: Pass the live WebSocket status to the Navbar ---
+                    wsStatus={wsStatus}
                 />
                 <main className="main-content-area">
                     {isConfigLoading ? (
