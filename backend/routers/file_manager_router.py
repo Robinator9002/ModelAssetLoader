@@ -1,12 +1,10 @@
 # backend/routers/file_manager_router.py
 import logging
-from typing import Optional
+from typing import Optional, Dict
 
-# --- REFACTOR: Import Depends for dependency injection ---
 from fastapi import APIRouter, HTTPException, Query, status, Depends
 from pydantic import BaseModel
 
-# --- API Model Imports ---
 from api.models import (
     MalFullConfiguration,
     PathConfigurationRequest,
@@ -18,25 +16,20 @@ from api.models import (
     LocalFileActionRequest,
     LocalFileContentResponse,
 )
-
-# --- REFACTOR: Import the provider function and the service class for type hinting ---
 from dependencies import get_file_manager
 from core.services.file_manager import FileManager
+from core.errors import MalError
 
-# --- NEW: Import custom error classes for standardized handling ---
-from core.errors import MalError, OperationFailedError, BadRequestError, EntityNotFoundError
+# --- FIX: Import the correct constant name 'KNOWN_UI_PROFILES' ---
+from core.constants.constants import KNOWN_UI_PROFILES, UiProfileType, ModelType
 
 logger = logging.getLogger(__name__)
 
 
-# --- Pydantic models for request bodies specific to this router ---
 class DownloadTaskRequest(BaseModel):
-    """Request model for actions targeting a download task by its ID."""
-
     download_id: str
 
 
-# --- Router Definition ---
 router = APIRouter(
     prefix="/api/filemanager",
     tags=["FileManager"],
@@ -52,24 +45,15 @@ router = APIRouter(
     summary="Get Current FileManager Configuration",
 )
 async def get_config_endpoint(fm: FileManager = Depends(get_file_manager)):
-    """
-    Returns the full, current application configuration.
-    The FileManager instance is now injected by FastAPI.
-    """
-    # This endpoint currently doesn't have a try...except block to refactor,
-    # as fm.get_current_configuration() is expected to always return a config.
-    # If it were to fail, it would likely be a critical internal error.
     try:
         return MalFullConfiguration(**fm.get_current_configuration())
     except MalError as e:
-        # Catch any MalError from the service layer and translate to HTTPException
         logger.error(
             f"[{e.error_code}] Error getting file manager configuration: {e.message}",
             exc_info=False,
         )
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        # Catch any other unexpected errors
         logger.critical(
             f"An unhandled exception occurred getting file manager configuration: {e}",
             exc_info=True,
@@ -88,13 +72,7 @@ async def get_config_endpoint(fm: FileManager = Depends(get_file_manager)):
 async def configure_paths_endpoint(
     config_request: PathConfigurationRequest, fm: FileManager = Depends(get_file_manager)
 ):
-    """
-    Configures the application's base paths and model folder structure.
-    Delegates the logic to the injected file_manager service.
-    """
     try:
-        # The fm.configure_paths method is expected to raise MalError on failure,
-        # so the explicit success check is removed.
         message = fm.configure_paths(
             base_path_str=config_request.base_path,
             profile=config_request.profile,
@@ -109,20 +87,31 @@ async def configure_paths_endpoint(
             current_config=MalFullConfiguration(**fm.get_current_configuration()),
         )
     except MalError as e:
-        # If the underlying service raises a MalError, translate it to an HTTPException
-        # using the error's status code and message.
         logger.error(
             f"[{e.error_code}] Error configuring file manager paths: {e.message}", exc_info=False
         )
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        # Catch any other truly unexpected errors and log them as critical.
         logger.critical(
             f"An unhandled exception occurred during file manager configuration: {e}", exc_info=True
         )
         raise HTTPException(
             status_code=500, detail="An unexpected internal error occurred during configuration."
         )
+
+
+@router.get(
+    "/known-ui-profiles",
+    response_model=Dict[UiProfileType, Dict[ModelType, str]],
+    summary="Get Known UI Profile Path Structures",
+)
+async def get_known_ui_profiles_endpoint():
+    """
+    Returns the dictionary of known UI profiles and their associated model
+    path structures, as defined in the backend's constants.
+    """
+    # --- FIX: Use the correct variable name ---
+    return KNOWN_UI_PROFILES
 
 
 @router.post(
@@ -133,10 +122,7 @@ async def configure_paths_endpoint(
 async def download_file_endpoint(
     download_request: FileDownloadRequest, fm: FileManager = Depends(get_file_manager)
 ):
-    """Initiates a model file download as a background task."""
     try:
-        # The fm.start_download_model_file method is expected to raise MalError on failure,
-        # so the explicit success check is removed.
         result = fm.start_download_model_file(
             source=download_request.source,
             repo_id=download_request.repo_id,
@@ -147,12 +133,9 @@ async def download_file_endpoint(
         )
         return FileDownloadResponse(**result)
     except MalError as e:
-        # If the underlying service raises a MalError, translate it to an HTTPException
-        # using the error's status code and message.
         logger.error(f"[{e.error_code}] Error initiating download: {e.message}", exc_info=False)
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        # Catch any other truly unexpected errors and log them as critical.
         logger.critical(
             f"An unhandled exception occurred during download initiation: {e}", exc_info=True
         )
@@ -170,9 +153,7 @@ async def download_file_endpoint(
 async def cancel_download_endpoint(
     request: DownloadTaskRequest, fm: FileManager = Depends(get_file_manager)
 ):
-    """Sends a cancellation request for an in-progress download."""
     try:
-        # fm.cancel_download is expected to raise MalError on failure.
         await fm.cancel_download(request.download_id)
         return {"success": True, "message": f"Cancellation request for {request.download_id} sent."}
     except MalError as e:
@@ -196,9 +177,7 @@ async def cancel_download_endpoint(
 async def dismiss_download_endpoint(
     request: DownloadTaskRequest, fm: FileManager = Depends(get_file_manager)
 ):
-    """Removes a completed, failed, or cancelled task from the UI."""
     try:
-        # fm.dismiss_download is expected to raise MalError on failure.
         await fm.dismiss_download(request.download_id)
         return {"success": True, "message": f"Task {request.download_id} dismissed."}
     except MalError as e:
@@ -224,22 +203,15 @@ async def scan_host_directories_endpoint(
     path: Optional[str] = Query(None),
     max_depth: int = Query(1, ge=1, le=5),
 ):
-    """Endpoint to scan the host filesystem for directories, used by the folder selector."""
     try:
-        # The fm.list_host_directories method is expected to raise MalError on failure,
-        # so the explicit success check is removed.
         result = await fm.list_host_directories(path_to_scan_str=path, max_depth=max_depth)
         return ScanHostDirectoriesResponse(**result)
-    # --- REFACTOR: Catch custom MalError first ---
     except MalError as e:
-        # If the underlying service raises a MalError, translate it to an HTTPException
-        # using the error's status code and message.
         logger.error(
             f"[{e.error_code}] Error scanning host directories: {e.message}", exc_info=False
         )
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        # Catch any other truly unexpected errors and log them as critical.
         logger.critical(
             f"An unhandled exception occurred during host directory scan: {e}", exc_info=True
         )
@@ -259,9 +231,7 @@ async def list_managed_files_endpoint(
     path: Optional[str] = Query(None),
     mode: str = Query("models", enum=["models", "explorer"]),
 ):
-    """Lists the contents of the configured base model directory."""
     try:
-        # fm.list_managed_files is expected to raise MalError on failure.
         return fm.list_managed_files(relative_path_str=path, mode=mode)
     except MalError as e:
         logger.error(f"[{e.error_code}] Error listing managed files: {e.message}", exc_info=False)
@@ -283,10 +253,7 @@ async def list_managed_files_endpoint(
 async def delete_managed_item_endpoint(
     request: LocalFileActionRequest, fm: FileManager = Depends(get_file_manager)
 ):
-    """Deletes a file or directory from the managed path."""
     try:
-        # The fm.delete_managed_item method is expected to raise MalError on failure,
-        # so the explicit success check is removed.
         result = await fm.delete_managed_item(relative_path_str=request.path)
         return result
     except MalError as e:
@@ -307,10 +274,7 @@ async def delete_managed_item_endpoint(
 async def get_file_preview_endpoint(
     path: str = Query(...), fm: FileManager = Depends(get_file_manager)
 ):
-    """Gets the content of a text file for previewing in the UI."""
     try:
-        # The fm.get_file_preview method is expected to raise MalError on failure,
-        # so the explicit success check is removed.
         result = await fm.get_file_preview(relative_path_str=path)
         return result
     except MalError as e:
