@@ -6,7 +6,9 @@ import uuid
 from typing import List, Optional
 
 from api.models import ManagedUiStatus
-from core.constants.constants import UiNameType
+
+# --- FIX: Import the MANAGED_UIS_ROOT_PATH constant ---
+from core.constants.constants import UiNameType, MANAGED_UIS_ROOT_PATH
 from core.ui_management.ui_adopter import UiAdopter, AdoptionAnalysisResult
 from core.ui_management.ui_registry import UiRegistry
 from core.ui_management.process_manager import ProcessManager
@@ -63,7 +65,7 @@ class UiManager:
             )
         return statuses
 
-    # --- NEW: Logic to update an existing installation ---
+    # --- Logic to update an existing installation ---
     def update_installation(
         self,
         installation_id: str,
@@ -72,13 +74,7 @@ class UiManager:
     ):
         """
         Updates the details of a UI instance after performing validation.
-
-        Args:
-            installation_id: The ID of the instance to update.
-            new_display_name: The new display name, if provided.
-            new_path_str: The new absolute path as a string, if provided.
         """
-        # Validation 1: Check if the UI is currently running.
         running_task = self.process_manager.get_running_tasks_by_installation_id().get(
             installation_id
         )
@@ -88,12 +84,7 @@ class UiManager:
             )
 
         new_path = pathlib.Path(new_path_str) if new_path_str else None
-
-        # Validation 2: If a new path is provided, check for conflicts.
         if new_path:
-            # You might want to add more robust validation here, e.g., checking
-            # if the new path points to a valid UI installation of the correct type.
-            # For now, we'll just check if it conflicts with another *managed* path.
             for id, details in self.registry.get_all_installations().items():
                 if (
                     id != installation_id
@@ -103,7 +94,6 @@ class UiManager:
                         f"The path '{new_path_str}' is already managed by another UI instance ('{details['display_name']}')."
                     )
 
-        # If validation passes, call the registry to perform the update.
         self.registry.update_installation(installation_id, new_display_name, new_path)
 
     # --- Delegated Lifecycle Methods ---
@@ -112,12 +102,27 @@ class UiManager:
         self,
         ui_name: UiNameType,
         display_name: str,
-        install_path: pathlib.Path,
+        install_path: Optional[pathlib.Path],  # Can be None
         task_id: str,
     ):
+        """
+        Handles the logic for starting a UI installation, including defining a
+        default installation path if one is not provided.
+        """
         installation_id = str(uuid.uuid4())
+
+        # --- FIX: Create a default path if the user does not provide one ---
+        if install_path:
+            resolved_path = install_path
+        else:
+            # Sanitize the display_name to create a safe folder name
+            safe_folder_name = "".join(
+                c for c in display_name if c.isalnum() or c in (" ", "_", "-")
+            ).rstrip()
+            resolved_path = MANAGED_UIS_ROOT_PATH / safe_folder_name
+
         self.installation_manager.start_install(
-            ui_name, install_path, task_id, installation_id, display_name
+            ui_name, resolved_path, task_id, installation_id, display_name
         )
 
     def run_ui(self, installation_id: str, task_id: str):
