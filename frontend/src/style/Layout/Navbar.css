@@ -142,3 +142,26 @@
     justify-content: center;
     margin-left: var(--spacing-unit);
 }
+
+/* Styling for new 'Reconnecting...' indicator*/
+.ws-reconnecting-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: var(--warning-color-bg);
+    color: var(--warning-color-text);
+    border-radius: var(--border-radius-medium);
+    font-size: 0.8rem;
+    font-weight: 500;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
