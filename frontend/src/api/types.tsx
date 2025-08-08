@@ -76,7 +76,6 @@ export interface PathConfigurationRequest {
     custom_model_type_paths?: Record<string, string> | null;
     color_theme?: ColorThemeType | null;
     config_mode?: ConfigurationMode | null;
-    // --- REFACTOR: This now sends the unique ID of the installation ---
     automatic_mode_ui?: string | null;
 }
 
@@ -86,7 +85,6 @@ export interface MalFullConfiguration {
     custom_model_type_paths: Record<string, string>;
     color_theme: ColorThemeType | null;
     config_mode: ConfigurationMode | null;
-    // --- REFACTOR: This now holds the unique ID of the installation ---
     automatic_mode_ui: string | null;
 }
 
@@ -126,8 +124,6 @@ export interface DownloadStatus {
     error_message?: string | null;
     status_text?: string | null;
     target_path?: string | null;
-    // --- FIX: Add the new optional field to match the backend payload ---
-    // This resolves the TypeScript error in the taskStore.
     installation_id?: string | null;
 }
 
@@ -181,17 +177,20 @@ export interface AvailableUiItem {
 
 export interface UiInstallRequest {
     ui_name: UiNameType;
-    // --- NEW: Add a user-provided name for the new instance ---
     display_name: string;
     custom_install_path: string | null;
     set_as_active: boolean;
 }
 
+// --- NEW: Add the type for the update request body ---
+export interface UpdateUiInstanceRequest {
+    display_name?: string;
+    path?: string;
+}
+
 export interface ManagedUiStatus {
-    // --- NEW: Add the unique ID and display name for the instance ---
     installation_id: string;
     display_name: string;
-    // --- The ui_name now refers to the *type* of UI (e.g., ComfyUI) ---
     ui_name: UiNameType;
     is_installed: boolean;
     is_running: boolean;
@@ -232,7 +231,6 @@ export interface UiAdoptionAnalysisRequest {
 }
 
 export interface UiAdoptionRepairRequest {
-    // --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameType;
     display_name: string;
     path: string;
@@ -240,7 +238,6 @@ export interface UiAdoptionRepairRequest {
 }
 
 export interface UiAdoptionFinalizeRequest {
-    // --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameType;
     display_name: string;
     path: string;
