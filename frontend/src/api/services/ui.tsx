@@ -6,6 +6,7 @@ import type {
     AllUiStatusResponse,
     UiInstallRequest,
     UiActionResponse,
+    UpdateUiInstanceRequest, // --- NEW: Import the type ---
     AdoptionAnalysisResponse,
     UiAdoptionAnalysisRequest,
     UiAdoptionRepairRequest,
@@ -20,11 +21,6 @@ import type {
 
 // --- UI Management API Functions ---
 
-/**
- * Fetches the list of all available UIs that can be installed.
- * @returns {Promise<AvailableUiItem[]>} A promise that resolves to an array of available UI items.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
     try {
         const response = await apiClient.get<AvailableUiItem[]>('/uis');
@@ -35,11 +31,6 @@ export const listAvailableUisAPI = async (): Promise<AvailableUiItem[]> => {
     }
 };
 
-/**
- * Fetches the current status of all managed UIs (e.g., installed, running).
- * @returns {Promise<AllUiStatusResponse>} A promise that resolves to an object containing the statuses.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
     try {
         const response = await apiClient.get<AllUiStatusResponse>('/uis/status');
@@ -50,12 +41,6 @@ export const getUiStatusesAPI = async (): Promise<AllUiStatusResponse> => {
     }
 };
 
-/**
- * Sends a request to install a specific UI.
- * @param {UiInstallRequest} request - The details of the UI to install.
- * @returns {Promise<UiActionResponse>} A promise that resolves with the response from the server, including a task ID.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const installUiAPI = async (request: UiInstallRequest): Promise<UiActionResponse> => {
     try {
         const response = await apiClient.post<UiActionResponse>('/uis/install', request);
@@ -65,15 +50,19 @@ export const installUiAPI = async (request: UiInstallRequest): Promise<UiActionR
     }
 };
 
-/**
- * @refactor {CRITICAL} Updated function to accept `installationId` instead of `uiName`.
- * This aligns with the backend's instance-based routing.
- *
- * Sends a request to run an installed UI instance.
- * @param {string} installationId - The unique ID of the UI instance to run.
- * @returns {Promise<UiActionResponse>} A promise that resolves with the response from the server, including a task ID.
- * @throws Will throw a standardized error from handleApiError.
- */
+// --- NEW: API function to update a UI instance ---
+export const updateUiInstanceAPI = async (
+    installationId: string,
+    data: UpdateUiInstanceRequest,
+): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await apiClient.put(`/uis/${installationId}`, data);
+        return response.data;
+    } catch (error) {
+        throw handleApiError(error, 'Failed to update UI instance.');
+    }
+};
+
 export const runUiAPI = async (installationId: string): Promise<UiActionResponse> => {
     try {
         const response = await apiClient.post<UiActionResponse>(`/uis/run/${installationId}`);
@@ -83,12 +72,6 @@ export const runUiAPI = async (installationId: string): Promise<UiActionResponse
     }
 };
 
-/**
- * Sends a request to stop a running UI task.
- * @param {string} taskId - The ID of the running task to stop.
- * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; message: string }> => {
     try {
         const response = await apiClient.post('/uis/stop', { task_id: taskId });
@@ -98,12 +81,6 @@ export const stopUiAPI = async (taskId: string): Promise<{ success: boolean; mes
     }
 };
 
-/**
- * Sends a request to cancel an ongoing UI-related task (e.g., installation).
- * @param {string} taskId - The ID of the task to cancel.
- * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const cancelUiTaskAPI = async (
     taskId: string,
 ): Promise<{ success: boolean; message: string }> => {
@@ -118,15 +95,6 @@ export const cancelUiTaskAPI = async (
     }
 };
 
-/**
- * @refactor {CRITICAL} Updated function to accept `installationId` instead of `uiName`.
- * This aligns with the backend's instance-based routing for deletion.
- *
- * Sends a request to delete/uninstall a UI instance.
- * @param {string} installationId - The unique ID of the UI instance to delete.
- * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const deleteUiAPI = async (
     installationId: string,
 ): Promise<{ success: boolean; message: string }> => {
@@ -140,12 +108,6 @@ export const deleteUiAPI = async (
 
 // --- UI Adoption API Functions ---
 
-/**
- * Analyzes an existing UI installation to check if it can be "adopted" and managed.
- * @param {UiAdoptionAnalysisRequest} request - The details of the UI path to analyze.
- * @returns {Promise<AdoptionAnalysisResponse>} A promise that resolves with the analysis results.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const analyzeUiForAdoptionAPI = async (
     request: UiAdoptionAnalysisRequest,
 ): Promise<AdoptionAnalysisResponse> => {
@@ -160,12 +122,6 @@ export const analyzeUiForAdoptionAPI = async (
     }
 };
 
-/**
- * Sends a request to repair issues found during the adoption analysis.
- * @param {UiAdoptionRepairRequest} request - The details of the UI and the issues to fix.
- * @returns {Promise<UiActionResponse>} A promise that resolves with the response from the server, including a task ID.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const repairUiAPI = async (request: UiAdoptionRepairRequest): Promise<UiActionResponse> => {
     try {
         const response = await apiClient.post<UiActionResponse>('/uis/adopt/repair', request);
@@ -175,12 +131,6 @@ export const repairUiAPI = async (request: UiAdoptionRepairRequest): Promise<UiA
     }
 };
 
-/**
- * Finalizes the adoption process for a UI, making it fully managed.
- * @param {UiAdoptionFinalizeRequest} request - The details of the UI to finalize.
- * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
- * @throws Will throw a standardized error from handleApiError.
- */
 export const finalizeAdoptionAPI = async (
     request: UiAdoptionFinalizeRequest,
 ): Promise<{ success: boolean; message: string }> => {
