@@ -24,16 +24,10 @@ import { useTaskStore } from '../../state/taskStore';
  * @description
  * This custom hook encapsulates all the business logic, state management, and
  * API interactions for the UI Environments page.
- *
- * @refactor This hook has been significantly updated to manage unique UI instances.
- * All actions (run, stop, delete) now operate on a specific `installation_id`.
- * It provides the main `UiManagementPage` with a clean, instance-based dataset
- * and the functions to interact with each instance.
  */
 export const useUiManagement = () => {
     // --- State from Zustand Stores ---
     const { availableUis, uiStatuses, fetchUiData, isLoading } = useUiStore();
-    // --- FIX: Expose activeTasks for use in the component ---
     const { activeTasks, addTaskToAutoConfigure } = useTaskStore();
 
     // --- Local View State (for modals) ---
@@ -42,10 +36,11 @@ export const useUiManagement = () => {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [uiToDelete, setUiToDelete] = useState<ManagedUiStatus | null>(null);
     const [isAdoptModalOpen, setIsAdoptModalOpen] = useState(false);
+    // --- NEW: State for the Edit Modal ---
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [uiToEdit, setUiToEdit] = useState<ManagedUiStatus | null>(null);
 
     // --- Derived State ---
-
-    // Checks if a specific UI instance is involved in a pending or in-progress task.
     const isUiBusy = useCallback(
         (installationId: string): boolean => {
             const instance = uiStatuses.find((s) => s.installation_id === installationId);
@@ -53,10 +48,8 @@ export const useUiManagement = () => {
 
             return Array.from(activeTasks.values()).some(
                 (task: DownloadStatus) =>
-                    // Match running processes by their task ID
                     (task.repo_id === 'UI Process' &&
                         instance.running_task_id === task.download_id) ||
-                    // Match install/repair tasks by their display name (filename)
                     (task.filename === instance.display_name &&
                         ['pending', 'downloading', 'running'].includes(task.status)),
             );
@@ -64,7 +57,7 @@ export const useUiManagement = () => {
         [activeTasks, uiStatuses],
     );
 
-    // --- Action Handlers (now instance-based) ---
+    // --- Action Handlers ---
 
     const handleInstall = useCallback(
         async (request: UiInstallRequest) => {
@@ -108,6 +101,13 @@ export const useUiManagement = () => {
         setIsDeleteConfirmOpen(false);
         setUiToDelete(null);
     }, [uiToDelete, fetchUiData]);
+
+    // --- NEW: Handler for successful update ---
+    const handleUpdateSuccess = useCallback(() => {
+        setIsEditModalOpen(false);
+        setUiToEdit(null);
+        fetchUiData();
+    }, [fetchUiData]);
 
     const handleRepair = useCallback(
         async (uiName: UiNameType, displayName: string, path: string, issuesToFix: string[]) => {
@@ -153,32 +153,48 @@ export const useUiManagement = () => {
         setIsDeleteConfirmOpen(true);
     };
 
+    // --- NEW: Handlers to open/close the Edit Modal ---
+    const openEditModal = (ui: ManagedUiStatus) => {
+        setUiToEdit(ui);
+        setIsEditModalOpen(true);
+    };
+
+    const closeEditModal = () => {
+        setUiToEdit(null);
+        setIsEditModalOpen(false);
+    };
+
     // --- Return Value ---
     return {
         // State
         isLoading,
         installedUis: uiStatuses,
         availableUis,
-        activeTasks, // --- FIX: Pass activeTasks through to the component ---
+        activeTasks,
         isInstallModalOpen,
         uiToInstall,
         isDeleteConfirmOpen,
         uiToDelete,
         isAdoptModalOpen,
+        isEditModalOpen, // <-- NEW
+        uiToEdit, // <-- NEW
         // Actions
         isUiBusy,
         handleInstall,
         handleRun,
         handleStop,
         handleDelete,
+        handleUpdateSuccess, // <-- NEW
         handleRepair,
         handleFinalizeAdoption,
         openInstallModal,
         requestDelete,
+        openEditModal, // <-- NEW
         // Setters
         setIsInstallModalOpen,
         setIsDeleteConfirmOpen,
         setUiToDelete,
         setIsAdoptModalOpen,
+        closeEditModal, // <-- NEW
     };
 };
