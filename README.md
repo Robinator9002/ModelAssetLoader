@@ -55,14 +55,15 @@ M.A.L. is more than just a downloader. The goal is for it to be the central hub 
 -   [x] Create a new, custom error handling System.
 -   [x] Abstract complex frontend logic into custom hooks.
 
-#### 🎯 **Phase 4: Core Improvements** `(Starting Now)`
+#### 🎯 **Phase 4: Core Improvements** `(Close to Finish)`
 
 -   [x] Fix the start button for every individual AI and give better feedback during startup.
 -   [x] Overwork Error Messages to be more descriptive and user-friendly.
--   [ ] Overwork UI Management to allow changing paths and stacking multiple versions of one UI.
--   [ ] Move the Hooks into a new Subfolder
+-   [x] Overwork UI Management to allow changing paths and stacking multiple versions of one UI.
+-   [x] Move the Hooks into a new Subfolder
+-   [ ] Fix new installation errors
 
-#### 🏁 **Phase 5: The M.A.L. Platform** `(Final Steps)`
+#### 🏁 **Phase 5: The M.A.L. Platform** `(Planning in Progress)`
 
 -   [ ] Integrate more model sources, with **[CivitAI]** as the next major target.
 -   [ ] Expand support to a wider range of applications, including LLM chat interfaces.
