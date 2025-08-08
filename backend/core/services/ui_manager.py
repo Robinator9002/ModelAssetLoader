@@ -121,6 +121,9 @@ class UiManager:
             ).rstrip()
             resolved_path = MANAGED_UIS_ROOT_PATH / safe_folder_name
 
+        # Ensure the root directory exists
+        MANAGED_UIS_ROOT_PATH.mkdir(exist_ok=True)
+
         self.installation_manager.start_install(
             ui_name, resolved_path, task_id, installation_id, display_name
         )
