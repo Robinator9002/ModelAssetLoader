@@ -138,6 +138,11 @@
     transform-origin: top;
 }
 
+.custom-path-section .base-path-selector {
+    display: flex;
+    gap: var(--spacing-unit);
+}
+
 @keyframes slideDownFadeIn {
     from {
         opacity: 0;
