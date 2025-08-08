@@ -89,7 +89,6 @@ class MalFullConfiguration(BaseModel):
     custom_model_type_paths: Dict[str, str]
     color_theme: Optional[ColorThemeTypePydantic]
     config_mode: Optional[ConfigurationModePydantic]
-    # --- REFACTOR: This now stores the unique ID of the installation, not the UI name ---
     automatic_mode_ui: Optional[str] = Field(
         None, description="The unique installation_id for the UI in 'automatic' mode."
     )
@@ -106,7 +105,6 @@ class PathConfigurationRequest(BaseModel):
     custom_model_type_paths: Optional[Dict[str, str]] = Field(None)
     color_theme: Optional[ColorThemeTypePydantic] = Field(None)
     config_mode: Optional[ConfigurationModePydantic] = Field(None)
-    # --- REFACTOR: This now sends the unique ID of the installation ---
     automatic_mode_ui: Optional[str] = Field(
         None, description="The selected installation_id for 'automatic' mode."
     )
@@ -214,7 +212,6 @@ class UiInstallRequest(BaseModel):
     """Request model for installing a UI environment."""
 
     ui_name: UiNameTypePydantic
-    # --- NEW: Add a user-provided name for the new instance ---
     display_name: str = Field(..., description="A user-friendly name for this UI instance.")
     custom_install_path: Optional[str] = Field(
         None, description="An optional user-provided absolute path for the installation."
@@ -228,10 +225,8 @@ class UiInstallRequest(BaseModel):
 class ManagedUiStatus(BaseModel):
     """Represents the status of a single managed UI environment instance."""
 
-    # --- NEW: Add the unique ID and display name for the instance ---
     installation_id: str = Field(..., description="The unique identifier for this installation.")
     display_name: str = Field(..., description="The user-friendly name for this installation.")
-    # --- The ui_name now refers to the *type* of UI (e.g., ComfyUI) ---
     ui_name: UiNameTypePydantic
     is_installed: bool = Field(..., description="Indicates if the UI environment directory exists.")
     is_running: bool = Field(..., description="Indicates if the UI process is currently running.")
@@ -318,7 +313,6 @@ class AdoptionAnalysisResponse(BaseModel):
 class UiAdoptionRepairRequest(BaseModel):
     """Request model to trigger a repair process for an adoption candidate."""
 
-    # --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameTypePydantic
     display_name: str = Field(..., description="A user-friendly name for this new UI instance.")
     path: str = Field(..., description="The absolute path to the directory to be repaired.")
@@ -330,7 +324,6 @@ class UiAdoptionRepairRequest(BaseModel):
 class UiAdoptionFinalizeRequest(BaseModel):
     """Request model to finalize the adoption of a UI, adding it to the registry."""
 
-    # --- NEW: Add display_name for the new instance being adopted ---
     ui_name: UiNameTypePydantic
     display_name: str = Field(..., description="A user-friendly name for this new UI instance.")
     path: str = Field(..., description="The absolute path to the directory to be adopted.")
