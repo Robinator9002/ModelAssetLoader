@@ -3,7 +3,7 @@ import asyncio
 import logging
 import pathlib
 import uuid
-from typing import List
+from typing import List, Optional
 
 from api.models import ManagedUiStatus
 from core.constants.constants import UiNameType
@@ -38,7 +38,6 @@ class UiManager:
         It combines data from the registry and the process manager.
         """
         statuses: List[ManagedUiStatus] = []
-        # --- FIX: Call the new, correct method on the process_manager ---
         running_ui_map = self.process_manager.get_running_tasks_by_installation_id()
 
         for installation_id, details in self.registry.get_all_installations().items():
@@ -64,6 +63,49 @@ class UiManager:
             )
         return statuses
 
+    # --- NEW: Logic to update an existing installation ---
+    def update_installation(
+        self,
+        installation_id: str,
+        new_display_name: Optional[str] = None,
+        new_path_str: Optional[str] = None,
+    ):
+        """
+        Updates the details of a UI instance after performing validation.
+
+        Args:
+            installation_id: The ID of the instance to update.
+            new_display_name: The new display name, if provided.
+            new_path_str: The new absolute path as a string, if provided.
+        """
+        # Validation 1: Check if the UI is currently running.
+        running_task = self.process_manager.get_running_tasks_by_installation_id().get(
+            installation_id
+        )
+        if running_task:
+            raise BadRequestError(
+                "Cannot modify a UI instance while it is running. Please stop it first."
+            )
+
+        new_path = pathlib.Path(new_path_str) if new_path_str else None
+
+        # Validation 2: If a new path is provided, check for conflicts.
+        if new_path:
+            # You might want to add more robust validation here, e.g., checking
+            # if the new path points to a valid UI installation of the correct type.
+            # For now, we'll just check if it conflicts with another *managed* path.
+            for id, details in self.registry.get_all_installations().items():
+                if (
+                    id != installation_id
+                    and pathlib.Path(details["path"]).resolve() == new_path.resolve()
+                ):
+                    raise BadRequestError(
+                        f"The path '{new_path_str}' is already managed by another UI instance ('{details['display_name']}')."
+                    )
+
+        # If validation passes, call the registry to perform the update.
+        self.registry.update_installation(installation_id, new_display_name, new_path)
+
     # --- Delegated Lifecycle Methods ---
 
     def install_ui_environment(
@@ -74,13 +116,10 @@ class UiManager:
         task_id: str,
     ):
         installation_id = str(uuid.uuid4())
-        # This logic assumes install_path is always provided by the router layer.
-        # If it can be None, a default path should be constructed here.
         self.installation_manager.start_install(
             ui_name, install_path, task_id, installation_id, display_name
         )
 
-    # --- FIX: Pass installation_id to the process_manager ---
     def run_ui(self, installation_id: str, task_id: str):
         self.process_manager.start_process(installation_id, task_id)
 
@@ -96,7 +135,6 @@ class UiManager:
             raise EntityNotFoundError(entity_name="UI Installation", entity_id=installation_id)
 
         install_path = pathlib.Path(details["path"])
-        # --- FIX: Use the correct method to find the running task ---
         running_task_id = self.process_manager.get_running_tasks_by_installation_id().get(
             installation_id
         )
