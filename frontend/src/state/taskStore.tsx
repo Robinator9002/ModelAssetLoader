@@ -6,7 +6,6 @@ import {
     dismissDownloadAPI,
     // Type definitions
     type DownloadStatus,
-    type UiNameType,
 } from '~/api';
 import { useUiStore } from './uiStore';
 import { useConfigStore } from './configStore';
@@ -83,19 +82,33 @@ export const useTaskStore = create<TaskState>((set, get) => ({
                                 useUiStore.getState().fetchUiData();
                             }
 
-                            // If the completed task was marked for auto-configuration...
-                            if (get().tasksToAutoConfigure.has(status.download_id)) {
-                                const uiName = status.filename as UiNameType;
+                            // --- PHASE 2.2 MODIFICATION: Handle Auto-Configuration ---
+                            // Check if the completed task was marked for auto-configuration
+                            // AND if the backend provided the necessary installation_id.
+                            if (
+                                get().tasksToAutoConfigure.has(status.download_id) &&
+                                status.installation_id
+                            ) {
+                                // The `repo_id` for UI tasks is the `ui_name` (e.g., 'ComfyUI').
+                                const uiName = status.repo_id;
                                 const { availableUis } = useUiStore.getState();
                                 const uiInfo = availableUis.find((ui) => ui.ui_name === uiName);
 
                                 if (uiInfo) {
-                                    // Trigger the configuration update in the config store.
+                                    // Trigger the configuration update in the config store,
+                                    // using the new installation_id.
+                                    console.log(
+                                        `Auto-configuring to new instance: ${status.installation_id}`,
+                                    );
                                     useConfigStore.getState().updateConfiguration({
                                         config_mode: 'automatic',
-                                        automatic_mode_ui: uiName,
+                                        automatic_mode_ui: status.installation_id,
                                         profile: uiInfo.default_profile_name,
                                     });
+                                } else {
+                                    console.warn(
+                                        `Could not auto-configure: UI type '${uiName}' not found in availableUis.`,
+                                    );
                                 }
 
                                 // Clean up the task from the auto-configure set.
