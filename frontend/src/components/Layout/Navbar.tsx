@@ -13,6 +13,8 @@ import {
     Play,
     Power,
 } from 'lucide-react';
+// --- PHASE 2.4 MODIFICATION: Import the new status type ---
+import { type WsConnectionStatus } from '../../state/taskStore';
 import { type DownloadSummaryStatus } from '../../App';
 
 export interface NavItemConfig {
@@ -28,25 +30,16 @@ const navItems: NavItemConfig[] = [
     { key: '/configuration', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
-/**
- * @refactor This component has been updated for react-router-dom.
- * It no longer takes `activeTab` or `onTabChange` props. Instead, it uses
- * the `NavLink` component, which automatically handles the 'active' state
- * based on the current URL, fully decoupling navigation from App.tsx.
- */
 interface NavbarProps {
     onToggleDownloads: () => void;
     downloadStatus: DownloadSummaryStatus;
     downloadCount: number;
-    /**
-     * @fix {TYPESCRIPT} Changed type from `UiNameType | null` to `string | null`.
-     * This is the fix for the TypeScript error. The quick-start button now correctly
-     * accepts any user-defined `display_name` string, not just the restrictive enum.
-     */
     activeUiName: string | null;
     isUiInstalled: boolean;
     isUiRunning: boolean;
     onQuickStart: () => void;
+    // --- PHASE 2.4 MODIFICATION: Add prop to receive WebSocket connection status ---
+    wsStatus: WsConnectionStatus;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -57,6 +50,7 @@ const Navbar: React.FC<NavbarProps> = ({
     isUiInstalled,
     isUiRunning,
     onQuickStart,
+    wsStatus, // Destructure the new prop
 }) => {
     const getDownloadStatusIcon = () => {
         switch (downloadStatus) {
@@ -95,6 +89,17 @@ const Navbar: React.FC<NavbarProps> = ({
             </nav>
 
             <div className="navbar-actions">
+                {/* --- PHASE 2.4 MODIFICATION: Add a visual indicator for reconnection --- */}
+                {wsStatus === 'reconnecting' && (
+                    <div
+                        className="ws-reconnecting-indicator"
+                        title="Connection to server lost. Attempting to reconnect..."
+                    >
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Reconnecting...</span>
+                    </div>
+                )}
+
                 {showQuickStartButton && (
                     <button
                         className={`quick-start-button ${isUiRunning ? 'running' : 'stopped'}`}
