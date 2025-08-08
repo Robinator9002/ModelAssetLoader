@@ -1,5 +1,6 @@
 // frontend/src/api/services/fileManager.tsx
 import apiClient from '../client';
+import { handleApiError } from '../errorHandler';
 import type {
     FileDownloadRequest,
     FileDownloadResponse,
@@ -24,7 +25,7 @@ import type {
  * Initiates a file download from a source repository.
  * @param {FileDownloadRequest} request - The details of the file to be downloaded.
  * @returns {Promise<FileDownloadResponse>} A promise that resolves with the download status and ID.
- * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const downloadFileAPI = async (
     request: FileDownloadRequest,
@@ -36,11 +37,7 @@ export const downloadFileAPI = async (
         );
         return response.data;
     } catch (error) {
-        const axiosError = error as any;
-        if (axiosError.response && axiosError.response.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
+        throw handleApiError(error, 'Failed to start file download.');
     }
 };
 
@@ -48,7 +45,7 @@ export const downloadFileAPI = async (
  * Sends a request to cancel an in-progress download.
  * @param {string} downloadId - The unique identifier of the download to cancel.
  * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
- * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const cancelDownloadAPI = async (
     downloadId: string,
@@ -59,11 +56,7 @@ export const cancelDownloadAPI = async (
         });
         return response.data;
     } catch (error) {
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
+        throw handleApiError(error, 'Failed to cancel download.');
     }
 };
 
@@ -71,7 +64,7 @@ export const cancelDownloadAPI = async (
  * Dismisses a completed or failed download from the tracker.
  * @param {string} downloadId - The unique identifier of the download to dismiss.
  * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
- * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const dismissDownloadAPI = async (
     downloadId: string,
@@ -83,11 +76,7 @@ export const dismissDownloadAPI = async (
         return response.data;
     } catch (error) {
         console.error(`Error dismissing download ${downloadId}:`, error);
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
+        throw handleApiError(error, 'Failed to dismiss task.');
     }
 };
 
@@ -95,7 +84,7 @@ export const dismissDownloadAPI = async (
  * Configures the base paths and model type paths for the file manager.
  * @param {PathConfigurationRequest} config - The configuration settings to apply.
  * @returns {Promise<PathConfigurationResponse>} A promise that resolves with the result of the operation.
- * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const configurePathsAPI = async (
     config: PathConfigurationRequest,
@@ -107,18 +96,14 @@ export const configurePathsAPI = async (
         );
         return response.data;
     } catch (error) {
-        const axiosError = error as any;
-        if (axiosError.response && axiosError.response.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
+        throw handleApiError(error, 'Failed to save configuration.');
     }
 };
 
 /**
  * Fetches the current, complete configuration from the server.
  * @returns {Promise<MalFullConfiguration>} A promise that resolves to the full configuration object.
- * @throws Will throw an error if the network request fails.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration> => {
     try {
@@ -126,7 +111,7 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
         return response.data;
     } catch (error) {
         console.error('Error fetching current configuration:', error);
-        throw error;
+        throw handleApiError(error, 'Failed to load application configuration.');
     }
 };
 
@@ -134,7 +119,7 @@ export const getCurrentConfigurationAPI = async (): Promise<MalFullConfiguration
  * Fetches known UI profiles from the backend. This eliminates hardcoded constants
  * in the frontend, making the backend the single source of truth for model path structures.
  * @returns {Promise<Record<string, Record<string, string>>>} A promise that resolves to a map of UI profiles.
- * @throws Will throw an error if the network request fails.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const getKnownUiProfilesAPI = async (): Promise<Record<string, Record<string, string>>> => {
     try {
@@ -142,7 +127,7 @@ export const getKnownUiProfilesAPI = async (): Promise<Record<string, Record<str
         return response.data;
     } catch (error) {
         console.error('Error fetching known UI profiles:', error);
-        throw error;
+        throw handleApiError(error, 'Failed to fetch UI profiles.');
     }
 };
 
@@ -151,7 +136,7 @@ export const getKnownUiProfilesAPI = async (): Promise<Record<string, Record<str
  * @param {string} [path] - The starting path to scan. Defaults to the root if not provided.
  * @param {number} [depth=1] - The maximum depth to scan.
  * @returns {Promise<ScanHostDirectoriesResponse>} A promise that resolves with the directory structure.
- * @throws Will throw a specific error message if the API returns one, or a generic error.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const scanHostDirectoriesAPI = async (
     path?: string,
@@ -168,11 +153,7 @@ export const scanHostDirectoriesAPI = async (
         );
         return response.data;
     } catch (error) {
-        const axiosError = error as any;
-        if (axiosError.response && axiosError.response.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw new Error('An unknown error occurred while scanning directories.');
+        throw handleApiError(error, 'An unknown error occurred while scanning directories.');
     }
 };
 
@@ -181,7 +162,7 @@ export const scanHostDirectoriesAPI = async (
  * @param {string | null} relativePath - The path relative to the managed base directory.
  * @param {ViewMode} mode - The view mode ('models' or 'explorer').
  * @returns {Promise<FileManagerListResponse>} A promise that resolves with the list of items.
- * @throws Will throw an error if the network request fails.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const listManagedFilesAPI = async (
     relativePath: string | null,
@@ -194,7 +175,7 @@ export const listManagedFilesAPI = async (
         return response.data;
     } catch (error) {
         console.error('Error listing managed files:', error);
-        throw error;
+        throw handleApiError(error, 'Failed to list managed files.');
     }
 };
 
@@ -202,7 +183,7 @@ export const listManagedFilesAPI = async (
  * Deletes a file or directory from the managed file system.
  * @param {string} relativePath - The path of the item to delete, relative to the managed base directory.
  * @returns {Promise<{ success: boolean; message: string }>} A promise that resolves with a success status and message.
- * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const deleteManagedItemAPI = async (
     relativePath: string,
@@ -214,11 +195,7 @@ export const deleteManagedItemAPI = async (
         );
         return response.data;
     } catch (error) {
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
+        throw handleApiError(error, 'Failed to delete item.');
     }
 };
 
@@ -226,7 +203,7 @@ export const deleteManagedItemAPI = async (
  * Fetches a preview of a file's content (e.g., for text files).
  * @param {string} relativePath - The path of the file to preview.
  * @returns {Promise<FilePreviewResponse>} A promise that resolves with the file content or an error.
- * @throws Will throw a specific error message if the API returns one, otherwise a generic error.
+ * @throws Will throw a standardized error from handleApiError.
  */
 export const getFilePreviewAPI = async (relativePath: string): Promise<FilePreviewResponse> => {
     try {
@@ -235,10 +212,6 @@ export const getFilePreviewAPI = async (relativePath: string): Promise<FilePrevi
         });
         return response.data;
     } catch (error) {
-        const axiosError = error as any;
-        if (axiosError.response?.data?.detail) {
-            throw new Error(axiosError.response.data.detail);
-        }
-        throw error;
+        throw handleApiError(error, 'Failed to get file preview.');
     }
 };
