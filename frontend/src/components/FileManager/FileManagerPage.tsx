@@ -1,7 +1,7 @@
 // frontend/src/components/FileManager/FileManagerPage.tsx
 import React from 'react';
 // --- REFACTOR: Import the new custom hook ---
-import { useFileManager } from './useFileManager';
+import { useFileManager } from '../../hooks/useFileManager';
 
 // --- Component & Icon Imports ---
 import { Loader2, AlertTriangle, ArrowLeft, RefreshCw, Home, Info } from 'lucide-react';

@@ -2,7 +2,7 @@
 import React from 'react';
 // --- FIX: Import useNavigate to handle navigation directly ---
 import { useNavigate } from 'react-router-dom';
-import { useModelSearch } from './useModelSearch';
+import { useModelSearch } from '../../hooks/useModelSearch';
 import { type ModelListItem } from '~/api';
 import { Download, Info, Loader2, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react';
 

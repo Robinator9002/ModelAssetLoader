@@ -15,8 +15,8 @@ import {
     type DownloadStatus,
     type ManagedUiStatus,
 } from '~/api';
-import { useUiStore } from '../../state/uiStore';
-import { useTaskStore } from '../../state/taskStore';
+import { useUiStore } from '../state/uiStore';
+import { useTaskStore } from '../state/taskStore';
 
 /**
  * @hook useUiManagement

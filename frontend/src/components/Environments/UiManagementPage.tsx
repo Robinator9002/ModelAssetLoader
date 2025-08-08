@@ -1,6 +1,6 @@
 // frontend/src/components/Environments/UiManagementPage.tsx
 import React from 'react';
-import { useUiManagement } from './useUiManagement';
+import { useUiManagement } from '../../hooks/useUiManagement';
 import {
     Layers,
     Download,

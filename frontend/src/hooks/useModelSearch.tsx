@@ -7,8 +7,8 @@ import {
     type ModelListItem,
     type PaginatedModelListResponse,
 } from '~/api';
-import { useModalStore } from '../../state/modalStore';
-import { useConfigStore } from '../../state/configStore';
+import { useModalStore } from '../state/modalStore';
+import { useConfigStore } from '../state/configStore';
 
 /**
  * @hook useModelSearch

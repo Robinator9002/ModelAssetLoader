@@ -8,7 +8,7 @@ import {
     type LocalFileItem,
     type ViewMode,
 } from '~/api';
-import { useConfigStore } from '../../state/configStore';
+import { useConfigStore } from '../state/configStore';
 
 /**
  * @hook useFileManager
