@@ -126,7 +126,9 @@ export interface DownloadStatus {
     error_message?: string | null;
     status_text?: string | null;
     target_path?: string | null;
-    set_as_active_on_completion?: boolean;
+    // --- FIX: Add the new optional field to match the backend payload ---
+    // This resolves the TypeScript error in the taskStore.
+    installation_id?: string | null;
 }
 
 // --- Host Directory Scanning Interfaces ---
