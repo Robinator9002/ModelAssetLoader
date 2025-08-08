@@ -12,7 +12,7 @@ from api.models import (
     AllUiStatusResponse,
     UiActionResponse,
     UiInstallRequest,
-    UiNameTypePydantic,
+    UpdateUiInstanceRequest,  # --- NEW: Import the request model for updates ---
     AdoptionAnalysisResponse,
     UiAdoptionAnalysisRequest,
     UiAdoptionRepairRequest,
@@ -82,6 +82,38 @@ async def get_all_ui_statuses_endpoint(um: UiManager = Depends(get_ui_manager)):
         )
 
 
+# --- NEW: Endpoint to update an existing UI instance ---
+@router.put(
+    "/{installation_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Update a UI Instance",
+)
+async def update_ui_instance_endpoint(
+    installation_id: str,
+    request: UpdateUiInstanceRequest,
+    um: UiManager = Depends(get_ui_manager),
+):
+    """Updates the display name or path of a registered UI instance."""
+    try:
+        um.update_installation(
+            installation_id=installation_id,
+            new_display_name=request.display_name,
+            new_path_str=request.path,
+        )
+        return {"success": True, "message": "UI instance updated successfully."}
+    except MalError as e:
+        logger.error(f"[{e.error_code}] Error updating UI instance: {e.message}", exc_info=False)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.critical(
+            f"An unhandled exception occurred during UI instance update: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected internal error occurred during UI instance update.",
+        )
+
+
 @router.post(
     "/install",
     response_model=UiActionResponse,
@@ -93,11 +125,9 @@ async def install_ui_endpoint(
     """Triggers the installation of a new UI instance as a background task."""
     task_id = str(uuid.uuid4())
     try:
-        # --- REFACTOR: Pass the new display_name to the manager ---
         um.install_ui_environment(
             ui_name=request.ui_name,
             display_name=request.display_name,
-            # Path logic remains simple here; manager/installer handles complexity
             install_path=(
                 pathlib.Path(request.custom_install_path) if request.custom_install_path else None
             ),
@@ -121,7 +151,6 @@ async def install_ui_endpoint(
         )
 
 
-# --- REFACTOR: Route now uses installation_id ---
 @router.post(
     "/run/{installation_id}",
     response_model=UiActionResponse,
@@ -194,7 +223,6 @@ async def cancel_ui_task_endpoint(request: UiTaskRequest, um: UiManager = Depend
         )
 
 
-# --- REFACTOR: Route now uses installation_id ---
 @router.delete(
     "/{installation_id}",
     status_code=status.HTTP_200_OK,
@@ -266,7 +294,6 @@ async def repair_and_adopt_endpoint(
     """Triggers a repair-and-adopt process as a background task."""
     try:
         task_id = str(uuid.uuid4())
-        # --- REFACTOR: Pass the new display_name to the manager ---
         um.repair_and_adopt_ui(
             ui_name=request.ui_name,
             display_name=request.display_name,
@@ -306,7 +333,6 @@ async def finalize_adoption_endpoint(
 ):
     """Finalizes the adoption of a healthy UI by simply registering it."""
     try:
-        # --- REFACTOR: Pass the new display_name to the manager ---
         um.finalize_adoption(request.ui_name, request.display_name, pathlib.Path(request.path))
         return {"success": True, "message": f"'{request.display_name}' adopted successfully."}
     except MalError as e:
