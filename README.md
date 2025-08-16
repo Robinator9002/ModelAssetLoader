@@ -63,11 +63,17 @@ M.A.L. is more than just a downloader. The goal is for it to be the central hub 
 -   [x] Move the Hooks into a new Subfolder
 -   [ ] Fix new installation errors
 
-#### 🏁 **Phase 5: The M.A.L. Platform** `(Planning in Progress)`
+#### 🌐 **Phase 5: The M.A.L. Platform** `(Up Next)`
 
 -   [ ] Integrate more model sources, with **[CivitAI]** as the next major target.
 -   [ ] Expand support to a wider range of applications, including LLM chat interfaces.
 -   [ ] Create comprehensive documentation on a dedicated website.
+
+#### 🏁 **Phase 6: Compatibility and Broadening Support** `(Planning in Progress)`
+-   [ ] Implement GPU-specific optimizations and detection for AMD and Intel, in addition to existing NVIDIA support.
+-   [ ] Expand detailed distro support for Linux and macOS, including custom shell script management.
+-   [ ] Add functionality to manage custom additions and extensions for AI UIs (e.g., custom nodes for ComfyUI, extensions for A1111).
+-   [ ] Develop a system for users to create and share their own custom path configurations for non-standard installations.
 
 ---
 
